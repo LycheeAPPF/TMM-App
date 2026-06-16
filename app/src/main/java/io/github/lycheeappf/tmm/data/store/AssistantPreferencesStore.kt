@@ -47,9 +47,13 @@ class AssistantPreferencesStore @Inject constructor(
     suspend fun systemPrompt(): String =
         resolveDriverTemplate(systemPromptRaw(), driverName())
 
-    /** Rohes Template inkl. {driver}-Token (für den Settings-Editor). */
+    /**
+     * Rohes Template inkl. {driver}-Token (für den Settings-Editor). Der Default
+     * greift NUR, wenn der Key noch nie gesetzt wurde (null) — ein bewusst geleertes
+     * Feld bleibt leer, statt im Editor auf den langen Default zurückzuspringen.
+     */
     suspend fun systemPromptRaw(): String =
-        store.data.first()[KEY_SYSTEM_PROMPT].orEmpty().ifBlank { DEFAULT_SYSTEM_PROMPT }
+        store.data.first()[KEY_SYSTEM_PROMPT] ?: DEFAULT_SYSTEM_PROMPT
 
     suspend fun setSystemPrompt(value: String) {
         store.edit { it[KEY_SYSTEM_PROMPT] = value }
@@ -67,16 +71,21 @@ class AssistantPreferencesStore @Inject constructor(
         store.data.first()[KEY_DRIVER_NAME] ?: DEFAULT_DRIVER_NAME
 
     suspend fun setDriverName(value: String) {
-        store.edit { it[KEY_DRIVER_NAME] = value.trim() }
+        // Nicht beim Tippen trimmen — sonst lässt sich kein Leerzeichen setzen.
+        // resolveDriverTemplate trimmt erst beim Einsetzen (Runtime).
+        store.edit { it[KEY_DRIVER_NAME] = value }
     }
 
     /** Welcome mit eingesetztem Fahrernamen (RUNTIME). Editor: [welcomeMessageRaw]. */
     suspend fun welcomeMessage(): String =
         resolveDriverTemplate(welcomeMessageRaw(), driverName())
 
-    /** Rohes Welcome-Template inkl. {driver}-Token (für den Settings-Editor). */
+    /**
+     * Rohes Welcome-Template inkl. {driver}-Token (für den Settings-Editor). Default
+     * nur bei nie gesetztem Key (null); ein geleertes Feld bleibt leer.
+     */
     suspend fun welcomeMessageRaw(): String =
-        store.data.first()[KEY_WELCOME].orEmpty().ifBlank { DEFAULT_WELCOME }
+        store.data.first()[KEY_WELCOME] ?: DEFAULT_WELCOME
 
     suspend fun setWelcomeMessage(value: String) {
         store.edit { it[KEY_WELCOME] = value }

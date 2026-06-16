@@ -10,6 +10,8 @@ import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +50,11 @@ class AssistantViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AssistantUiState())
     val uiState: StateFlow<AssistantUiState> = _uiState.asStateFlow()
 
+    // Pro Editor-Feld ein laufender (debounced) Persist-Job. Solange einer aktiv
+    // ist, gilt das Feld als "in Bearbeitung" und wird von refresh() nicht von der
+    // Platte überschrieben.
+    private val persistJobs = mutableMapOf<String, Job>()
+
     init { refresh() }
 
     fun refresh() {
@@ -69,7 +76,29 @@ class AssistantViewModel @Inject constructor(
                     privacyConsent = prefs.isPrivacyConsentGiven()
                 )
             }
-            _uiState.value = snapshot
+            // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
+            // Felder NICHT von der Platte überschreiben — sonst verwirft ein Resume
+            // die noch nicht gespeicherten Zeichen. Extern bestimmte Felder
+            // (API-Key gesetzt?, Consent) trotzdem übernehmen.
+            val persisting = persistJobs.values.any { it.isActive }
+            _uiState.update { cur ->
+                if (persisting) {
+                    snapshot.copy(
+                        assistantName = cur.assistantName,
+                        driverName = cur.driverName,
+                        systemPrompt = cur.systemPrompt,
+                        welcomeMessage = cur.welcomeMessage,
+                        model = cur.model,
+                        contextTtlSeconds = cur.contextTtlSeconds,
+                        maxTokens = cur.maxTokens,
+                        temperature = cur.temperature,
+                        rateLimitPerMin = cur.rateLimitPerMin,
+                        rateLimitPerHour = cur.rateLimitPerHour
+                    )
+                } else {
+                    snapshot
+                }
+            }
         }
     }
 
@@ -115,17 +144,45 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
-    fun setAssistantName(value: String) = update(value) { prefs.setAssistantDisplayName(it) }
-    fun setDriverName(value: String) = update(value) { prefs.setDriverName(it) }
-    fun setSystemPrompt(value: String) = update(value) { prefs.setSystemPrompt(it) }
-    fun setWelcome(value: String) = update(value) { prefs.setWelcomeMessage(it) }
-    fun setModel(value: String) = update(value) { prefs.setModel(it) }
+    fun setAssistantName(value: String) =
+        edit("assistant_name", { it.copy(assistantName = value) }) { prefs.setAssistantDisplayName(value) }
 
-    fun setContextTtl(value: Int) = updateInt(value, 30, 600) { prefs.setContextTtlSeconds(it) }
-    fun setMaxTokens(value: Int) = updateInt(value, 64, 2048) { prefs.setMaxTokens(it) }
-    fun setTemperature(value: Float) = updateFloat(value, 0f, 1.5f) { prefs.setTemperature(it) }
-    fun setRateLimitPerMin(value: Int) = updateInt(value, 1, 60) { prefs.setMaxRequestsPerMin(it) }
-    fun setRateLimitPerHour(value: Int) = updateInt(value, 1, 600) { prefs.setMaxRequestsPerHour(it) }
+    fun setDriverName(value: String) =
+        edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
+
+    fun setSystemPrompt(value: String) =
+        edit("system_prompt", { it.copy(systemPrompt = value) }) { prefs.setSystemPrompt(value) }
+
+    fun setWelcome(value: String) =
+        edit("welcome", { it.copy(welcomeMessage = value) }) { prefs.setWelcomeMessage(value) }
+
+    fun setModel(value: String) =
+        edit("model", { it.copy(model = value) }) { prefs.setModel(value) }
+
+    fun setContextTtl(value: Int) {
+        val clamped = value.coerceIn(30, 600)
+        edit("context_ttl", { it.copy(contextTtlSeconds = clamped) }) { prefs.setContextTtlSeconds(clamped) }
+    }
+
+    fun setMaxTokens(value: Int) {
+        val clamped = value.coerceIn(64, 2048)
+        edit("max_tokens", { it.copy(maxTokens = clamped) }) { prefs.setMaxTokens(clamped) }
+    }
+
+    fun setTemperature(value: Float) {
+        val clamped = value.coerceIn(0f, 1.5f)
+        edit("temperature", { it.copy(temperature = clamped) }) { prefs.setTemperature(clamped) }
+    }
+
+    fun setRateLimitPerMin(value: Int) {
+        val clamped = value.coerceIn(1, 60)
+        edit("rate_per_min", { it.copy(rateLimitPerMin = clamped) }) { prefs.setMaxRequestsPerMin(clamped) }
+    }
+
+    fun setRateLimitPerHour(value: Int) {
+        val clamped = value.coerceIn(1, 600)
+        edit("rate_per_hour", { it.copy(rateLimitPerHour = clamped) }) { prefs.setMaxRequestsPerHour(clamped) }
+    }
 
     fun setPrivacyConsent(granted: Boolean) {
         viewModelScope.launch(ioDispatcher) {
@@ -155,26 +212,27 @@ class AssistantViewModel @Inject constructor(
 
     fun consumeFeedback() = _uiState.update { it.copy(lastFeedback = null) }
 
-    private fun update(value: String, block: suspend (String) -> Unit) {
-        viewModelScope.launch(ioDispatcher) {
-            block(value)
-            refresh()
+    /**
+     * Aktualisiert ein Editor-Feld SOFORT im UI-State, damit das controlled
+     * OutlinedTextField das getippte Zeichen ohne Verzögerung anzeigt, und
+     * persistiert den Wert erst debounced. Es wird bewusst NICHT pro Tastendruck
+     * der komplette State neu von der Platte gelesen (das frühere refresh()) — genau
+     * das ließ Zeichen "wegbuggen" und Felder leer zurückspringen.
+     */
+    private fun edit(
+        key: String,
+        applyToState: (AssistantUiState) -> AssistantUiState,
+        persist: suspend () -> Unit
+    ) {
+        _uiState.update(applyToState)
+        persistJobs[key]?.cancel()
+        persistJobs[key] = viewModelScope.launch(ioDispatcher) {
+            delay(PERSIST_DEBOUNCE_MS)
+            persist()
         }
     }
 
-    private fun updateInt(value: Int, min: Int, max: Int, block: suspend (Int) -> Unit) {
-        val clamped = value.coerceIn(min, max)
-        viewModelScope.launch(ioDispatcher) {
-            block(clamped)
-            refresh()
-        }
-    }
-
-    private fun updateFloat(value: Float, min: Float, max: Float, block: suspend (Float) -> Unit) {
-        val clamped = value.coerceIn(min, max)
-        viewModelScope.launch(ioDispatcher) {
-            block(clamped)
-            refresh()
-        }
+    companion object {
+        private const val PERSIST_DEBOUNCE_MS = 350L
     }
 }
