@@ -32,7 +32,8 @@ fun MfsNavHost(
                     navController.navigate(MfsDestination.Home.route) {
                         popUpTo(MfsDestination.Onboarding.route) { inclusive = true }
                     }
-                }
+                },
+                onOpenWhitelist = { navController.navigate(MfsDestination.Whitelist.route) }
             )
         }
         composable(MfsDestination.Home.route) {

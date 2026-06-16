@@ -37,14 +37,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.ui.component.MfsMotion
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
+import io.github.lycheeappf.tmm.ui.component.SettingCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.component.StepCard
 import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
@@ -55,6 +58,7 @@ import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 @Composable
 fun OnboardingScreen(
     onFinished: () -> Unit,
+    onOpenWhitelist: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -216,6 +220,18 @@ fun OnboardingScreen(
                     targetAddress = state.preflightTargetAddress,
                     onAcknowledge = { viewModel.acknowledgeRisk() }
                 )
+            }
+
+            // Optionaler Schritt: jetzt schon wählen, welche Messenger-Apps ans Tesla
+            // gehen. Standardmäßig ist keine App aktiv. Nicht erforderlich, um das
+            // Setup abzuschließen — der Grok-Assistent läuft auch ohne freigegebene App.
+            SettingCard(
+                title = stringResource(R.string.onboarding_title_whitelist),
+                description = stringResource(R.string.onboarding_body_whitelist)
+            ) {
+                OutlinedButton(onClick = onOpenWhitelist) {
+                    Text(stringResource(R.string.onboarding_action_configure_whitelist))
+                }
             }
 
             Button(
