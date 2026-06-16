@@ -44,7 +44,7 @@ class MappingRepositoryImpl @Inject constructor(
         val existing = dao.findByConversationKey(channel.code, conversationKey)
         if (existing != null) {
             val newReplyable = payload.isReplyable
-            // CX7: einmal replyable, bleibt replyable. Wenn Beeper eine Folge-
+            // CX7: einmal replyable, bleibt replyable. Wenn ein Messenger eine Folge-
             // Notification ohne RemoteInput postet (z.B. "delivered"-Update),
             // soll der Chat weiter beantwortbar bleiben.
             val effectiveReplyable = existing.replyable || newReplyable

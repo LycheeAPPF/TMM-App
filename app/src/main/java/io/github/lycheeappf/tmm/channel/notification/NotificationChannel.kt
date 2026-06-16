@@ -9,7 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Channel für Tesla-Antworten, die an die Original-Notification (Beeper, WhatsApp,
+ * Channel für Tesla-Antworten, die an die Original-Notification (WhatsApp, Telegram,
  * Signal, ...) zurückgehen sollen. Triggert die RemoteInput-Action der Notification.
  *
  * Wird in Phase 3 mit [NotificationReplyExecutor] verkabelt.

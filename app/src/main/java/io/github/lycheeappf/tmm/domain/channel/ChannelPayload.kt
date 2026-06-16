@@ -24,8 +24,7 @@ sealed class ChannelPayload {
         val notificationKey: String,
         val remoteInputResultKey: String?,
         val conversationLabel: String,
-        val senderDisplayName: String,
-        val bridgeHint: String? = null
+        val senderDisplayName: String
     ) : ChannelPayload() {
         override val isReplyable: Boolean get() = remoteInputResultKey != null
     }

@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class MessagingStyleExtractorTest {
 
-    private val extractor = MessagingStyleExtractor(BeeperExtractor())
+    private val extractor = MessagingStyleExtractor()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
@@ -25,11 +25,11 @@ class MessagingStyleExtractorTest {
             .setContentText("Hallo!")
             .build()
 
-        val result = extractor.extractFromNotification("com.beeper.android", notif)
+        val result = extractor.extractFromNotification("com.whatsapp", notif)
         assertThat(result).isNotNull()
         assertThat(result!!.senderName).isEqualTo("Anna")
         assertThat(result.body).isEqualTo("Hallo!")
-        assertThat(result.conversationKey).startsWith("com.beeper.android::")
+        assertThat(result.conversationKey).startsWith("com.whatsapp::")
     }
 
     @Test
@@ -37,20 +37,20 @@ class MessagingStyleExtractorTest {
         val notif = NotificationCompat.Builder(context, "ch")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
-        assertThat(extractor.extractFromNotification("com.beeper.android", notif)).isNull()
+        assertThat(extractor.extractFromNotification("com.whatsapp", notif)).isNull()
     }
 
     @Test
     fun `returns null when notification is null`() {
-        assertThat(extractor.extractFromNotification("com.beeper.android", null)).isNull()
+        assertThat(extractor.extractFromNotification("com.whatsapp", null)).isNull()
     }
 
     @Test
     fun `conversation key is stable for same package + title`() {
         val notif1 = buildNotif("Anna", "Erste Nachricht")
         val notif2 = buildNotif("Anna", "Zweite Nachricht")
-        val key1 = extractor.extractFromNotification("com.beeper.android", notif1)?.conversationKey
-        val key2 = extractor.extractFromNotification("com.beeper.android", notif2)?.conversationKey
+        val key1 = extractor.extractFromNotification("com.whatsapp", notif1)?.conversationKey
+        val key2 = extractor.extractFromNotification("com.whatsapp", notif2)?.conversationKey
         assertThat(key1).isEqualTo(key2)
     }
 
@@ -58,17 +58,17 @@ class MessagingStyleExtractorTest {
     fun `conversation key differs between different senders in same app`() {
         val notifAnna = buildNotif("Anna", "Hi")
         val notifMax = buildNotif("Max", "Hi")
-        val keyAnna = extractor.extractFromNotification("com.beeper.android", notifAnna)?.conversationKey
-        val keyMax = extractor.extractFromNotification("com.beeper.android", notifMax)?.conversationKey
+        val keyAnna = extractor.extractFromNotification("com.whatsapp", notifAnna)?.conversationKey
+        val keyMax = extractor.extractFromNotification("com.whatsapp", notifMax)?.conversationKey
         assertThat(keyAnna).isNotEqualTo(keyMax)
     }
 
     @Test
     fun `conversation key differs between different apps even with same title`() {
         val notif = buildNotif("Anna", "Hi")
-        val keyBeeper = extractor.extractFromNotification("com.beeper.android", notif)?.conversationKey
+        val keyWhatsapp = extractor.extractFromNotification("com.whatsapp", notif)?.conversationKey
         val keyOther = extractor.extractFromNotification("com.other.app", notif)?.conversationKey
-        assertThat(keyBeeper).isNotEqualTo(keyOther)
+        assertThat(keyWhatsapp).isNotEqualTo(keyOther)
     }
 
     @Test
@@ -78,7 +78,7 @@ class MessagingStyleExtractorTest {
             .setContentTitle("Anna")
             .setStyle(NotificationCompat.BigTextStyle().bigText("Längerer Text"))
             .build()
-        val result = extractor.extractFromNotification("com.beeper.android", notif)
+        val result = extractor.extractFromNotification("com.whatsapp", notif)
         assertThat(result?.body).isEqualTo("Längerer Text")
     }
 
@@ -93,11 +93,44 @@ class MessagingStyleExtractorTest {
             .setContentTitle("WRONG_TITLE")
             .setStyle(msgStyle)
             .build()
-        val result = extractor.extractFromNotification("com.beeper.android", notif)
+        val result = extractor.extractFromNotification("com.whatsapp", notif)
         assertThat(result).isNotNull()
         assertThat(result!!.senderName).isEqualTo("Anna")
         assertThat(result.body).isEqualTo("Hallo!")
         assertThat(result.conversationLabel).isEqualTo("Anna Chat")
+    }
+
+    @Test
+    fun `1-to-1 chat with conversationTitle is not treated as group`() {
+        // WhatsApp/Signal/Telegram setzen conversationTitle auch für Einzelchats.
+        // Das darf NICHT als Gruppe gelten, sonst liest Tesla "Anna: hallo".
+        val msgStyle = NotificationCompat.MessagingStyle("MyName")
+            .setConversationTitle("Anna")
+            .addMessage("Hallo!", System.currentTimeMillis(),
+                androidx.core.app.Person.Builder().setName("Anna").build())
+        val notif = NotificationCompat.Builder(context, "ch")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(msgStyle)
+            .build()
+        val result = extractor.extractFromNotification("com.whatsapp", notif)
+        assertThat(result).isNotNull()
+        assertThat(result!!.isGroup).isFalse()
+    }
+
+    @Test
+    fun `group conversation is detected via isGroupConversation flag`() {
+        val msgStyle = NotificationCompat.MessagingStyle("MyName")
+            .setConversationTitle("Familie")
+            .setGroupConversation(true)
+            .addMessage("Hallo!", System.currentTimeMillis(),
+                androidx.core.app.Person.Builder().setName("Anna").build())
+        val notif = NotificationCompat.Builder(context, "ch")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(msgStyle)
+            .build()
+        val result = extractor.extractFromNotification("com.whatsapp", notif)
+        assertThat(result).isNotNull()
+        assertThat(result!!.isGroup).isTrue()
     }
 
     private fun buildNotif(title: String, text: String): Notification =

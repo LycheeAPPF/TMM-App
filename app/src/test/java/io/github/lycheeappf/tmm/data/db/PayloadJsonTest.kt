@@ -9,12 +9,11 @@ class PayloadJsonTest {
     @Test
     fun `notification payload round-trips`() {
         val original = ChannelPayload.Notification(
-            sourcePackage = "com.beeper.android",
-            notificationKey = "0|com.beeper.android|42|null|10042",
+            sourcePackage = "com.whatsapp",
+            notificationKey = "0|com.whatsapp|42|null|10042",
             remoteInputResultKey = "input_text",
             conversationLabel = "WhatsApp – Anna",
-            senderDisplayName = "Anna",
-            bridgeHint = "WhatsApp"
+            senderDisplayName = "Anna"
         )
         val encoded = PayloadJson.encode(original)
         val decoded = PayloadJson.decode(encoded)

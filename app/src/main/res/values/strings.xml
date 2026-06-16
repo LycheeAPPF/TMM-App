@@ -9,7 +9,7 @@
     <string name="onboarding_action_set_role">Als Standard setzen</string>
 
     <string name="onboarding_title_listener">Notification Access</string>
-    <string name="onboarding_body_listener">Aktiviere den Notification-Listener, damit die App Nachrichten aus Beeper, WhatsApp, Signal etc. erfassen kann.</string>
+    <string name="onboarding_body_listener">Aktiviere den Notification-Listener, damit die App Nachrichten aus WhatsApp, Telegram, Signal etc. erfassen kann.</string>
     <string name="onboarding_action_open_listener_settings">Notification-Settings öffnen</string>
 
     <string name="onboarding_title_post_notifications">Benachrichtigungen</string>
@@ -21,7 +21,7 @@
     <string name="onboarding_action_run_preflight">Test starten</string>
 
     <string name="onboarding_title_whitelist">Apps freigeben</string>
-    <string name="onboarding_body_whitelist">Wähle die Messenger-Apps, deren Notifications ans Tesla weitergeleitet werden sollen. Beeper ist standardmäßig aktiv.</string>
+    <string name="onboarding_body_whitelist">Wähle die Messenger-Apps (z. B. WhatsApp, Telegram, Signal), deren Notifications ans Tesla weitergeleitet werden sollen. Standardmäßig ist keine App aktiv.</string>
     <string name="onboarding_action_configure_whitelist">Whitelist konfigurieren</string>
 
     <!-- Channels -->

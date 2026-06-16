@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 /**
  * Cost-Cap: verhindert, dass die App in einem Tag mehr Notifications ans Tesla
- * forwarded als das Settings-Budget erlaubt. Schützt vor Runaway-Loops (Beeper-Spam)
+ * forwarded als das Settings-Budget erlaubt. Schützt vor Runaway-Loops (Messenger-Spam)
  * und vor unwahrscheinlichem Carrier-Routing der `+99942`-Test-Range.
  *
  * Zählt jeden erfolgreichen `injectIncoming`-Call. Bei Budget-Überlauf wird eine
@@ -65,7 +65,7 @@ class SendBudget @Inject constructor(
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
                     "Tageslimit von $budget forwarded Notifications aufgebraucht. " +
-                        "Weitere Beeper-Nachrichten werden bis Mitternacht ignoriert. " +
+                        "Weitere Nachrichten werden bis Mitternacht ignoriert. " +
                         "In den App-Einstellungen kann das Budget erhöht werden."
                 )
             )

@@ -20,25 +20,19 @@ import javax.inject.Singleton
  * 1. Notification.shortcutId (Android 11+ Conversation-Shortcuts) — am stabilsten
  * 2. Notification.locusId (Android 11+) — auch stabil
  * 3. MessagingStyle.user/last-person.key — stable wenn von App vergeben
- * 4. bridgeHint + senderName + conversationTitle — Beeper-spezifischer Fallback
- * 5. packageName + label-hash — letzter Fallback
+ * 4. packageName + label-hash (conversationTitle/senderName) — letzter Fallback
  *
  * **WICHTIG:** Verschiedene Chats in derselben App MÜSSEN verschiedene Keys
- * produzieren. Display-Text allein ist NICHT ausreichend, weil Display-Namen
- * über Bridges hinweg kollidieren können (z.B. "Anna" in WhatsApp und Signal
- * via Beeper). Daher fließt bridgeHint und Person-Key explizit ein.
+ * produzieren. Display-Text allein ist NICHT ausreichend, daher fließen die
+ * structured IDs (shortcutId/locusId/Person.key) bevorzugt ein.
  */
 @Singleton
-class MessagingStyleExtractor @Inject constructor(
-    private val beeperExtractor: BeeperExtractor
-) {
+class MessagingStyleExtractor @Inject constructor() {
 
     fun extract(sbn: StatusBarNotification): ExtractedMessage? {
-        val bridgeHint = beeperExtractor.extractBridgeHint(sbn)
         return extractFromNotification(
             packageName = sbn.packageName,
             n = sbn.notification,
-            bridgeHint = bridgeHint,
             shortcutId = sbn.notification?.shortcutId,
             locusId = sbn.notification?.locusId?.id
         )
@@ -47,7 +41,6 @@ class MessagingStyleExtractor @Inject constructor(
     fun extractFromNotification(
         packageName: String,
         n: Notification?,
-        bridgeHint: String? = null,
         shortcutId: String? = null,
         locusId: String? = null
     ): ExtractedMessage? {
@@ -63,11 +56,12 @@ class MessagingStyleExtractor @Inject constructor(
                 ?: "Unknown"
             val body = last.text?.toString() ?: ""
             val conversationLabel = style.conversationTitle?.toString() ?: senderName
-            // Gruppen-Detection: primär MessagingStyle.isGroupConversation, fallback
-            // auf vorhandenen conversationTitle. Heuristik "senderName != conversationLabel"
-            // ist zu fragil (Codex-Review).
-            val isGroup = style.isGroupConversation ||
-                !style.conversationTitle.isNullOrBlank()
+            // Gruppen-Detection ausschließlich über MessagingStyle.isGroupConversation
+            // (das setzen WhatsApp/Signal/Telegram für Gruppen korrekt). Der frühere
+            // Fallback "conversationTitle ist gesetzt" stufte 1:1-Chats fälschlich als
+            // Gruppe ein — diese Apps setzen conversationTitle auch für Einzelchats auf
+            // den Kontaktnamen, wodurch das Tesla "Anna: hallo" statt "hallo" vorlas.
+            val isGroup = style.isGroupConversation
             return ExtractedMessage(
                 senderName = senderName,
                 body = body,
@@ -77,7 +71,6 @@ class MessagingStyleExtractor @Inject constructor(
                     packageName = packageName,
                     shortcutId = shortcutId,
                     locusId = locusId,
-                    bridgeHint = bridgeHint,
                     personKey = last.person?.key ?: style.user.key,
                     conversationTitle = style.conversationTitle?.toString(),
                     senderName = senderName
@@ -101,7 +94,6 @@ class MessagingStyleExtractor @Inject constructor(
                 packageName = packageName,
                 shortcutId = shortcutId,
                 locusId = locusId,
-                bridgeHint = bridgeHint,
                 personKey = null,
                 conversationTitle = title.ifEmpty { null },
                 senderName = title.ifEmpty { text.take(32) }
@@ -112,13 +104,12 @@ class MessagingStyleExtractor @Inject constructor(
     /**
      * Baut einen stabilen Conversation-Key. Bevorzugt structured IDs der App
      * (shortcutId, locusId, Person.key); falls die fehlen, nutzt es eine
-     * deterministische Mischung aus bridge + sender + title.
+     * deterministische Mischung aus conversationTitle bzw. sender.
      */
     private fun buildConversationKey(
         packageName: String,
         shortcutId: String?,
         locusId: String?,
-        bridgeHint: String?,
         personKey: String?,
         conversationTitle: String?,
         senderName: String
@@ -127,25 +118,13 @@ class MessagingStyleExtractor @Inject constructor(
             ?: locusId
             ?: personKey
         if (!structured.isNullOrBlank()) {
-            // bridgeHint mitschleifen: Beeper bringt mehrere Messenger unter
-            // demselben Package zusammen, und shortcutId/locusId aus zwei
-            // verschiedenen Bridges (z.B. WhatsApp+Signal) können den selben
-            // String tragen. Ohne Bridge-Diskriminator landen beide auf demselben
-            // ChannelMapping und damit derselben fakeAddress.
-            val bridgeSegment = bridgeHint?.lowercase()?.trim().orEmpty()
-            return "$packageName::id::$bridgeSegment::${structured.take(96)}"
+            return "$packageName::id::${structured.take(96)}"
         }
-        // Fallback: kombiniert bridgeHint + conversationTitle. senderName fließt
-        // NUR ein wenn conversationTitle fehlt — sonst würde jeder Sprecher in
-        // einer Gruppen-Chat-Notification eine eigene fakeAddress bekommen
+        // Fallback: bevorzugt conversationTitle. senderName fließt NUR ein wenn
+        // conversationTitle fehlt — sonst würde jeder Sprecher in einer
+        // Gruppen-Chat-Notification eine eigene fakeAddress bekommen
         // (= Gruppe splittet in N Threads).
-        val labelInput = if (conversationTitle.isNullOrBlank()) {
-            listOf(bridgeHint.orEmpty(), senderName)
-                .joinToString("|") { it.lowercase().trim() }
-        } else {
-            listOf(bridgeHint.orEmpty(), conversationTitle)
-                .joinToString("|") { it.lowercase().trim() }
-        }
+        val labelInput = (conversationTitle ?: senderName).lowercase().trim()
         val labelHash = sha1(labelInput).take(16)
         return "$packageName::lbl::$labelHash"
     }

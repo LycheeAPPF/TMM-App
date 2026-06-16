@@ -8,7 +8,6 @@ import io.github.lycheeappf.tmm.core.util.SendBudget
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
-import io.github.lycheeappf.tmm.listener.filter.BeeperExtractor
 import io.github.lycheeappf.tmm.listener.filter.MessagingStyleExtractor
 import io.github.lycheeappf.tmm.listener.filter.WhitelistFilter
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
@@ -21,13 +20,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Orchestriert den Inbound-Pfad (Beeper-Notification → Tesla-sichtbare fake SMS).
+ * Orchestriert den Inbound-Pfad (Messenger-Notification → Tesla-sichtbare fake SMS).
  *
  * Reihenfolge der Checks:
  * 1. Whitelist
  * 2. Body-Extraktion (MessagingStyle / Title-Fallback)
  * 3. **Dedup**: gleicher (conversationKey, bodyHash) wie vorher → skip
- *    (Beeper postet oft mehrere Update-Events für dieselbe Nachricht)
+ *    (Messenger posten oft mehrere Update-Events für dieselbe Nachricht)
  * 4. roleManager.isDefault()
  * 5. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
  * 6. Mapping allocate/reuse + ActionCache + injectIncoming
@@ -37,7 +36,6 @@ import javax.inject.Singleton
 class NotificationCapture @Inject constructor(
     private val whitelist: WhitelistFilter,
     private val messagingStyleExtractor: MessagingStyleExtractor,
-    private val beeperExtractor: BeeperExtractor,
     private val actionResolver: ActionResolver,
     private val actionCache: ActionCache,
     private val mappingRepository: MappingRepository,
@@ -54,7 +52,7 @@ class NotificationCapture @Inject constructor(
      * Dedup-Cache pro conversationKey → letzter Body-Inhalt.
      *
      * Wir speichern den vollen Body-String statt nur `hashCode()` — 32-bit-Hashes
-     * kollidieren bei kurzen, ähnlichen Beeper-Antworten ("OK", "Ok", "ok") und
+     * kollidieren bei kurzen, ähnlichen Antworten ("OK", "Ok", "ok") und
      * würden legitime Nachrichten silent droppen. Konkret: zwei Strings mit
      * gleichem `hashCode()` aber verschiedenem Inhalt sind häufiger als man denkt.
      *
@@ -78,7 +76,7 @@ class NotificationCapture @Inject constructor(
         if (msg.body.isBlank()) return
 
         // Dedup: identische (conversation, body) Tuple wurde schon verarbeitet?
-        // Beeper sendet typischerweise mehrere onNotificationPosted Events
+        // Messenger senden typischerweise mehrere onNotificationPosted Events
         // für dieselbe eingehende Nachricht (z.B. nach 'delivered'-Update).
         val previousBody = lastBodies[msg.conversationKey]
         if (previousBody == msg.body) return
@@ -98,7 +96,6 @@ class NotificationCapture @Inject constructor(
         // Ab hier ist das Budget reserviert. Bei jedem early-return ROLLBACK.
         var budgetCommitted = false
         try {
-            val bridgeHint = beeperExtractor.extractBridgeHint(sbn)
             val resolved = actionResolver.findReplyAction(sbn.notification)
             val replyable = resolved != null
 
@@ -107,8 +104,7 @@ class NotificationCapture @Inject constructor(
                 notificationKey = sbn.key,
                 remoteInputResultKey = resolved?.remoteInputs?.firstOrNull()?.resultKey,
                 conversationLabel = msg.conversationLabel,
-                senderDisplayName = msg.senderName,
-                bridgeHint = bridgeHint
+                senderDisplayName = msg.senderName
             )
 
             val ttlMillis = TimeUnit.HOURS.toMillis(settingsStore.mappingTtlHours().toLong())
@@ -158,7 +154,7 @@ class NotificationCapture @Inject constructor(
         if (lastBodies.size <= DEDUP_CACHE_SIZE) return
         // grobe Eviction — ConcurrentHashMap.keys ist nicht ordered, also droppen
         // wir willkürliche Einträge. Akzeptabel weil Cache nur Performance, kein
-        // Korrektheits-Krücke (Worst-Case: zwei aufeinanderfolgende Beeper-Events
+        // Korrektheits-Krücke (Worst-Case: zwei aufeinanderfolgende Events
         // mit identischem Body werden beide gepostet, was wir sowieso über
         // SendBudget abfedern).
         val toRemove = lastBodies.keys.take(lastBodies.size - DEDUP_CACHE_SIZE)

@@ -29,8 +29,8 @@ class NotificationReplyExecutorTest {
     private val executor = NotificationReplyExecutor(context, cache, rebuilder, fallback)
 
     private val payload = ChannelPayload.Notification(
-        sourcePackage = "com.beeper.android",
-        notificationKey = "0|com.beeper.android|42|null|10042",
+        sourcePackage = "com.whatsapp",
+        notificationKey = "0|com.whatsapp|42|null|10042",
         remoteInputResultKey = "input_text",
         conversationLabel = "Anna",
         senderDisplayName = "Anna"

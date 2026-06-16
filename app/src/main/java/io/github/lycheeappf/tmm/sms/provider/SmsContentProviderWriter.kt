@@ -18,7 +18,7 @@ import javax.inject.Singleton
  * Schreibt SMS-Rows in den Android SMS Content Provider.
  *
  * Wird in zwei Pfaden genutzt:
- * 1. [injectIncoming]: vom NotificationCapture (Beeper → Tesla) und Channel.maybeInjectFollowUp (LLM)
+ * 1. [injectIncoming]: vom NotificationCapture (Messenger → Tesla) und Channel.maybeInjectFollowUp (LLM)
  * 2. Aufruf via DeliverSmsReceiver für echte eingehende SMS (DeliverSmsReceiver
  *    macht das direkt, ohne diese Klasse zu nutzen)
  *

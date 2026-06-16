@@ -6,9 +6,9 @@ import javax.inject.Singleton
 /**
  * Entscheidet, ob eine Notification eines Packages ans Tesla weitergeleitet wird.
  *
- * Default-Whitelist enthält Beeper. User kann in der UI (Phase 5) weitere Apps
- * aktivieren. Die Whitelist wird aus dem AppPolicyDao gespeist – V1: hardcoded
- * Defaults im AppPolicySeed.
+ * Standardmäßig ist keine App freigegeben. Der User aktiviert die gewünschten
+ * Messenger (z.B. WhatsApp, Telegram, Signal) in der UI. Die Whitelist wird aus
+ * dem AppPolicyDao gespeist.
  */
 @Singleton
 class WhitelistFilter @Inject constructor(

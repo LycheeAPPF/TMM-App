@@ -25,7 +25,7 @@ interface MessagingChannel {
      * Verarbeitung eine eigene Nachricht als neue Tesla-sichtbare SMS zu injizieren
      * (z.B. LlmChannel injiziert die LLM-Antwort, damit Tesla sie vorliest).
      *
-     * V1-NotificationChannel macht das nicht – Beeper bestätigt selbst.
+     * V1-NotificationChannel macht das nicht – die Messaging-App bestätigt selbst.
      */
     suspend fun maybeInjectFollowUp(
         mapping: ChannelMapping,

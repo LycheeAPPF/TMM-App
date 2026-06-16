@@ -6,12 +6,7 @@ import android.app.NotificationManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
-import io.github.lycheeappf.tmm.data.repository.AppPolicySeed
 import io.github.lycheeappf.tmm.sms.outbound.OutboundSmsObserver
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -19,9 +14,6 @@ class MfsApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var outboundSmsObserver: OutboundSmsObserver
-    @Inject lateinit var appPolicySeed: AppPolicySeed
-
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -33,7 +25,6 @@ class MfsApplication : Application(), Configuration.Provider {
         super.onCreate()
         createAppNotificationChannels()
         outboundSmsObserver.register()
-        appScope.launch { appPolicySeed.seedIfEmpty() }
     }
 
     override fun onTerminate() {

@@ -9,12 +9,10 @@ import javax.inject.Singleton
  * Room-basierte Implementation der App-Whitelist. Cached häufige Lookups
  * (Notification-Listener wird oft mehrmals pro Sekunde aufgerufen).
  *
- * Race-Resilienz: Wenn der App-Start-Seed (AppPolicySeed) noch nicht durchgelaufen
- * ist, ist die DB für die Default-Packages leer und würde `isWhitelisted("com.beeper.android")`
- * mit `false` zurückgeben — was dazu führt, dass die ersten Beeper-Notifications
- * silent gedropt werden. Daher: bei DB-Miss wird gegen [AppPolicySeed.DEFAULT_PACKAGES]
- * als Hardcoded-Fallback geprüft, und der `false`-Wert nur dann gecached,
- * wenn die DB-Row explizit existiert.
+ * Standardmäßig ist KEINE App whitelisted: bei einem DB-Miss liefert
+ * [isWhitelisted] `false`. Der User aktiviert die gewünschten Messenger
+ * (z.B. WhatsApp, Telegram, Signal) selbst im Whitelist-Screen — erst dann
+ * existiert eine DB-Row und Notifications dieser App werden erfasst.
  */
 @Singleton
 class RoomAppPolicyProvider @Inject constructor(
@@ -32,9 +30,9 @@ class RoomAppPolicyProvider @Inject constructor(
             return dbValue
         }
 
-        // DB-Miss: nutze Hardcoded-Default-Whitelist als Fallback.
-        // NICHT cachen — sobald Seed läuft, soll die DB-Quelle übernehmen.
-        return packageName in AppPolicySeed.DEFAULT_PACKAGES
+        // DB-Miss: keine App ist standardmäßig whitelisted.
+        // NICHT cachen — sobald der User die App aktiviert, übernimmt die DB-Quelle.
+        return false
     }
 
     fun invalidateCache(packageName: String? = null) {

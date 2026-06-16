@@ -25,12 +25,11 @@ class MappingRepositoryImplTest {
     private val repository = MappingRepositoryImpl(dao, settings, contactSyncWriter)
 
     private val testPayload = ChannelPayload.Notification(
-        sourcePackage = "com.beeper.android",
+        sourcePackage = "com.whatsapp",
         notificationKey = "key-1",
         remoteInputResultKey = "input",
         conversationLabel = "Anna",
-        senderDisplayName = "Anna",
-        bridgeHint = "WhatsApp"
+        senderDisplayName = "Anna"
     )
 
     @Test
@@ -44,7 +43,7 @@ class MappingRepositoryImplTest {
 
         val mapping = repository.allocateOrReuse(
             channel = ChannelId.NOTIFICATION,
-            conversationKey = "com.beeper.android::anna",
+            conversationKey = "com.whatsapp::anna",
             payload = testPayload,
             ttlMillis = 24L * 60 * 60 * 1000
         )
@@ -63,7 +62,7 @@ class MappingRepositoryImplTest {
             mappingId = 7L,
             channel = ChannelId.NOTIFICATION.code,
             fakeAddress = "+9994200000007",
-            conversationKey = "com.beeper.android::anna",
+            conversationKey = "com.whatsapp::anna",
             payloadJson = PayloadJson.encode(testPayload),
             createdAt = now - 60_000,
             expiresAt = now - 1000,
@@ -72,13 +71,13 @@ class MappingRepositoryImplTest {
             replyable = true
         )
         coEvery {
-            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.beeper.android::anna")
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
         } returns existing
         coEvery { dao.refreshOnReuse(any(), any(), any(), any(), any(), any()) } just Runs
 
         val mapping = repository.allocateOrReuse(
             channel = ChannelId.NOTIFICATION,
-            conversationKey = "com.beeper.android::anna",
+            conversationKey = "com.whatsapp::anna",
             payload = testPayload,
             ttlMillis = 24L * 60 * 60 * 1000
         )

@@ -11,7 +11,7 @@ The app's UI is currently German.
 
 ## What it does
 
-- **Message bridge** — forwards notifications from messengers (Beeper, WhatsApp, Signal, …) to your
+- **Message bridge** — forwards notifications from messengers (WhatsApp, Telegram, Signal, …) to your
   Tesla so the car reads them aloud, and routes your dictated replies back to the original app.
 - **In-car Grok assistant** — start a chat, dictate a question via the car's built-in "reply to
   message" function; the question goes to the xAI Grok API and the answer is injected back as a

@@ -8,8 +8,8 @@ import android.widget.Toast
 
 /**
  * Tap-Handler für die Fallback-Notification: kopiert den nicht-zustellbaren
- * Reply-Text in die Zwischenablage, damit der User ihn manuell in Beeper einfügen
- * kann.
+ * Reply-Text in die Zwischenablage, damit der User ihn manuell in die Messaging-App
+ * einfügen kann.
  */
 class ClipboardCopyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

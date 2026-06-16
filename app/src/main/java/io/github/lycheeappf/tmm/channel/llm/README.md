@@ -78,7 +78,7 @@ OutboundSmsObserver.processRow
 | Trigger | `AssistantTriggerCoordinator` als Single-Entry. V2: MANUAL_BUTTON. V3: BLE/QuickSettings/Intent. |
 | TTS-Safe | `LlmResponseFormatter` strippt Markdown, Code-Blöcke, Listen → flowing Text, max 800 Zeichen. |
 | Echo-Protection | `InjectedMessageLedger`: Outbox-Echos eigener Inserts (sollten praktisch nicht vorkommen) werden 10 s geblockt; Normalisierung strippt Display-Prefix vor Vergleich. |
-| Sender-Display | `Telephony.Sms.ADDRESS` wird als Hybrid-Form `"Grok <+9994210000007>"` geschrieben (RFC-822-Mailbox). Tesla MCU2 zeigt den ASCII-Teil direkt — ohne PBAP-Cache-Roundtrip, ohne Phonebook-Spam, ohne `WRITE_CONTACTS`-Permission. `FakeAddress.parse` strippt `[^+0-9]` und resolved daraus wieder die `(channel, mappingId)` für's Reply-Routing. Skaliert linear für Grok + alle Beeper-Konversationen ohne RawContact-Multiplikation. |
+| Sender-Display | `Telephony.Sms.ADDRESS` wird als Hybrid-Form `"Grok <+9994210000007>"` geschrieben (RFC-822-Mailbox). Tesla MCU2 zeigt den ASCII-Teil direkt — ohne PBAP-Cache-Roundtrip, ohne Phonebook-Spam, ohne `WRITE_CONTACTS`-Permission. `FakeAddress.parse` strippt `[^+0-9]` und resolved daraus wieder die `(channel, mappingId)` für's Reply-Routing. Skaliert linear für Grok + alle Messenger-Konversationen ohne RawContact-Multiplikation. |
 
 ## Trigger-Sources (V3-Vorbereitung)
 
