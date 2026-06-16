@@ -1,0 +1,32 @@
+.env
+*.iml
+.gradle/
+.kotlin/
+local.properties
+.idea/
+.DS_Store
+
+# Internal AI-collaboration artifacts — never publish
+.claude/
+build/
+captures/
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+*.aar
+release/
+
+# Keystore / signing secrets
+*.jks
+*.keystore
+keystore.properties
+
+# Logs
+*.log
+
+# Loose AOSP reference dumps (never compiled) + ad-hoc screenshots
+/ContactsProvider2.java
+/ContactsDatabaseHelper.java
+/logs/
+/Screenshot_*.png

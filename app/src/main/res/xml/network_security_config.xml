@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Config für die Grok-Integration.
+    Default: cleartextTrafficPermitted=false (HTTPS-only). Tesla-Bridge
+    arbeitet komplett offline, das LLM-Modul telefoniert nur zu api.x.ai.
+    Cert-Pinning wird bewusst NICHT konfiguriert — Cert-Rotation seitens xAI
+    würde die App ohne Backdoor brechen.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,62 @@
+package io.github.lycheeappf.tmm.domain.repository
+
+import io.github.lycheeappf.tmm.core.model.ChannelId
+import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
+import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
+
+/**
+ * Repository-Interface für Channel-Mappings. Implementation in Phase 4 (data/repository/).
+ *
+ * Mapping-IDs sind monoton wachsend pro Channel; reuse erfolgt nur über
+ * `findByConversationKey`-Lookup, um Tesla-Thread-Stabilität zu garantieren.
+ */
+interface MappingRepository {
+
+    suspend fun findById(mappingId: Long, channel: ChannelId): ChannelMapping?
+
+    suspend fun findByConversationKey(channel: ChannelId, conversationKey: String): ChannelMapping?
+
+    /**
+     * Findet ein Mapping anhand des `fakeAddress`-Werts. Wird vom
+     * [io.github.lycheeappf.tmm.sms.outbound.OutboundSmsClassifier] benutzt,
+     * um Tesla-Replies (die exakt unsere ADDRESS-Spalte zurückschreiben)
+     * deterministisch dem richtigen Channel zuzuordnen.
+     */
+    suspend fun findByFakeAddress(fakeAddress: String): ChannelMapping?
+
+    /**
+     * Findet ein existierendes Mapping mit gleichem conversationKey/Channel oder
+     * erzeugt ein neues. Refreshes `lastUsedAt` und `expiresAt` bei Reuse.
+     */
+    suspend fun allocateOrReuse(
+        channel: ChannelId,
+        conversationKey: String,
+        payload: ChannelPayload,
+        ttlMillis: Long
+    ): ChannelMapping
+
+    /**
+     * Aktualisiert die Reply-Statistik nach erfolgreicher Zustellung.
+     */
+    suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId)
+
+    suspend fun deleteExpired(now: Long)
+
+    /**
+     * Löscht ein einzelnes Mapping inkl. zugehörigem RawContact im Tesla-
+     * Bridge-Account.
+     */
+    suspend fun delete(mappingId: Long, channel: ChannelId)
+
+    /**
+     * Löscht ALLE Mappings. Wird beim Wechsel des Number-Schema gerufen, sodass
+     * alte fakeAddresses (im alten Schema-Prefix) nicht mehr aktiv sind.
+     */
+    suspend fun deleteAll()
+
+    /**
+     * Alle aktiven Mappings. Wird vom ContactBackfillWorker iteriert, um
+     * RawContacts für bereits existierende Mappings nachzulegen.
+     */
+    suspend fun allMappings(): List<ChannelMapping>
+}
