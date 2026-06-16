@@ -21,6 +21,7 @@ release/
 *.jks
 *.keystore
 keystore.properties
+*.local.md
 
 # Logs
 *.log
