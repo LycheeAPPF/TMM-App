@@ -53,6 +53,9 @@ class AssistantContactProvisionerTest {
 
         coVerify { mappingRepository.ensureStaticAssistantMapping("Grok") }
         coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
+        // Beide phonetischen Sprach-Aliasse werden mitgeführt.
+        coVerify { contactSyncWriter.upsertContact("+88810000001", "Grog") }
+        coVerify { contactSyncWriter.upsertContact("+88810000002", "Grogg") }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 
@@ -64,6 +67,8 @@ class AssistantContactProvisionerTest {
         provisioner.reconcile()
 
         coVerify { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify { contactSyncWriter.deleteContact("+88810000002") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
         coVerify(exactly = 0) { contactSyncWriter.upsertContact(any(), any()) }
     }
@@ -76,6 +81,8 @@ class AssistantContactProvisionerTest {
         provisioner.reconcile()
 
         coVerify { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify { contactSyncWriter.deleteContact("+88810000002") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
     }
 }

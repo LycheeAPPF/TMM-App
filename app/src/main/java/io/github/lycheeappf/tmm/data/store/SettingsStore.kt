@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.core.model.AddressScheme
+import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -42,9 +43,16 @@ class SettingsStore @Inject constructor(
             val legacyMax = (0..9).maxOfOrNull { code ->
                 prefs[longPreferencesKey("next_mapping_id_$code")] ?: 0L
             } ?: 0L
-            val cur = (prefs[key] ?: 1L).coerceAtLeast(legacyMax)
+            // Reservierte Ids (statische Grok-Identität id 0 + Sprach-Aliasse) NIE
+            // dynamisch vergeben — sonst bekäme ein Messenger-Mapping eine reservierte
+            // Fake-Adresse. Die Schleifen sind für reale Counter-Werte (zweistellig)
+            // No-ops und verschieben keinen bestehenden Kontakt.
+            var cur = (prefs[key] ?: 1L).coerceAtLeast(legacyMax)
+            while (cur in AssistantIdentity.RESERVED_MAPPING_IDS) cur++
             assigned = cur
-            prefs[key] = (cur + 1).coerceAtMost(MAX_MAPPING_ID - 1)
+            var next = cur + 1
+            while (next in AssistantIdentity.RESERVED_MAPPING_IDS) next++
+            prefs[key] = next.coerceAtMost(MAX_MAPPING_ID - 1)
         }
         return assigned
     }

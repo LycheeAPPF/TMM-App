@@ -38,12 +38,23 @@ interface MappingRepository {
 
     /**
      * Stellt das reservierte, **nicht ablaufende** Mapping für den statischen
-     * Grok-Kontakt sicher (idempotent). Erzeugt bei Bedarf die reservierte Id
-     * ([io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_ID])
-     * und migriert ein evtl. vorhandenes dynamisches `default-assistant`-Mapping
-     * (mit anderer Id) auf diese reservierte Identität.
+     * Grok-Kontakt sicher (idempotent). Räumt vorab via
+     * [sweepStaleAssistantMappings] alle veralteten dynamischen LLM-Mappings ab
+     * und erzeugt/aktualisiert dann die reservierte Id
+     * ([io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_ID]).
      */
     suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping
+
+    /**
+     * Entfernt ALLE LLM-Mappings (inkl. zugehörigem Tesla-Kontakt), deren Id NICHT
+     * die reservierte statische Grok-Id
+     * ([io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_ID])
+     * ist. Da die App nur EINE Assistenten-Konversation kennt, sind alle anderen
+     * LLM-Rows Altlasten (veraltete „Grok"-Duplikate, z.B. nach einem dynamischen
+     * Allocate vor dem Seed der reservierten Identität). NOTIFICATION/SYSTEM-
+     * Mappings werden nie angefasst. Gibt die Anzahl entfernter Rows zurück.
+     */
+    suspend fun sweepStaleAssistantMappings(): Int
 
     /**
      * Aktualisiert die Reply-Statistik nach erfolgreicher Zustellung.

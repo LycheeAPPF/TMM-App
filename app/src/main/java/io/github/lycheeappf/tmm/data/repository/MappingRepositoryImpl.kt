@@ -122,6 +122,11 @@ class MappingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping {
+        // Erst alle veralteten dynamischen LLM-Mappings (+ ihre Kontakte) abräumen.
+        // Danach kann höchstens noch die reservierte id-0-Row existieren — der
+        // Unique-Index (channel, conversationKey) ist damit garantiert frei.
+        sweepStaleAssistantMappings()
+
         val now = System.currentTimeMillis()
         val payloadJson = PayloadJson.encode(
             ChannelPayload.Llm(
@@ -130,11 +135,11 @@ class MappingRepositoryImpl @Inject constructor(
                 conversationKey = AssistantIdentity.CONVERSATION_KEY
             )
         )
-        val existing = dao.findByConversationKey(ChannelId.LLM.code, AssistantIdentity.CONVERSATION_KEY)
+        val existing = dao.findById(AssistantIdentity.RESERVED_MAPPING_ID, ChannelId.LLM.code)
 
         // Bereits reserviert (id 0) → nur Adresse/Name aktualisieren und
         // Nicht-Ablaufen (expiresAt = MAX) sicherstellen. Idempotent.
-        if (existing != null && existing.mappingId == AssistantIdentity.RESERVED_MAPPING_ID) {
+        if (existing != null) {
             val updated = existing.copy(
                 fakeAddress = AssistantIdentity.STATIC_FAKE_ADDRESS,
                 payloadJson = payloadJson,
@@ -143,14 +148,6 @@ class MappingRepositoryImpl @Inject constructor(
             )
             dao.update(updated)
             return updated.toDomain()
-        }
-
-        // Ein früher dynamisch alloziertes Grok-Mapping (id != 0) auf die
-        // reservierte Identität migrieren: alten Kontakt + Row entfernen (sonst
-        // kollidiert der Insert auf dem Unique-Index (channel, conversationKey)).
-        if (existing != null) {
-            coRunCatching { contactSyncWriter.deleteContact(existing.fakeAddress) }
-            dao.deleteById(existing.mappingId, ChannelId.LLM.code)
         }
 
         val entity = MappingEntity(
@@ -167,6 +164,19 @@ class MappingRepositoryImpl @Inject constructor(
         )
         dao.insert(entity)
         return entity.toDomain()
+    }
+
+    override suspend fun sweepStaleAssistantMappings(): Int {
+        var removed = 0
+        val llmRows = dao.findByChannel(ChannelId.LLM.code)
+        for (entity in llmRows) {
+            if (entity.mappingId == AssistantIdentity.RESERVED_MAPPING_ID) continue
+            // ZUERST Kontakt löschen (fakeAddress als Lookup-Key), DANN die Row.
+            coRunCatching { contactSyncWriter.deleteContact(entity.fakeAddress) }
+            dao.deleteById(entity.mappingId, ChannelId.LLM.code)
+            removed++
+        }
+        return removed
     }
 
     override suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId) {

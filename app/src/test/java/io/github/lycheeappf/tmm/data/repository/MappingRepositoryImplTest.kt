@@ -209,7 +209,8 @@ class MappingRepositoryImplTest {
 
     @Test
     fun `ensureStaticAssistantMapping seeds reserved id-0 mapping when none exists`() = runTest {
-        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns null
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns emptyList()
+        coEvery { dao.findById(0L, ChannelId.LLM.code) } returns null
         val inserted = slot<MappingEntity>()
         coEvery { dao.insert(capture(inserted)) } just Runs
 
@@ -238,7 +239,9 @@ class MappingRepositoryImplTest {
             replyCount = 3,
             replyable = true
         )
-        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns existing
+        // Sweep sieht nur die reservierte id 0 → schont sie (kein Delete).
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(existing)
+        coEvery { dao.findById(0L, ChannelId.LLM.code) } returns existing
         val updated = slot<MappingEntity>()
         coEvery { dao.update(capture(updated)) } just Runs
 
@@ -248,10 +251,11 @@ class MappingRepositoryImplTest {
         assertThat(updated.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
         coVerify(exactly = 0) { dao.insert(any()) }
         coVerify(exactly = 0) { dao.deleteById(any(), any()) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 
     @Test
-    fun `ensureStaticAssistantMapping migrates a dynamic mapping onto the reserved id`() = runTest {
+    fun `ensureStaticAssistantMapping sweeps a stale dynamic mapping then seeds the reserved id`() = runTest {
         val now = System.currentTimeMillis()
         val dynamic = MappingEntity(
             mappingId = 5L,
@@ -265,8 +269,9 @@ class MappingRepositoryImplTest {
             replyCount = 0,
             replyable = true
         )
-        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns dynamic
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(dynamic)
         coEvery { dao.deleteById(5L, ChannelId.LLM.code) } returns 1
+        coEvery { dao.findById(0L, ChannelId.LLM.code) } returns null
         val inserted = slot<MappingEntity>()
         coEvery { dao.insert(capture(inserted)) } just Runs
 
@@ -277,6 +282,34 @@ class MappingRepositoryImplTest {
         assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
         coVerify { contactSyncWriter.deleteContact("+88810000005") }
         coVerify { dao.deleteById(5L, ChannelId.LLM.code) }
+    }
+
+    @Test
+    fun `sweepStaleAssistantMappings removes non-reserved LLM rows and preserves id 0`() = runTest {
+        val now = System.currentTimeMillis()
+        fun llm(id: Long) = MappingEntity(
+            mappingId = id,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+8881" + id.toString().padStart(7, '0'),
+            conversationKey = if (id == 0L) "default-assistant" else "default-assistant-$id",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(llm(0L), llm(3L))
+        coEvery { dao.deleteById(3L, ChannelId.LLM.code) } returns 1
+
+        val removed = repository.sweepStaleAssistantMappings()
+
+        assertThat(removed).isEqualTo(1)
+        coVerify { contactSyncWriter.deleteContact("+88810000003") }
+        coVerify { dao.deleteById(3L, ChannelId.LLM.code) }
+        // Reservierte id 0 bleibt unangetastet.
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
     }
 
     @Test

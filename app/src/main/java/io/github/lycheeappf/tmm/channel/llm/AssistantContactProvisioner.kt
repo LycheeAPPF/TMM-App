@@ -43,16 +43,32 @@ class AssistantContactProvisioner @Inject constructor(
 
     private suspend fun ensure() {
         val name = prefs.assistantDisplayName()
+        // ensureStaticAssistantMapping räumt zuerst veraltete dynamische Grok-Mappings
+        // (+ ihre Kontakte) ab, danach steht genau die reservierte id-0-Identität.
         val mapping = mappingRepository.ensureStaticAssistantMapping(name)
         val ok = contactSyncWriter.upsertContact(mapping.fakeAddress, name)
         logBuffer.info(TAG, "Grok-Auto-Kontakt bereit: ${mapping.fakeAddress} ($name, upsert=$ok)")
+
+        // Phonetische Sprach-Aliasse („Grog"/„Grogg") — eigene Kontakte, KEINE
+        // Mapping-Rows. Der Classifier lenkt Diktate an diese Adressen auf die
+        // kanonische Grok-Session (id 0) um; die Antwort kommt als „Grok" zurück.
+        for (alias in AssistantIdentity.ALIASES) {
+            val aliasOk = contactSyncWriter.upsertContact(alias.fakeAddress, alias.displayName)
+            logBuffer.info(
+                TAG,
+                "Grok-Alias-Kontakt bereit: ${alias.fakeAddress} (${alias.displayName}, upsert=$aliasOk)"
+            )
+        }
     }
 
     private suspend fun remove() {
-        // Nur den Kontakt entfernen — das reservierte Mapping bleibt bestehen
+        // Nur die Kontakte entfernen — das reservierte Mapping bleibt bestehen
         // (nicht ablaufend, ohne Kontakt unsichtbar). Das ermöglicht sofortiges
         // Re-Enable und Kontext-Kontinuität, ohne erneute Migration.
         coRunCatching { contactSyncWriter.deleteContact(AssistantIdentity.STATIC_FAKE_ADDRESS) }
+        for (alias in AssistantIdentity.ALIASES) {
+            coRunCatching { contactSyncWriter.deleteContact(alias.fakeAddress) }
+        }
     }
 
     companion object {
