@@ -2,8 +2,10 @@ package io.github.lycheeappf.tmm.channel.llm
 
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.core.model.ChannelId
+import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.core.util.SendBudget
+import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.channel.MessagingChannel
@@ -30,6 +32,8 @@ class LlmChannel @Inject constructor(
     private val turnRunner: LlmTurnRunner,
     private val smsWriter: SmsContentProviderWriter,
     private val sendBudget: SendBudget,
+    private val prefs: AssistantPreferencesStore,
+    private val apiKeyStore: ApiKeyStore,
     private val logBuffer: LogBuffer
 ) : MessagingChannel {
 
@@ -44,6 +48,17 @@ class LlmChannel @Inject constructor(
         if (replyText.isBlank()) {
             logBuffer.info(TAG, "Blank Tesla-reply für LLM-Channel — ignoring")
             return ReplyResult.Ignored
+        }
+        // Consent + API-Key zur TURN-Zeit prüfen. Der Reply-/Auto-Pfad (Tesla schickt
+        // eine SMS an die Grok-Adresse) läuft NICHT über [LlmStarter], der diese
+        // Checks macht — und das statische Grok-Mapping ist nicht-ablaufend. Ohne
+        // diese Schranke könnte ein zurückgezogener Consent (bei noch gesetztem Key)
+        // via gecachtem Tesla-Kontakt weiter einen echten xAI-Turn auslösen.
+        if (!prefs.isPrivacyConsentGiven() || apiKeyStore.read().isNullOrBlank()) {
+            logBuffer.warn(TAG, "Tesla-reply für LLM, aber Assistent inaktiv (Consent/Key) — Turn abgelehnt")
+            return ReplyResult.ProviderError(
+                "Der Assistent ist nicht aktiv. Bitte Einwilligung und API-Key in der App bestätigen."
+            )
         }
         return when (val outcome = turnRunner.run(mapping.mappingId, replyText)) {
             is LlmTurnRunner.TurnResult.Success ->

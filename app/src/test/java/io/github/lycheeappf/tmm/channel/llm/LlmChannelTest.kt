@@ -4,8 +4,10 @@ import android.net.Uri
 import com.google.common.truth.Truth.assertThat
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.core.model.ChannelId
+import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.core.util.SendBudget
+import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.reply.ReplyResult
@@ -24,6 +26,8 @@ class LlmChannelTest {
     private val turnRunner: LlmTurnRunner = mockk()
     private val smsWriter: SmsContentProviderWriter = mockk()
     private val sendBudget: SendBudget = mockk()
+    private val prefs: AssistantPreferencesStore = mockk()
+    private val apiKeyStore: ApiKeyStore = mockk()
     private val logBuffer: LogBuffer = mockk(relaxed = true)
     private lateinit var channel: LlmChannel
 
@@ -45,9 +49,12 @@ class LlmChannelTest {
     )
 
     @Before fun setup() {
-        channel = LlmChannel(turnRunner, smsWriter, sendBudget, logBuffer)
+        channel = LlmChannel(turnRunner, smsWriter, sendBudget, prefs, apiKeyStore, logBuffer)
         coEvery { sendBudget.checkAndIncrement() } returns true
         coEvery { sendBudget.rollback() } returns Unit
+        // Default: Assistent aktiv (Consent gegeben + Key gesetzt).
+        coEvery { prefs.isPrivacyConsentGiven() } returns true
+        coEvery { apiKeyStore.read() } returns "xai-key"
     }
 
     @Test fun `handleTeslaReply with blank text returns Ignored without provider call`() = runTest {
@@ -75,6 +82,20 @@ class LlmChannelTest {
             LlmTurnRunner.TurnResult.ProviderFailed(LlmProviderError.Auth("403"))
         val result = channel.handleTeslaReply(llmMapping, "Frage")
         assertThat(result).isInstanceOf(ReplyResult.ProviderError::class.java)
+    }
+
+    @Test fun `handleTeslaReply refuses turn when consent withdrawn`() = runTest {
+        coEvery { prefs.isPrivacyConsentGiven() } returns false
+        val result = channel.handleTeslaReply(llmMapping, "Frage")
+        assertThat(result).isInstanceOf(ReplyResult.ProviderError::class.java)
+        coVerify(exactly = 0) { turnRunner.run(any(), any()) }
+    }
+
+    @Test fun `handleTeslaReply refuses turn when api key missing`() = runTest {
+        coEvery { apiKeyStore.read() } returns null
+        val result = channel.handleTeslaReply(llmMapping, "Frage")
+        assertThat(result).isInstanceOf(ReplyResult.ProviderError::class.java)
+        coVerify(exactly = 0) { turnRunner.run(any(), any()) }
     }
 
     @Test fun `maybeInjectFollowUp injects FollowUp body via SmsWriter`() = runTest {
