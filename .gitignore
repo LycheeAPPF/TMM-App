@@ -31,3 +31,6 @@ keystore.properties
 /ContactsDatabaseHelper.java
 /logs/
 /Screenshot_*.png
+
+# Loose local artifacts (download/export dumps — never publish)
+*.zip

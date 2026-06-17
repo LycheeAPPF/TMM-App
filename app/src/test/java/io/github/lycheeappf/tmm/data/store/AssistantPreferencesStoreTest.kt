@@ -11,7 +11,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Sichert den Antwort-Namen (fest „Grok") und den konfigurierbaren Sprach-Ansprech-
- * Kontakt: Default aktiv mit Name „Elon Musk", Setter persistieren. DataStore
+ * Kontakt: Default aktiv mit neutralem Namen „xAI Grok", Setter persistieren. DataStore
  * braucht einen echten Context → Robolectric.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -29,15 +29,15 @@ class AssistantPreferencesStoreTest {
     }
 
     @Test
-    fun `voice alias defaults enabled to Elon Musk and persists updates`() = runTest {
+    fun `voice alias defaults enabled to xAI Grok and persists updates`() = runTest {
         assertThat(store.voiceAliasEnabled()).isTrue()
         assertThat(store.voiceAliasName())
             .isEqualTo(AssistantPreferencesStore.DEFAULT_VOICE_ALIAS_NAME)
-        assertThat(store.voiceAliasName()).isEqualTo("Elon Musk")
-
-        store.setVoiceAliasName("xAI Grok")
-        store.setVoiceAliasEnabled(false)
         assertThat(store.voiceAliasName()).isEqualTo("xAI Grok")
+
+        store.setVoiceAliasName("Elon Musk")
+        store.setVoiceAliasEnabled(false)
+        assertThat(store.voiceAliasName()).isEqualTo("Elon Musk")
         assertThat(store.voiceAliasEnabled()).isFalse()
     }
 }

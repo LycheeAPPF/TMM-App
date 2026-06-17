@@ -278,6 +278,6 @@ class AssistantViewModel @Inject constructor(
          * adressiert; alles andere geht über das freie Custom-Feld. „Grok" ist hier
          * bewusst NICHT dabei — das ist der feste Antwort-Name.
          */
-        val PRESET_NAMES = listOf("Elon Musk", "xAI Grok")
+        val PRESET_NAMES = listOf("xAI Grok", "Elon Musk")
     }
 }

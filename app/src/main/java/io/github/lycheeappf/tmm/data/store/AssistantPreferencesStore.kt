@@ -161,7 +161,7 @@ class AssistantPreferencesStore @Inject constructor(
         store.edit { it[KEY_VOICE_ALIAS_ENABLED] = value }
     }
 
-    /** Anzeigename des Sprach-Ansprech-Kontakts (Default „Elon Musk"). */
+    /** Anzeigename des Sprach-Ansprech-Kontakts (Default „xAI Grok" — neutral). */
     suspend fun voiceAliasName(): String =
         store.data.first()[KEY_VOICE_ALIAS_NAME] ?: DEFAULT_VOICE_ALIAS_NAME
 
@@ -172,7 +172,7 @@ class AssistantPreferencesStore @Inject constructor(
     companion object {
         const val DEFAULT_MODEL = "grok-4.3"
         const val DEFAULT_ASSISTANT_NAME = "Grok"
-        const val DEFAULT_VOICE_ALIAS_NAME = "Elon Musk"
+        const val DEFAULT_VOICE_ALIAS_NAME = "xAI Grok"
         const val DEFAULT_DRIVER_NAME = ""
         const val DEFAULT_WELCOME =
             "Hey {driver}, hier ist Grok. Stell mir einfach deine Frage, ich antworte kurz und freihändig."
