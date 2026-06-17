@@ -4,6 +4,38 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-17
+
+### Added
+- **Standard SMS support.** Now that the app is the default SMS app, it doubles as a
+  real SMS client:
+  - **Inbox / history** — a new **“SMS”** bottom-nav tab shows real conversations read
+    directly from `content://sms`, grouped by thread, with contact-name resolution. The
+    `+888…` Tesla-bridge messages are filtered out so they never appear here.
+  - **Send** — compose new messages and reply to real SMS straight from the app. Incoming
+    messages are marked read when their thread is opened (scoped to real, non-bridge rows).
+
+### Changed
+- **`+888` (ITU TDR) is now the only fake-address scheme.** The multi-scheme machinery
+  (per-scheme parse loop, the `toE164` scheme parameter, the runtime scheme selector) was
+  collapsed accordingly.
+
+### Removed
+- The deprecated **`+4932` (DE)** and **`+99942` (ITU test)** legacy fake-address schemes,
+  including their parse/cleanup paths — a real SMS to such a number can no longer be
+  mistaken for a Tesla-bridge message.
+- The vestigial Tesla **display-mode / number-scheme** configuration (its switcher was
+  already gone): the unused accessors, the dead non-numeric “bracket-form” write path, and
+  the related diagnostics UI.
+- A batch of dead code surfaced by an audit: unused Room queries (`countForChannel`,
+  `refreshExpiry`, `deleteByAddress`, `countSince`, …), the unused `MappingRepository.deleteAll`
+  chain, the `ApiCompat` helper, `ToolRegistry.isEmpty`, and assorted stale annotations and
+  KDoc links.
+
+### Internal
+- Outbound real SMS are guarded by a `SelfSendLedger` so the bridge’s outbox observer never
+  treats a user-sent SMS as a Tesla-dictated reply.
+
 ## [0.2.0] — 2026-06-17
 
 ### Added
@@ -37,4 +69,5 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Signal, …) to a Tesla over Bluetooth MAP and routes dictated replies back to the
   originating app.
 
+[0.3.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.3.0
 [0.2.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.2.0
