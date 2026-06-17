@@ -5,7 +5,7 @@ import android.accounts.Account
 /**
  * Konstanten für den App-eigenen Contacts-Account.
  *
- * Pro Mapping (z.B. "+9994200000042" → "Anna") wird ein `RawContact` in diesem
+ * Pro Mapping (z.B. "+88800000042" → "Anna") wird ein `RawContact` in diesem
  * Account-Namespace abgelegt. Tesla löst beim Bluetooth-MAP-Export bzw. PBAP-
  * Lookup die Fake-Nummer via `ContactsContract.PhoneLookup` auf und findet so
  * den Klartextnamen.

@@ -30,8 +30,7 @@ class FailedRowCleaner @Inject constructor(
     /**
      * Periodischer Cleanup: Findet alle FAILED-Rows mit Fake-Adresse und löscht sie.
      * Verwendet [FakeAddress.parse] zur exakten Validierung — `LIKE prefix%` allein
-     * könnte reale Telefonnummern im selben Range (z.B. `+4932...` als DE-Personal-Number)
-     * versehentlich treffen.
+     * könnte reale Telefonnummern mit gleichem Prefix versehentlich treffen.
      */
     fun deleteAllFailedFakeRows(): Int {
         val candidates = queryFailedCandidates() ?: return 0
@@ -50,20 +49,18 @@ class FailedRowCleaner @Inject constructor(
     }
 
     private fun queryFailedCandidates(): List<Pair<Long, String>>? {
-        // Pre-Filter über LIKE auf alle Schema-Prefixes (cheap), Final-Validierung
+        // Pre-Filter über LIKE auf den Fake-Prefix (cheap), Final-Validierung
         // dann pro Row via FakeAddress.parse.
-        val prefixClauses = AddressScheme.entries.joinToString(" OR ") {
-            "${Telephony.Sms.ADDRESS} LIKE ?"
-        }
-        val args = mutableListOf(Telephony.Sms.MESSAGE_TYPE_FAILED.toString())
-        AddressScheme.entries.forEach { args.add("${it.prefix}%") }
-
+        val args = arrayOf(
+            Telephony.Sms.MESSAGE_TYPE_FAILED.toString(),
+            "${AddressScheme.Itu888.prefix}%"
+        )
         return try {
             context.contentResolver.query(
                 Telephony.Sms.CONTENT_URI,
                 arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS),
-                "${Telephony.Sms.TYPE} = ? AND ($prefixClauses)",
-                args.toTypedArray(),
+                "${Telephony.Sms.TYPE} = ? AND ${Telephony.Sms.ADDRESS} LIKE ?",
+                args,
                 null
             )?.use { c ->
                 val list = mutableListOf<Pair<Long, String>>()

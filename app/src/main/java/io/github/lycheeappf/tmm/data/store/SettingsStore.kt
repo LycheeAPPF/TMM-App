@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.lycheeappf.tmm.core.model.AddressScheme
 import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -168,28 +167,6 @@ class SettingsStore @Inject constructor(
     fun developerModeFlow(): Flow<Boolean> =
         store.data.map { it[androidx.datastore.preferences.core.booleanPreferencesKey(KEY_DEVELOPER_MODE)] ?: false }
 
-    // ---------- Address-Scheme ----------
-
-    /**
-     * Aktives Fake-Adress-Schema. Fix auf [AddressScheme.Itu888] — +888 ist das
-     * einzige aktive Schema (von Android auflösbar, vom Carrier kostenlos abgelehnt).
-     * Die abgelösten Schemata (+99942, +4932) leben nur noch als Parse-Fallback in
-     * [AddressScheme.entries] für Alt-Mappings.
-     */
-    suspend fun addressScheme(): AddressScheme = AddressScheme.Itu888
-
-    // ---------- Display-Mode (Tesla-Sender-Anzeige) ----------
-
-    /**
-     * Steuert wie `Telephony.Sms.ADDRESS` für eingehende Fake-SMS gebaut wird.
-     * Tesla MCU2 zeigt die ADDRESS-Spalte verbatim im Sender-Display.
-     *  - [DISPLAY_NUMERIC] (Default): nur `"+9994x..."` — kein Name in der ADDRESS;
-     *    der Name kommt über den Contact-Sync-Pfad (PBAP).
-     *  - Jeder andere (Legacy-)Wert: `"Name <+9994x...>"`-Bracket-Form als Fallback.
-     */
-    suspend fun displayMode(): String =
-        store.data.first()[stringPreferencesKey(KEY_DISPLAY_MODE)] ?: DEFAULT_DISPLAY_MODE
-
     fun sendBudgetFlow(): Flow<Int> =
         store.data.map { it[intPreferencesKey(KEY_SEND_BUDGET)] ?: DEFAULT_SEND_BUDGET }
 
@@ -197,16 +174,6 @@ class SettingsStore @Inject constructor(
         const val DEFAULT_SEND_BUDGET = 100
         const val DEFAULT_TTL_HOURS = 24
         const val MAX_MAPPING_ID = 10_000_000L
-
-        // Display-Modus für Sms.ADDRESS — siehe [displayMode] für Beschreibung
-        const val DISPLAY_NUMERIC = "numeric"      // "+999..." + ContactSync → Tesla zeigt "Grok" sauber
-
-        // Default = NUMERIC: pure Nummer in ADDRESS + ContactSync legt einen
-        // unsichtbaren RawContact an, sodass AOSP-MAP den Namen ins Listing
-        // schreibt. Sauberes Tesla-Display, Phonebook bleibt clean. Bei
-        // fehlender WRITE_CONTACTS-Permission zeigt Tesla die Rohnummer (Signal
-        // an den User, Permission zu erteilen).
-        const val DEFAULT_DISPLAY_MODE = DISPLAY_NUMERIC
 
         const val PREFLIGHT_OK = "ok_failed_in_carrier"
         const val PREFLIGHT_RISK = "warning_sent_via_carrier"
@@ -222,7 +189,6 @@ class SettingsStore @Inject constructor(
         private const val KEY_ONBOARDED = "is_onboarded"
         private const val KEY_RISK_ACK = "risk_acknowledged"
         private const val KEY_CONTACTS_SKIPPED = "contacts_step_skipped"
-        private const val KEY_DISPLAY_MODE = "tesla_display_mode"
         private const val KEY_DEVELOPER_MODE = "developer_mode"
     }
 }

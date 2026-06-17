@@ -40,9 +40,6 @@ interface MappingDao {
     @Query("UPDATE mappings SET lastUsedAt = :now, replyCount = replyCount + 1 WHERE mappingId = :mappingId AND channel = :channel")
     suspend fun recordReply(mappingId: Long, channel: Int, now: Long)
 
-    @Query("UPDATE mappings SET expiresAt = :newExpiresAt, lastUsedAt = :now WHERE mappingId = :mappingId AND channel = :channel")
-    suspend fun refreshExpiry(mappingId: Long, channel: Int, newExpiresAt: Long, now: Long)
-
     @Query("UPDATE mappings SET fakeAddress = :newFakeAddress WHERE mappingId = :mappingId AND channel = :channel")
     suspend fun updateFakeAddress(mappingId: Long, channel: Int, newFakeAddress: String): Int
 
@@ -59,15 +56,6 @@ interface MappingDao {
     @Query("DELETE FROM mappings WHERE expiresAt < :now")
     suspend fun deleteExpired(now: Long): Int
 
-    @Query("DELETE FROM mappings")
-    suspend fun deleteAll(): Int
-
-    @Query("DELETE FROM mappings WHERE fakeAddress = :address")
-    suspend fun deleteByAddress(address: String): Int
-
     @Query("DELETE FROM mappings WHERE mappingId = :mappingId AND channel = :channel")
     suspend fun deleteById(mappingId: Long, channel: Int): Int
-
-    @Query("SELECT COUNT(*) FROM mappings WHERE channel = :channel")
-    suspend fun countForChannel(channel: Int): Int
 }

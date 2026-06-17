@@ -10,7 +10,7 @@ interface AssistantTool {
     val schema: ToolSchema
 
     /**
-     * Wird vom Turn-Runner aufgerufen, wenn Grok einen [ToolCall] mit
+     * Wird vom Turn-Runner aufgerufen, wenn Grok einen Tool-Call mit
      * `name == schema.name` produziert.
      */
     suspend fun invoke(arguments: JsonObject): ToolInvocationResult

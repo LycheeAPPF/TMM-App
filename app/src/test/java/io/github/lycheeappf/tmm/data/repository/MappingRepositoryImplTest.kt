@@ -38,7 +38,6 @@ class MappingRepositoryImplTest {
     fun `allocateOrReuse creates new mapping with numeric fakeAddress`() = runTest {
         coEvery { dao.findByConversationKey(any(), any()) } returns null
         coEvery { settings.nextMappingId() } returns 42L
-        coEvery { settings.addressScheme() } returns io.github.lycheeappf.tmm.core.model.AddressScheme.Itu999
 
         val inserted = slot<MappingEntity>()
         coEvery { dao.insert(capture(inserted)) } just Runs
@@ -51,10 +50,10 @@ class MappingRepositoryImplTest {
         )
 
         assertThat(mapping.mappingId).isEqualTo(42L)
-        assertThat(mapping.fakeAddress).isEqualTo("+9994200000042")
+        assertThat(mapping.fakeAddress).isEqualTo("+88800000042")
         assertThat(mapping.channel).isEqualTo(ChannelId.NOTIFICATION)
         assertThat(mapping.replyable).isTrue()
-        assertThat(inserted.captured.fakeAddress).isEqualTo("+9994200000042")
+        assertThat(inserted.captured.fakeAddress).isEqualTo("+88800000042")
     }
 
     @Test
@@ -63,7 +62,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.NOTIFICATION.code,
-            fakeAddress = "+9994200000007",
+            fakeAddress = "+88800000007",
             conversationKey = "com.whatsapp::anna",
             payloadJson = PayloadJson.encode(testPayload),
             createdAt = now - 60_000,
@@ -85,14 +84,14 @@ class MappingRepositoryImplTest {
         )
 
         assertThat(mapping.mappingId).isEqualTo(7L)
-        assertThat(mapping.fakeAddress).isEqualTo("+9994200000007")
+        assertThat(mapping.fakeAddress).isEqualTo("+88800000007")
         coVerify(exactly = 0) { dao.insert(any()) }
     }
 
     @Test
     fun `allocateOrReuse migrates display-only legacy address back to numeric`() = runTest {
         // Aus dem Display-only-Versuch: fakeAddress = "Grok". Wir migrieren
-        // zurück auf "+9994210000007", weil das den Reply-Pfad ermöglicht.
+        // zurück auf "+88810000007", weil das den Reply-Pfad ermöglicht.
         val now = System.currentTimeMillis()
         val legacy = MappingEntity(
             mappingId = 7L,
@@ -109,8 +108,7 @@ class MappingRepositoryImplTest {
         coEvery {
             dao.findByConversationKey(ChannelId.LLM.code, "default-assistant")
         } returns legacy
-        coEvery { settings.addressScheme() } returns io.github.lycheeappf.tmm.core.model.AddressScheme.Itu999
-        coEvery { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+9994210000007") } returns 1
+        coEvery { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+88810000007") } returns 1
 
         val mapping = repository.allocateOrReuse(
             channel = ChannelId.LLM,
@@ -119,8 +117,8 @@ class MappingRepositoryImplTest {
             ttlMillis = 1000L
         )
 
-        assertThat(mapping.fakeAddress).isEqualTo("+9994210000007")
-        coVerify { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+9994210000007") }
+        assertThat(mapping.fakeAddress).isEqualTo("+88810000007")
+        coVerify { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+88810000007") }
     }
 
     @Test
@@ -129,7 +127,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+9994210000007",
+            fakeAddress = "+88810000007",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now - 60_000,
@@ -149,7 +147,7 @@ class MappingRepositoryImplTest {
             ttlMillis = 1000L
         )
 
-        assertThat(mapping.fakeAddress).isEqualTo("+9994210000007")
+        assertThat(mapping.fakeAddress).isEqualTo("+88810000007")
         coVerify(exactly = 0) { dao.updateFakeAddress(any(), any(), any()) }
     }
 
@@ -164,7 +162,7 @@ class MappingRepositoryImplTest {
         val entity = MappingEntity(
             mappingId = 5L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+9994210000005",
+            fakeAddress = "+88810000005",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = 0L,
@@ -173,9 +171,9 @@ class MappingRepositoryImplTest {
             replyCount = 0,
             replyable = true
         )
-        coEvery { dao.findByFakeAddress("+9994210000005") } returns entity
+        coEvery { dao.findByFakeAddress("+88810000005") } returns entity
 
-        val mapping = repository.findByFakeAddress("+9994210000005")
+        val mapping = repository.findByFakeAddress("+88810000005")
         assertThat(mapping).isNotNull()
         assertThat(mapping!!.mappingId).isEqualTo(5L)
     }
@@ -194,7 +192,6 @@ class MappingRepositoryImplTest {
         val payloadWithoutRemoteInput = testPayload.copy(remoteInputResultKey = null)
         coEvery { dao.findByConversationKey(any(), any()) } returns null
         coEvery { settings.nextMappingId() } returns 1L
-        coEvery { settings.addressScheme() } returns io.github.lycheeappf.tmm.core.model.AddressScheme.Itu999
         coEvery { dao.insert(any()) } just Runs
 
         val mapping = repository.allocateOrReuse(

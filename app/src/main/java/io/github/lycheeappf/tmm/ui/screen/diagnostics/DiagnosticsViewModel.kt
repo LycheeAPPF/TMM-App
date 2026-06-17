@@ -17,7 +17,6 @@ import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryDao
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryEntity
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
 import java.util.concurrent.TimeUnit
@@ -47,7 +46,6 @@ data class DiagnosticsUiState(
 data class SenderTestUi(
     val fakeAddress: String = "",
     val displayName: String = "",
-    val mode: String = "",
     val result: SenderResolutionResult? = null,
     val error: String? = null
 )
@@ -61,7 +59,6 @@ class DiagnosticsViewModel @Inject constructor(
     logBuffer: LogBuffer,
     private val contactDiagnostics: ContactDiagnostics,
     private val mappingRepository: MappingRepository,
-    private val settingsStore: SettingsStore,
     private val assistantPrefs: AssistantPreferencesStore,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
@@ -139,7 +136,6 @@ class DiagnosticsViewModel @Inject constructor(
                     SenderTestUi(
                         fakeAddress = mapping.fakeAddress,
                         displayName = displayName,
-                        mode = settingsStore.displayMode(),
                         result = contactDiagnostics.testSenderResolution(mapping.fakeAddress, displayName)
                     )
                 }.getOrElse { e ->

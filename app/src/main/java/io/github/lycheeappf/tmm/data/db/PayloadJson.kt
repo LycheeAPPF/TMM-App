@@ -8,8 +8,8 @@ import kotlinx.serialization.json.Json
  * Singleton-Konfiguration für die Serialisierung von [ChannelPayload] in/aus
  * der Room-Spalte `payloadJson` (String).
  *
- * Polymorphe sealed classes werden automatisch mit Type-Discriminator serialisiert
- * (Default-Key `"type"`).
+ * Polymorphe sealed classes werden mit Type-Discriminator serialisiert; der
+ * Discriminator-Key ist explizit auf `"kind"` gesetzt (siehe [format]).
  */
 object PayloadJson {
     val format: Json = Json {

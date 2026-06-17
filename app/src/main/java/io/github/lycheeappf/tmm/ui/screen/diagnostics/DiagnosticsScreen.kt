@@ -42,7 +42,6 @@ import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryEntity
-import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.ui.component.MfsStatus
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.component.accentColor
@@ -329,8 +328,6 @@ private fun SenderResolutionCard(state: DiagnosticsUiState, onTest: () -> Unit) 
                 val (verdictLabel, verdictStatus) = when {
                     r.phoneLookupFound && r.resolvedName == test.displayName ->
                         "Tesla zeigt den Namen korrekt" to MfsStatus.Success
-                    test.mode != SettingsStore.DISPLAY_NUMERIC ->
-                        "Anzeige-Modus ist nicht 'Nur Nummer'" to MfsStatus.Warning
                     !r.hasWrite ->
                         "Schreibrecht für Kontakte fehlt" to MfsStatus.Warning
                     else ->
@@ -357,7 +354,6 @@ private fun SenderResolutionCard(state: DiagnosticsUiState, onTest: () -> Unit) 
                     Column(verticalArrangement = Arrangement.spacedBy(MfsSpacing.xs)) {
                         HorizontalDivider()
                         Text(test.fakeAddress, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                        KeyValueRow("Display-Modus", test.mode, ok = test.mode == SettingsStore.DISPLAY_NUMERIC)
                         KeyValueRow("READ_CONTACTS", if (r.hasRead) "ja" else "nein", ok = r.hasRead)
                         KeyValueRow("WRITE_CONTACTS", if (r.hasWrite) "ja" else "nein", ok = r.hasWrite)
                         KeyValueRow("Kontakte im Account", r.contactCount.toString(), ok = r.contactCount > 0)
@@ -374,7 +370,7 @@ private fun SenderResolutionCard(state: DiagnosticsUiState, onTest: () -> Unit) 
                             ok = r.phoneLookupFound && r.resolvedName == test.displayName
                         )
                         Text(
-                            technicalVerdict(test.mode, r),
+                            technicalVerdict(r),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -408,11 +404,8 @@ private fun EmptyHint(text: String) {
 }
 
 private fun technicalVerdict(
-    mode: String,
     r: io.github.lycheeappf.tmm.contact.SenderResolutionResult
 ): String = when {
-    mode != SettingsStore.DISPLAY_NUMERIC ->
-        "Modus ist nicht 'Nur Nummer': Tesla zeigt die ADDRESS-Form direkt. Für sauberen Namen in Einstellungen auf 'Nur Nummer' stellen."
     !r.hasWrite ->
         "WRITE_CONTACTS fehlt — ohne das kann kein Kontakt angelegt werden."
     r.phoneLookupFound && r.resolvedName != null ->
@@ -431,7 +424,6 @@ private fun buildSenderTestReport(state: DiagnosticsUiState): String {
     return buildString {
         appendLine("fakeAddress=${test.fakeAddress}")
         appendLine("displayName=${test.displayName}")
-        appendLine("mode=${test.mode}")
         appendLine("hasRead=${r.hasRead}")
         appendLine("hasWrite=${r.hasWrite}")
         appendLine("contactCount=${r.contactCount}")

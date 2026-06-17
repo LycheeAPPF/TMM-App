@@ -16,7 +16,4 @@ interface ReplyHistoryDao {
 
     @Query("DELETE FROM reply_history WHERE attemptedAt < :before")
     suspend fun pruneBefore(before: Long): Int
-
-    @Query("SELECT COUNT(*) FROM reply_history WHERE attemptedAt > :since AND result = :result")
-    suspend fun countSince(since: Long, result: String): Int
 }

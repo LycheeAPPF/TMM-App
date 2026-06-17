@@ -24,7 +24,7 @@ import javax.inject.Singleton
  *     Namen (z.B. `"Grok"`, `"Anna · WhatsApp"`), den das Tesla in der
  *     Outbox 1:1 wieder zurückschreibt.
  *  3. **`FakeAddress.parse`-Fallback** für Legacy-Mappings, die noch das
- *     numerische `+99942x...`-Schema in `fakeAddress` haben (vor der
+ *     numerische `+888x...`-Schema in `fakeAddress` haben (vor der
  *     Migration zu Display-Adresses).
  *
  * Nicht-unsere Adressen (echte SMS-Sends durch Google Messages) durchlaufen
@@ -56,7 +56,7 @@ class OutboundSmsClassifier @Inject constructor(
             return Classification.TeslaReply(mapping.mappingId, mapping.channel.code)
         }
 
-        // Fallback: `+9994x...`-Schema (aus Bracket-Form extrahiert oder pure Numeric).
+        // Fallback: `+888x...`-Schema (aus Bracket-Form extrahiert oder pure Numeric).
         FakeAddress.parse(row.address)?.let { parsed ->
             return Classification.TeslaReply(parsed.mappingId, parsed.channel.code)
         }

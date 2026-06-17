@@ -96,14 +96,12 @@ private fun ChannelCard(row: ChannelRow) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            AddressScheme.entries.forEach { scheme ->
-                Text(
-                    "${scheme.displayLabel}: ${scheme.prefix}${row.id.code}XXXXXXX",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                "${AddressScheme.Itu888.displayLabel}: ${AddressScheme.Itu888.prefix}${row.id.code}XXXXXXX",
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

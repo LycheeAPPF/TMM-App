@@ -44,7 +44,7 @@ class PreFlightTester @Inject constructor(
     private val nonce = AtomicLong(0)
 
     suspend fun targetAddress(): String =
-        FakeAddress(ChannelId.SYSTEM, 0).toE164(settingsStore.addressScheme())
+        FakeAddress(ChannelId.SYSTEM, 0).toE164()
 
     suspend fun run(): Result {
         settingsStore.setPreflightResult(SettingsStore.PREFLIGHT_RUNNING)

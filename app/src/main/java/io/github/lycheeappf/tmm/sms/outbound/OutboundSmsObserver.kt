@@ -14,11 +14,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.MfsApplication
 import io.github.lycheeappf.tmm.channel.llm.InjectedMessageLedger
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.model.FakeAddress
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.repository.ReplyHistoryRecorder
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.domain.reply.ReplyResult
 import io.github.lycheeappf.tmm.domain.routing.ReplyDispatcher
+import io.github.lycheeappf.tmm.sms.send.SelfSendLedger
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightCoordinator
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +56,7 @@ class OutboundSmsObserver @Inject constructor(
     private val preFlightCoordinator: PreFlightCoordinator,
     private val logBuffer: LogBuffer,
     private val injectedMessageLedger: InjectedMessageLedger,
+    private val selfSendLedger: SelfSendLedger,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
 
@@ -138,7 +141,7 @@ class OutboundSmsObserver @Inject constructor(
                     // CancellationException muss durch — sonst bricht structured concurrency.
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     Log.e(TAG, "processRow failed for row=${row.id}", e)
-                    logBuffer.error(TAG, "row ${row.id} (${row.address}) failed: ${e.message}")
+                    logBuffer.error(TAG, "row ${row.id} (${addrForLog(row.address)}) failed: ${e.message}")
                 }
                 if (row.id > maxSeenId) maxSeenId = row.id
             }
@@ -178,7 +181,7 @@ class OutboundSmsObserver @Inject constructor(
         // Body-Länge). Body selbst landet nicht im Buffer (Privacy).
         logBuffer.info(
             TAG,
-            "Outbox-Row #${row.id} type=${row.type} addr='${row.address}' body=${row.body.length}ch"
+            "Outbox-Row #${row.id} type=${row.type} addr='${addrForLog(row.address)}' body=${row.body.length}ch"
         )
 
         if (preFlightCoordinator.isReservedForPreflight(row.address)) {
@@ -192,8 +195,17 @@ class OutboundSmsObserver @Inject constructor(
         // Eigene Inserts kommen normalerweise als INBOX rein und triggern den
         // Observer nicht, der defensive Check kostet aber praktisch nichts.
         if (injectedMessageLedger.shouldIgnoreOutbound(row.address, row.body)) {
-            logBuffer.warn(TAG, "Echo detected for ${row.address} — dropped (row ${row.id})")
+            logBuffer.warn(TAG, "Echo detected for ${addrForLog(row.address)} — dropped (row ${row.id})")
             failedRowCleaner.delete(row.id)
+            dispatchedRowStates[row.id] = row.type
+            return
+        }
+
+        // Eigene In-App-Sends (RealSmsSender) NICHT als Tesla-Reply behandeln —
+        // weder dispatchen noch löschen. rowId-Match bevorzugt, (address,body) als
+        // Fallback fürs Race „Observer sieht Row, bevor markRowId lief".
+        if (selfSendLedger.isSelfSend(row.id) || selfSendLedger.isSelfSend(row.address, row.body)) {
+            logBuffer.info(TAG, "Row ${row.id}: self-send (eigene App) → skip")
             dispatchedRowStates[row.id] = row.type
             return
         }
@@ -206,7 +218,7 @@ class OutboundSmsObserver @Inject constructor(
         val cls = classifier.classify(row)
         if (cls is OutboundSmsClassifier.Classification.NotOurs) {
             // user-initiated SMS via Google Messages → nicht anfassen
-            logBuffer.info(TAG, "Row ${row.id} ('${row.address}') → NotOurs, kein Dispatch")
+            logBuffer.info(TAG, "Row ${row.id} ('${addrForLog(row.address)}') → NotOurs, kein Dispatch")
             return
         }
         cls as OutboundSmsClassifier.Classification.TeslaReply
@@ -326,6 +338,19 @@ class OutboundSmsObserver @Inject constructor(
             Log.e(TAG, "Query failed", e)
             emptyList()
         }
+    }
+
+    /**
+     * Redaktion für den (exportierten) LogBuffer: Fake-`+888…`-Adressen sind keine
+     * PII und bleiben zur Diagnose sichtbar; echte Rufnummern werden maskiert, damit
+     * sie nicht über [io.github.lycheeappf.tmm.core.util.DiagnosticsExporter] lecken.
+     */
+    private fun addrForLog(address: String): String =
+        if (FakeAddress.isFakeAddress(address)) address else maskReal(address)
+
+    private fun maskReal(address: String): String {
+        val digits = address.filter { it.isDigit() }
+        return if (digits.length >= 4) "•••${digits.takeLast(4)}" else "•••"
     }
 
     companion object {

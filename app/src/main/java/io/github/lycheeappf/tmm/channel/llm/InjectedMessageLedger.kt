@@ -54,12 +54,12 @@ class InjectedMessageLedger @Inject constructor(
     }
 
     /**
-     * Normalisiert "Grok <+9994210000007>" → "+9994210000007", damit
+     * Normalisiert "Grok <+88810000007>" → "+88810000007", damit
      * markInjected (called mit der reinen Fake-Number) und
      * shouldIgnoreOutbound (called mit Tesla-Reply-ADDRESS, evtl. inkl.
      * Display-Prefix) gleichgesetzt werden können. Wir filtern auf
      * `[^+0-9]`, weil unsere internen Identitäten (mapping.fakeAddress) immer
-     * numerische `+9994x...`-Form haben.
+     * numerische `+888x...`-Form haben.
      */
     private fun normalizeAddress(raw: String): String =
         raw.replace(Regex("[^+0-9]"), "")

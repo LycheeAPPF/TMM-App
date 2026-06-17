@@ -52,7 +52,6 @@ class DiagnosticsExporter @Inject constructor(
                 ttlHours = settingsStore.mappingTtlHours(),
                 sendBudget = settingsStore.sendBudgetPerDay(),
                 sendCountToday = settingsStore.dailySendCount(),
-                numberSchema = settingsStore.addressScheme().key,
                 preflightResult = settingsStore.preflightResult()
             ),
             mappings = mappings.map { it.toSerializable() },
@@ -124,7 +123,6 @@ private data class SettingsSnapshot(
     val ttlHours: Int,
     val sendBudget: Int,
     val sendCountToday: Int,
-    val numberSchema: String,
     val preflightResult: String?
 )
 

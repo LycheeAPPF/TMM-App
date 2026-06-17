@@ -59,7 +59,7 @@ class LlmStarterTest {
         } returns ChannelMapping(
             mappingId = 1L,
             channel = ChannelId.LLM,
-            fakeAddress = "+9994210000001",
+            fakeAddress = "+88810000001",
             conversationKey = "default-assistant",
             payload = ChannelPayload.Llm(),
             createdAt = 100L,
@@ -112,12 +112,12 @@ class LlmStarterTest {
         val result = starter.start(AssistantTriggerSource.MANUAL_BUTTON)
         assertThat(result).isInstanceOf(LlmStarter.StartResult.Success::class.java)
         assertThat((result as LlmStarter.StartResult.Success).fakeAddress)
-            .isEqualTo("+9994210000001")
+            .isEqualTo("+88810000001")
         coVerify { store.resetUnderLock(1L) }
         coVerify { rateLimiter.reset(1L) }
         coVerify {
             smsWriter.injectIncoming(
-                fakeAddress = "+9994210000001",
+                fakeAddress = "+88810000001",
                 body = "Hi",
                 timestamp = any(),
                 displayName = "Grok"
