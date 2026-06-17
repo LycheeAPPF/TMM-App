@@ -149,6 +149,9 @@ class OutboundSmsClassifierTest {
             ttlMillis: Long
         ): ChannelMapping = throw NotImplementedError()
 
+        override suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping =
+            throw NotImplementedError()
+
         override suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId) {}
         override suspend fun deleteExpired(now: Long) {}
         override suspend fun delete(mappingId: Long, channel: ChannelId) {}

@@ -26,7 +26,8 @@ interface MappingRepository {
 
     /**
      * Findet ein existierendes Mapping mit gleichem conversationKey/Channel oder
-     * erzeugt ein neues. Refreshes `lastUsedAt` und `expiresAt` bei Reuse.
+     * erzeugt ein neues. Refreshes `lastUsedAt` und `expiresAt` bei Reuse
+     * (verkürzt `expiresAt` dabei nie — `maxOf(bestehend, now+ttl)`).
      */
     suspend fun allocateOrReuse(
         channel: ChannelId,
@@ -34,6 +35,15 @@ interface MappingRepository {
         payload: ChannelPayload,
         ttlMillis: Long
     ): ChannelMapping
+
+    /**
+     * Stellt das reservierte, **nicht ablaufende** Mapping für den statischen
+     * Grok-Kontakt sicher (idempotent). Erzeugt bei Bedarf die reservierte Id
+     * ([io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_ID])
+     * und migriert ein evtl. vorhandenes dynamisches `default-assistant`-Mapping
+     * (mit anderer Id) auf diese reservierte Identität.
+     */
+    suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping
 
     /**
      * Aktualisiert die Reply-Statistik nach erfolgreicher Zustellung.

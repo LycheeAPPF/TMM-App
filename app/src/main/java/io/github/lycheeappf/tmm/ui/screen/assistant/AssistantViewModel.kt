@@ -3,11 +3,13 @@ package io.github.lycheeappf.tmm.ui.screen.assistant
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
+import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -44,6 +46,7 @@ class AssistantViewModel @Inject constructor(
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
     private val coordinator: AssistantTriggerCoordinator,
+    private val contactProvisioner: AssistantContactProvisioner,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -120,6 +123,8 @@ class AssistantViewModel @Inject constructor(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 false to "Speichern fehlgeschlagen: ${e::class.simpleName}"
             }
+            // Key gesetzt → statischen Grok-Auto-Kontakt anlegen (sofern Consent da).
+            if (apiKeyIsSet) coRunCatching { contactProvisioner.reconcile() }
             _uiState.update {
                 it.copy(
                     saving = false,
@@ -134,6 +139,8 @@ class AssistantViewModel @Inject constructor(
     fun clearApiKey() {
         viewModelScope.launch(ioDispatcher) {
             apiKeyStore.clear()
+            // Key weg → Grok-Auto-Kontakt entfernen.
+            coRunCatching { contactProvisioner.reconcile() }
             _uiState.update {
                 it.copy(
                     apiKeyIsSet = false,
@@ -187,6 +194,8 @@ class AssistantViewModel @Inject constructor(
     fun setPrivacyConsent(granted: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             prefs.setPrivacyConsentGiven(granted)
+            // Consent-Wechsel → Grok-Auto-Kontakt anlegen (an) bzw. entfernen (aus).
+            coRunCatching { contactProvisioner.reconcile() }
             _uiState.update { it.copy(privacyConsent = granted) }
         }
     }

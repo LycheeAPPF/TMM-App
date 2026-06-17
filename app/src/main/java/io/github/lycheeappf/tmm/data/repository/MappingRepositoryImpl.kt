@@ -8,6 +8,7 @@ import io.github.lycheeappf.tmm.data.db.MappingDao
 import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.PayloadJson
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
@@ -49,12 +50,17 @@ class MappingRepositoryImpl @Inject constructor(
             // soll der Chat weiter beantwortbar bleiben.
             val effectiveReplyable = existing.replyable || newReplyable
             val newPayloadJson = PayloadJson.encode(payload)
+            // Reuse verlängert die TTL, verkürzt sie aber NIE. Wichtig fürs statische
+            // Grok-Mapping (expiresAt = Long.MAX_VALUE): ein Button-Start
+            // (`allocateOrReuse`) darf es nicht auf now+ttl herunterziehen und damit
+            // wieder ablaufbar machen.
+            val effectiveExpiry = maxOf(existing.expiresAt, newExpiry)
             dao.refreshOnReuse(
                 mappingId = existing.mappingId,
                 channel = channel.code,
                 payloadJson = newPayloadJson,
                 replyable = effectiveReplyable,
-                newExpiresAt = newExpiry,
+                newExpiresAt = effectiveExpiry,
                 now = now
             )
             // Migration: ein vorheriger Display-only-Versuch hat fakeAddress
@@ -67,7 +73,7 @@ class MappingRepositoryImpl @Inject constructor(
             // Tesla wenigstens den Namen mit anzeigt.
             val migratedAddress = maybeMigrateDisplayBackToNumeric(existing)
             return existing.copy(
-                expiresAt = newExpiry,
+                expiresAt = effectiveExpiry,
                 lastUsedAt = now,
                 payloadJson = newPayloadJson,
                 replyable = effectiveReplyable,
@@ -113,6 +119,54 @@ class MappingRepositoryImpl @Inject constructor(
         ).toE164(settings.addressScheme())
         dao.updateFakeAddress(existing.mappingId, existing.channel, numeric)
         return numeric
+    }
+
+    override suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping {
+        val now = System.currentTimeMillis()
+        val payloadJson = PayloadJson.encode(
+            ChannelPayload.Llm(
+                providerId = "grok",
+                assistantDisplayName = displayName,
+                conversationKey = AssistantIdentity.CONVERSATION_KEY
+            )
+        )
+        val existing = dao.findByConversationKey(ChannelId.LLM.code, AssistantIdentity.CONVERSATION_KEY)
+
+        // Bereits reserviert (id 0) → nur Adresse/Name aktualisieren und
+        // Nicht-Ablaufen (expiresAt = MAX) sicherstellen. Idempotent.
+        if (existing != null && existing.mappingId == AssistantIdentity.RESERVED_MAPPING_ID) {
+            val updated = existing.copy(
+                fakeAddress = AssistantIdentity.STATIC_FAKE_ADDRESS,
+                payloadJson = payloadJson,
+                expiresAt = Long.MAX_VALUE,
+                replyable = true
+            )
+            dao.update(updated)
+            return updated.toDomain()
+        }
+
+        // Ein früher dynamisch alloziertes Grok-Mapping (id != 0) auf die
+        // reservierte Identität migrieren: alten Kontakt + Row entfernen (sonst
+        // kollidiert der Insert auf dem Unique-Index (channel, conversationKey)).
+        if (existing != null) {
+            coRunCatching { contactSyncWriter.deleteContact(existing.fakeAddress) }
+            dao.deleteById(existing.mappingId, ChannelId.LLM.code)
+        }
+
+        val entity = MappingEntity(
+            mappingId = AssistantIdentity.RESERVED_MAPPING_ID,
+            channel = ChannelId.LLM.code,
+            fakeAddress = AssistantIdentity.STATIC_FAKE_ADDRESS,
+            conversationKey = AssistantIdentity.CONVERSATION_KEY,
+            payloadJson = payloadJson,
+            createdAt = now,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        dao.insert(entity)
+        return entity.toDomain()
     }
 
     override suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId) {

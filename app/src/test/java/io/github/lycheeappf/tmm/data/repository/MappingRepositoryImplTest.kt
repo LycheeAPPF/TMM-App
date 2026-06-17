@@ -204,4 +204,111 @@ class MappingRepositoryImplTest {
 
         assertThat(mapping.replyable).isFalse()
     }
+
+    // --- Statischer Grok-Auto-Kontakt (reservierte Identität id 0) ---
+
+    @Test
+    fun `ensureStaticAssistantMapping seeds reserved id-0 mapping when none exists`() = runTest {
+        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns null
+        val inserted = slot<MappingEntity>()
+        coEvery { dao.insert(capture(inserted)) } just Runs
+
+        val mapping = repository.ensureStaticAssistantMapping("Grok")
+
+        assertThat(mapping.mappingId).isEqualTo(0L)
+        assertThat(mapping.channel).isEqualTo(ChannelId.LLM)
+        assertThat(mapping.fakeAddress).isEqualTo("+88810000000")
+        assertThat(mapping.expiresAt).isEqualTo(Long.MAX_VALUE)
+        assertThat(inserted.captured.mappingId).isEqualTo(0L)
+        assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
+    }
+
+    @Test
+    fun `ensureStaticAssistantMapping updates reserved mapping in place and lifts expiry to MAX`() = runTest {
+        val now = System.currentTimeMillis()
+        val existing = MappingEntity(
+            mappingId = 0L,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+88810000000",
+            conversationKey = "default-assistant",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now - 5000,
+            expiresAt = now + 1000, // ablaufend — muss auf MAX gehoben werden
+            lastUsedAt = null,
+            replyCount = 3,
+            replyable = true
+        )
+        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns existing
+        val updated = slot<MappingEntity>()
+        coEvery { dao.update(capture(updated)) } just Runs
+
+        val mapping = repository.ensureStaticAssistantMapping("Grok")
+
+        assertThat(mapping.mappingId).isEqualTo(0L)
+        assertThat(updated.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
+        coVerify(exactly = 0) { dao.insert(any()) }
+        coVerify(exactly = 0) { dao.deleteById(any(), any()) }
+    }
+
+    @Test
+    fun `ensureStaticAssistantMapping migrates a dynamic mapping onto the reserved id`() = runTest {
+        val now = System.currentTimeMillis()
+        val dynamic = MappingEntity(
+            mappingId = 5L,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+88810000005",
+            conversationKey = "default-assistant",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now - 5000,
+            expiresAt = now + 1000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns dynamic
+        coEvery { dao.deleteById(5L, ChannelId.LLM.code) } returns 1
+        val inserted = slot<MappingEntity>()
+        coEvery { dao.insert(capture(inserted)) } just Runs
+
+        val mapping = repository.ensureStaticAssistantMapping("Grok")
+
+        assertThat(mapping.mappingId).isEqualTo(0L)
+        assertThat(mapping.fakeAddress).isEqualTo("+88810000000")
+        assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
+        coVerify { contactSyncWriter.deleteContact("+88810000005") }
+        coVerify { dao.deleteById(5L, ChannelId.LLM.code) }
+    }
+
+    @Test
+    fun `allocateOrReuse never shortens a non-expiring mapping on reuse`() = runTest {
+        val now = System.currentTimeMillis()
+        val staticMapping = MappingEntity(
+            mappingId = 0L,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+88810000000",
+            conversationKey = "default-assistant",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now - 5000,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery { dao.findByConversationKey(ChannelId.LLM.code, "default-assistant") } returns staticMapping
+        val expirySlot = slot<Long>()
+        coEvery {
+            dao.refreshOnReuse(any(), any(), any(), any(), capture(expirySlot), any())
+        } just Runs
+
+        val mapping = repository.allocateOrReuse(
+            channel = ChannelId.LLM,
+            conversationKey = "default-assistant",
+            payload = ChannelPayload.Llm(),
+            ttlMillis = 60_000L
+        )
+
+        // Ein Button-Start darf das nicht-ablaufende Mapping nicht auf now+ttl ziehen.
+        assertThat(expirySlot.captured).isEqualTo(Long.MAX_VALUE)
+        assertThat(mapping.expiresAt).isEqualTo(Long.MAX_VALUE)
+    }
 }

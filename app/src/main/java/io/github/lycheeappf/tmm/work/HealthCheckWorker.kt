@@ -14,6 +14,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.lycheeappf.tmm.MainActivity
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
+import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
 import java.util.concurrent.TimeUnit
@@ -30,7 +32,8 @@ class HealthCheckWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
     private val roleManager: DefaultSmsRoleManager,
-    private val permissionGate: PermissionGate
+    private val permissionGate: PermissionGate,
+    private val contactProvisioner: AssistantContactProvisioner
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -70,6 +73,11 @@ class HealthCheckWorker @AssistedInject constructor(
         } else {
             nm.cancel(NOTIF_ID_CONTACTS)
         }
+
+        // Statischen Grok-Auto-Kontakt nach Reboot / PBAP-Cache-Verlust
+        // wiederherstellen — bzw. entfernen, falls der Assistent nicht (mehr)
+        // eingerichtet ist. Idempotent; ohne Contacts-Permission ein No-op.
+        coRunCatching { contactProvisioner.reconcile() }
 
         return Result.success()
     }

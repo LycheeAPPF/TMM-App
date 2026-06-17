@@ -5,6 +5,7 @@ import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.core.util.SendBudget
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
@@ -123,10 +124,10 @@ class LlmStarter @Inject constructor(
     companion object {
         /**
          * Stabiler Key, damit dieselbe LLM-Konversation wiederverwendet wird.
-         * Wechsel auf z.B. "default-assistant-v2" würde ein frisches Mapping
-         * mit anderer Fake-Adresse erzwingen (für künftige Modell-Wechsel relevant).
+         * Einzige Quelle: [AssistantIdentity.CONVERSATION_KEY] — App-Button und der
+         * statische Auto-Kontakt teilen sich dieselbe Konversation.
          */
-        const val CONVERSATION_KEY = "default-assistant"
+        const val CONVERSATION_KEY = AssistantIdentity.CONVERSATION_KEY
         private const val TAG = "LlmStarter"
     }
 }

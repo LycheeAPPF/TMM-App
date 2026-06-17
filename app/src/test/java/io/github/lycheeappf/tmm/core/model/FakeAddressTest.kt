@@ -19,6 +19,16 @@ class FakeAddressTest {
     }
 
     @Test
+    fun `reserved Grok address +88810000000 round-trips to (LLM, 0)`() {
+        val reserved = FakeAddress(ChannelId.LLM, 0L)
+        assertThat(reserved.toE164()).isEqualTo("+88810000000")
+        assertThat(FakeAddress.parse("+88810000000")).isEqualTo(reserved)
+        // Single source of truth für den statischen Grok-Auto-Kontakt.
+        assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.STATIC_FAKE_ADDRESS)
+            .isEqualTo("+88810000000")
+    }
+
+    @Test
     fun `toE164 formats system channel address (default +888)`() {
         val addr = FakeAddress(ChannelId.SYSTEM, 1).toE164()
         assertThat(addr).isEqualTo("+88890000001")
