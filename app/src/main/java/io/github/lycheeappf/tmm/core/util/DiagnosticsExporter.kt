@@ -52,7 +52,7 @@ class DiagnosticsExporter @Inject constructor(
                 ttlHours = settingsStore.mappingTtlHours(),
                 sendBudget = settingsStore.sendBudgetPerDay(),
                 sendCountToday = settingsStore.dailySendCount(),
-                numberSchema = settingsStore.numberSchema(),
+                numberSchema = settingsStore.addressScheme().key,
                 preflightResult = settingsStore.preflightResult()
             ),
             mappings = mappings.map { it.toSerializable() },

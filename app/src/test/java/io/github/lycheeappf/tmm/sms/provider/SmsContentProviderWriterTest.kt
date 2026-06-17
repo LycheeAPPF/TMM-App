@@ -5,32 +5,25 @@ import io.github.lycheeappf.tmm.data.store.SettingsStore
 import org.junit.Test
 
 /**
- * Reine String-Composer-Tests für die ADDRESS-Spalte. Stellt sicher, dass alle
- * drei [SettingsStore.displayMode]-Optionen das richtige Format produzieren und
- * dass die Sanitization weder die Number noch das Bracket-Anchor zerstört.
+ * Reine String-Composer-Tests für die ADDRESS-Spalte. Stellt sicher, dass der
+ * [SettingsStore.DISPLAY_NUMERIC]-Modus die reine Nummer liefert, jeder andere
+ * (Legacy-)Wert die `"Name <+number>"`-Bracket-Form, und dass die Sanitization
+ * weder die Number noch das Bracket-Anchor zerstört.
  */
 class SmsContentProviderWriterTest {
 
     private val number = "+9994210000005"
 
-    @Test fun `hybrid mode produces RFC-822-mailbox form`() {
+    /** Jeder Wert != [SettingsStore.DISPLAY_NUMERIC] trifft den Bracket-Form-Zweig. */
+    private val bracketMode = "legacy"
+
+    @Test fun `non-numeric mode produces RFC-822-mailbox bracket form`() {
         val result = SmsContentProviderWriter.composeDisplayAddressPure(
             displayName = "Grok",
             fakeAddress = number,
-            mode = SettingsStore.DISPLAY_HYBRID
+            mode = bracketMode
         )
         assertThat(result).isEqualTo("Grok <+9994210000005>")
-    }
-
-    @Test fun `padding mode injects 40 spaces between name and bracketed number`() {
-        val result = SmsContentProviderWriter.composeDisplayAddressPure(
-            displayName = "Grok",
-            fakeAddress = number,
-            mode = SettingsStore.DISPLAY_PADDING
-        )
-        assertThat(result).isEqualTo("Grok" + " ".repeat(40) + "<+9994210000005>")
-        // Number bleibt als Bracket-Anchor erhalten — Reply-Pfad funktioniert
-        assertThat(result).contains("<+9994210000005>")
     }
 
     @Test fun `numeric mode returns only the fake number regardless of displayName`() {
@@ -43,11 +36,7 @@ class SmsContentProviderWriterTest {
     }
 
     @Test fun `null displayName always returns pure number`() {
-        for (mode in listOf(
-            SettingsStore.DISPLAY_HYBRID,
-            SettingsStore.DISPLAY_PADDING,
-            SettingsStore.DISPLAY_NUMERIC
-        )) {
+        for (mode in listOf(SettingsStore.DISPLAY_NUMERIC, bracketMode)) {
             val result = SmsContentProviderWriter.composeDisplayAddressPure(
                 displayName = null, fakeAddress = number, mode = mode
             )
@@ -59,7 +48,7 @@ class SmsContentProviderWriterTest {
         val result = SmsContentProviderWriter.composeDisplayAddressPure(
             displayName = "   ",
             fakeAddress = number,
-            mode = SettingsStore.DISPLAY_HYBRID
+            mode = bracketMode
         )
         assertThat(result).isEqualTo(number)
     }
@@ -69,7 +58,7 @@ class SmsContentProviderWriterTest {
         val result = SmsContentProviderWriter.composeDisplayAddressPure(
             displayName = "Anna<;Bob, \"Test\"\\\r\n\t",
             fakeAddress = number,
-            mode = SettingsStore.DISPLAY_HYBRID
+            mode = bracketMode
         )
         // Keine der gefährlichen Chars sollte in der finalen Form sein außer
         // dem ein gewollten < > Bracket um die fakeAddress
@@ -89,7 +78,7 @@ class SmsContentProviderWriterTest {
         val result = SmsContentProviderWriter.composeDisplayAddressPure(
             displayName = "Anna    Müller",
             fakeAddress = number,
-            mode = SettingsStore.DISPLAY_HYBRID
+            mode = bracketMode
         )
         assertThat(result).isEqualTo("Anna Müller <+9994210000005>")
     }
@@ -99,50 +88,41 @@ class SmsContentProviderWriterTest {
         val result = SmsContentProviderWriter.composeDisplayAddressPure(
             displayName = longName,
             fakeAddress = number,
-            mode = SettingsStore.DISPLAY_HYBRID
+            mode = bracketMode
         )
         // Display-Teil ist auf MAX_DISPLAY_CHARS=40 capped
         val displayPart = result.substringBefore(" <")
         assertThat(displayPart).hasLength(SmsContentProviderWriter.MAX_DISPLAY_CHARS)
     }
 
-    @Test fun `unknown mode falls back to hybrid form`() {
-        val result = SmsContentProviderWriter.composeDisplayAddressPure(
-            displayName = "Grok",
-            fakeAddress = number,
-            mode = "some_unknown_mode"
-        )
-        assertThat(result).isEqualTo("Grok <+9994210000005>")
-    }
-
-    @Test fun `padding number-suffix is parsable for reply routing`() {
+    @Test fun `bracket-form number-suffix is parsable for reply routing`() {
         // Sanity: nach Tesla-Roundtrip strippt FakeAddress.parse alles außer +0-9
-        val padded = SmsContentProviderWriter.composeDisplayAddressPure(
+        val bracketed = SmsContentProviderWriter.composeDisplayAddressPure(
             displayName = "Anna",
             fakeAddress = number,
-            mode = SettingsStore.DISPLAY_PADDING
+            mode = bracketMode
         )
-        val stripped = padded.replace(Regex("[^+0-9]"), "")
+        val stripped = bracketed.replace(Regex("[^+0-9]"), "")
         assertThat(stripped).isEqualTo(number)
     }
 
-    // --- displayMode-Fallback (Regression: vorher hart HYBRID, jetzt DEFAULT) ---
+    // --- displayMode-Fallback (Regression: vorher hart Bracket-Modus, jetzt DEFAULT) ---
 
-    @Test fun `displayMode read failure falls back to DEFAULT not HYBRID`() {
+    @Test fun `displayMode read failure falls back to DEFAULT NUMERIC`() {
         val mode = SmsContentProviderWriter.displayModeOrFallback(
             Result.failure(RuntimeException("datastore unavailable"))
         )
-        // Der frühere Bug: Fallback war hart DISPLAY_HYBRID → Tesla zeigte
+        // Der frühere Bug: Fallback war hart ein Bracket-Modus → Tesla zeigte
         // "Grok <+999...>" obwohl der User Clean-Name (NUMERIC) wollte.
         assertThat(mode).isEqualTo(SettingsStore.DEFAULT_DISPLAY_MODE)
         assertThat(mode).isEqualTo(SettingsStore.DISPLAY_NUMERIC)
-        assertThat(mode).isNotEqualTo(SettingsStore.DISPLAY_HYBRID)
     }
 
-    @Test fun `displayMode success returns the read value`() {
+    @Test fun `displayMode success returns the read value not the default`() {
         val mode = SmsContentProviderWriter.displayModeOrFallback(
-            Result.success(SettingsStore.DISPLAY_HYBRID)
+            Result.success(bracketMode)
         )
-        assertThat(mode).isEqualTo(SettingsStore.DISPLAY_HYBRID)
+        assertThat(mode).isEqualTo(bracketMode)
+        assertThat(mode).isNotEqualTo(SettingsStore.DEFAULT_DISPLAY_MODE)
     }
 }

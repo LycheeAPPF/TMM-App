@@ -120,7 +120,7 @@ class FakeAddressTest {
 
     @Test
     fun `parse extracts embedded number from display-name combined format`() {
-        // Hybrid-Address-Format: Tesla zeigt 'Grok' als Sender, weil das im
+        // Bracket-Address-Format: Tesla zeigt 'Grok' als Sender, weil das im
         // Display-Teil steht, Reply-Routing klappt via dem in spitzen Klammern
         // eingebetteten +99942...-Token.
         val parsed = FakeAddress.parse("Grok <+9994210000007>")

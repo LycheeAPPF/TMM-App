@@ -35,7 +35,7 @@ class OutboundSmsClassifier @Inject constructor(
             return Classification.TeslaReply(mapping.mappingId, mapping.channel.code)
         }
 
-        // Fallback: `+9994x...`-Schema (Hybrid-Form extracted oder pure Numeric).
+        // Fallback: `+9994x...`-Schema (aus Bracket-Form extrahiert oder pure Numeric).
         FakeAddress.parse(row.address)?.let { parsed ->
             return Classification.TeslaReply(parsed.mappingId, parsed.channel.code)
         }

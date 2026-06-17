@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.core.model.AddressScheme
-import io.github.lycheeappf.tmm.core.model.ChannelId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -49,11 +48,6 @@ class SettingsStore @Inject constructor(
         }
         return assigned
     }
-
-    @Deprecated("Use nextMappingId() — pro-Channel-Counter führten zu DB-PK-Conflicts",
-        ReplaceWith("nextMappingId()"))
-    suspend fun nextMappingIdFor(@Suppress("UNUSED_PARAMETER") channel: ChannelId): Long =
-        nextMappingId()
 
     suspend fun lastSeenOutboxId(): Long =
         store.data.first()[longPreferencesKey(KEY_LAST_OUTBOX_ID)] ?: 0L
@@ -166,39 +160,27 @@ class SettingsStore @Inject constructor(
     fun developerModeFlow(): Flow<Boolean> =
         store.data.map { it[androidx.datastore.preferences.core.booleanPreferencesKey(KEY_DEVELOPER_MODE)] ?: false }
 
-    // ---------- Number-Schema ----------
+    // ---------- Address-Scheme ----------
 
-    suspend fun numberSchema(): String =
-        store.data.first()[stringPreferencesKey(KEY_NUMBER_SCHEMA)] ?: SCHEMA_ITU_888
-
-    suspend fun setNumberSchema(value: String) {
-        store.edit { it[stringPreferencesKey(KEY_NUMBER_SCHEMA)] = value }
-    }
-
-    fun numberSchemaFlow(): Flow<String> =
-        store.data.map { it[stringPreferencesKey(KEY_NUMBER_SCHEMA)] ?: SCHEMA_ITU_888 }
-
-    suspend fun addressScheme(): AddressScheme =
-        AddressScheme.fromKey(numberSchema())
+    /**
+     * Aktives Fake-Adress-Schema. Fix auf [AddressScheme.Itu888] — +888 ist das
+     * einzige aktive Schema (von Android auflösbar, vom Carrier kostenlos abgelehnt).
+     * Die abgelösten Schemata (+99942, +4932) leben nur noch als Parse-Fallback in
+     * [AddressScheme.entries] für Alt-Mappings.
+     */
+    suspend fun addressScheme(): AddressScheme = AddressScheme.Itu888
 
     // ---------- Display-Mode (Tesla-Sender-Anzeige) ----------
 
     /**
      * Steuert wie `Telephony.Sms.ADDRESS` für eingehende Fake-SMS gebaut wird.
      * Tesla MCU2 zeigt die ADDRESS-Spalte verbatim im Sender-Display.
-     *  - [DISPLAY_HYBRID]: `"Name <+9994x...>"` — sicher für Reply, Number sichtbar
-     *  - [DISPLAY_PADDING]: `"Name" + 40 Spaces + "<+9994x...>"` — Hoffnung dass Tesla truncated
-     *  - [DISPLAY_NUMERIC]: nur `"+9994x..."` — kein Name (für PBAP/Contact-Sync-Pfad)
+     *  - [DISPLAY_NUMERIC] (Default): nur `"+9994x..."` — kein Name in der ADDRESS;
+     *    der Name kommt über den Contact-Sync-Pfad (PBAP).
+     *  - Jeder andere (Legacy-)Wert: `"Name <+9994x...>"`-Bracket-Form als Fallback.
      */
     suspend fun displayMode(): String =
         store.data.first()[stringPreferencesKey(KEY_DISPLAY_MODE)] ?: DEFAULT_DISPLAY_MODE
-
-    suspend fun setDisplayMode(value: String) {
-        store.edit { it[stringPreferencesKey(KEY_DISPLAY_MODE)] = value }
-    }
-
-    fun displayModeFlow(): Flow<String> =
-        store.data.map { it[stringPreferencesKey(KEY_DISPLAY_MODE)] ?: DEFAULT_DISPLAY_MODE }
 
     fun sendBudgetFlow(): Flow<Int> =
         store.data.map { it[intPreferencesKey(KEY_SEND_BUDGET)] ?: DEFAULT_SEND_BUDGET }
@@ -208,14 +190,7 @@ class SettingsStore @Inject constructor(
         const val DEFAULT_TTL_HOURS = 24
         const val MAX_MAPPING_ID = 10_000_000L
 
-        const val SCHEMA_ITU_888 = "itu_888"      // +888... (TDR, parsebar + carrier-rejected) — einziges aktives Schema
-        // Die abgelösten Schemata (+99942 "itu_999", +4932 "de_32") leben nur noch
-        // als Parse-Fallback in [AddressScheme] für Alt-Mappings — kein eigener
-        // SettingsStore-Konstant mehr nötig, da sie nie als aktives Schema gesetzt werden.
-
-        // Display-Modi für Sms.ADDRESS — siehe [displayMode] für Beschreibung
-        const val DISPLAY_HYBRID = "hybrid"        // "Name <+999...>"  (Reply-safe, Nummer sichtbar)
-        const val DISPLAY_PADDING = "padding"      // "Name" + 40sp + "<+999...>"  (verworfen: Tesla wrapped)
+        // Display-Modus für Sms.ADDRESS — siehe [displayMode] für Beschreibung
         const val DISPLAY_NUMERIC = "numeric"      // "+999..." + ContactSync → Tesla zeigt "Grok" sauber
 
         // Default = NUMERIC: pure Nummer in ADDRESS + ContactSync legt einen
@@ -237,7 +212,6 @@ class SettingsStore @Inject constructor(
         private const val KEY_TTL_HOURS = "mapping_ttl_hours"
         private const val KEY_PREFLIGHT_RESULT = "preflight_result"
         private const val KEY_ONBOARDED = "is_onboarded"
-        private const val KEY_NUMBER_SCHEMA = "number_schema"
         private const val KEY_RISK_ACK = "risk_acknowledged"
         private const val KEY_CONTACTS_SKIPPED = "contacts_step_skipped"
         private const val KEY_DISPLAY_MODE = "tesla_display_mode"
