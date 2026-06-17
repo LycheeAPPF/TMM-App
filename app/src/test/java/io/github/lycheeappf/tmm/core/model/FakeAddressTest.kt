@@ -26,9 +26,12 @@ class FakeAddressTest {
         // Single source of truth für den statischen Grok-Auto-Kontakt.
         assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.STATIC_FAKE_ADDRESS)
             .isEqualTo("+88810000000")
-        // Nur die Grok-Id (0) ist reserviert — keine Sprach-Aliasse mehr.
+        // Zusätzlicher Sprach-Ansprech-Kontakt (Id 1).
+        assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS)
+            .isEqualTo("+88810000001")
+        // Reserviert: Grok-Id (0) + Sprach-Alias-Id (1).
         assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_IDS)
-            .containsExactly(0L)
+            .containsExactly(0L, 1L)
     }
 
     @Test

@@ -20,10 +20,10 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Sichert den Apply-Pfad des Tesla-Anzeigenamens
- * ([AssistantViewModel.applyAssistantName]): der Name wird erst persistiert und DANN
- * ein Tesla-Resync erzwungen (Reihenfolge ist load-bearing — der Backfill liest die
- * Pref), die Eingabe wird getrimmt, und leere Eingaben werden ignoriert.
+ * Sichert den Apply-Pfad des zusätzlichen Sprach-Ansprech-Kontakts
+ * ([AssistantViewModel.applyVoiceAlias]): aktivieren setzt Enabled+Name und erzwingt
+ * DANN den Tesla-Resync; „Aus" setzt nur Enabled=false (kein Name) + Resync; leerer
+ * Name bei aktiviert ist ein No-op.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AssistantViewModelTest {
@@ -50,39 +50,43 @@ class AssistantViewModelTest {
     }
 
     @Test
-    fun `applyAssistantName persists name then forces tesla resync`() = runTest(dispatcher) {
+    fun `applyVoiceAlias enabled persists name then forces resync`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle() // init refresh() abwarten
 
-        vm.applyAssistantName("Walter Grok")
+        vm.applyVoiceAlias(true, "xAI Grok")
         advanceUntilIdle()
 
         coVerifyOrder {
-            prefs.setAssistantDisplayName("Walter Grok")
+            prefs.setVoiceAliasEnabled(true)
+            prefs.setVoiceAliasName("xAI Grok")
             teslaContactResync.force()
         }
     }
 
     @Test
-    fun `applyAssistantName trims surrounding whitespace`() = runTest(dispatcher) {
+    fun `applyVoiceAlias disabled does not set a name but resyncs`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.applyAssistantName("  xAI Grok  ")
+        vm.applyVoiceAlias(false, "ignored")
         advanceUntilIdle()
 
-        coVerify { prefs.setAssistantDisplayName("xAI Grok") }
+        coVerify { prefs.setVoiceAliasEnabled(false) }
+        coVerify { teslaContactResync.force() }
+        coVerify(exactly = 0) { prefs.setVoiceAliasName(any()) }
     }
 
     @Test
-    fun `applyAssistantName ignores blank input`() = runTest(dispatcher) {
+    fun `applyVoiceAlias enabled with blank name is a no-op`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.applyAssistantName("   ")
+        vm.applyVoiceAlias(true, "   ")
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { prefs.setAssistantDisplayName(any()) }
+        coVerify(exactly = 0) { prefs.setVoiceAliasEnabled(any()) }
+        coVerify(exactly = 0) { prefs.setVoiceAliasName(any()) }
         coVerify(exactly = 0) { teslaContactResync.force() }
     }
 }

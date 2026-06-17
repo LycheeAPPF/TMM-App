@@ -177,31 +177,45 @@ fun AssistantScreen(
             }
 
             SettingCard(
-                title = "Name im Tesla (Sprachsteuerung)",
-                description = "So heißt Grok als Kontakt im Auto. Teslas Sprachsteuerung erkennt " +
-                    "einen VOR- + NACHNAMEN am zuverlässigsten. Auswählen bzw. Anwenden " +
-                    "synchronisiert den Namen direkt zum Tesla."
+                title = "Zusätzlicher Name für Sprachsteuerung",
+                description = "Zusätzlicher Kontakt zum Ansprechen per Sprache ('Text an …'). " +
+                    "Leitet auf Grok um — Grok antwortet weiterhin als 'Grok'. Teslas " +
+                    "Sprachsteuerung erkennt einen VOR- + NACHNAMEN am zuverlässigsten. 'Aus' " +
+                    "entfernt den Zusatzkontakt; Auswählen bzw. Anwenden synchronisiert direkt zum Tesla."
             ) {
-                val isCustom = state.assistantName !in AssistantViewModel.PRESET_NAMES
-                var customMode by remember(state.assistantName) { mutableStateOf(isCustom) }
-                var customDraft by remember(state.assistantName) {
-                    mutableStateOf(if (isCustom) state.assistantName else "")
+                val isCustom = state.voiceAliasEnabled &&
+                    state.voiceAliasName !in AssistantViewModel.PRESET_NAMES
+                var customMode by remember(state.voiceAliasName, state.voiceAliasEnabled) {
+                    mutableStateOf(isCustom)
+                }
+                var customDraft by remember(state.voiceAliasName) {
+                    mutableStateOf(if (isCustom) state.voiceAliasName else "")
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
+                    FilterChip(
+                        selected = !state.voiceAliasEnabled,
+                        enabled = !state.voiceAliasApplying,
+                        onClick = {
+                            customMode = false
+                            viewModel.applyVoiceAlias(false, state.voiceAliasName)
+                        },
+                        label = { Text("Aus") }
+                    )
                     AssistantViewModel.PRESET_NAMES.forEach { preset ->
                         FilterChip(
-                            selected = !customMode && state.assistantName == preset,
-                            enabled = !state.assistantNameApplying,
+                            selected = state.voiceAliasEnabled && !customMode &&
+                                state.voiceAliasName == preset,
+                            enabled = !state.voiceAliasApplying,
                             onClick = {
                                 customMode = false
-                                viewModel.applyAssistantName(preset)
+                                viewModel.applyVoiceAlias(true, preset)
                             },
                             label = { Text(preset) }
                         )
                     }
                     FilterChip(
                         selected = customMode,
-                        enabled = !state.assistantNameApplying,
+                        enabled = !state.voiceAliasApplying,
                         onClick = { customMode = true },
                         label = { Text("Eigener Name") }
                     )
@@ -215,10 +229,10 @@ fun AssistantScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Button(
-                        onClick = { viewModel.applyAssistantName(customDraft) },
-                        enabled = customDraft.isNotBlank() && !state.assistantNameApplying
+                        onClick = { viewModel.applyVoiceAlias(true, customDraft) },
+                        enabled = customDraft.isNotBlank() && !state.voiceAliasApplying
                     ) {
-                        Text(if (state.assistantNameApplying) "läuft…" else "Anwenden & zum Tesla syncen")
+                        Text(if (state.voiceAliasApplying) "läuft…" else "Anwenden & zum Tesla syncen")
                     }
                 }
             }

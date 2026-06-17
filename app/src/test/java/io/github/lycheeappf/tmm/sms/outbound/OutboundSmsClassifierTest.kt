@@ -85,6 +85,42 @@ class OutboundSmsClassifierTest {
         )
     }
 
+    // --- Sprach-Ansprech-Kontakt (+88810000001) → kanonische Grok-Session (id 0) ---
+
+    @Test
+    fun `voice alias address redirects to canonical Grok id 0`() = runBlocking {
+        // Bewusst KEIN Mapping im Repo — der Redirect darf nicht von der DB abhängen.
+        val result = classifier.classify(row(address = "+88810000001"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `voice alias bracket form redirects to canonical Grok id 0`() = runBlocking {
+        val result = classifier.classify(row(address = "Walter Grok <+88810000001>"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `voice alias 00-prefix form redirects to canonical Grok id 0`() = runBlocking {
+        val result = classifier.classify(row(address = "0088810000001"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
     @Test
     fun `LLM address routes by its own id via parse`() = runBlocking {
         // +88810000009 → über FakeAddress.parse als (LLM, 9).

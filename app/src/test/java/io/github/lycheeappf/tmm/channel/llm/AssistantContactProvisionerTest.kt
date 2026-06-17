@@ -15,9 +15,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 /**
- * Gate-Logik des statischen Grok-Auto-Kontakts: er existiert genau dann, wenn der
- * Assistent einsatzbereit ist (Datenschutz-Einwilligung gegeben UND API-Key gesetzt),
- * und trägt den konfigurierten Anzeigenamen.
+ * Gate-Logik der Tesla-Kontakte: der kanonische Grok-Antwort-Kontakt (+88810000000,
+ * fest „Grok") existiert genau dann, wenn der Assistent einsatzbereit ist (Consent +
+ * API-Key). Der zusätzliche Sprach-Ansprech-Kontakt (+88810000001) trägt einen
+ * konfigurierbaren Namen und folgt dem `voiceAliasEnabled`-Schalter.
  */
 class AssistantContactProvisionerTest {
 
@@ -43,54 +44,74 @@ class AssistantContactProvisionerTest {
         replyable = true
     )
 
-    @Test
-    fun `reconcile provisions contact when consent given and api key set`() = runTest {
+    private fun ready() {
         coEvery { prefs.isPrivacyConsentGiven() } returns true
         coEvery { apiKeyStore.read() } returns "xai-key"
         coEvery { prefs.assistantDisplayName() } returns "Grok"
         coEvery { mappingRepository.ensureStaticAssistantMapping("Grok") } returns staticMapping
+    }
+
+    @Test
+    fun `reconcile provisions Grok plus enabled voice alias`() = runTest {
+        ready()
+        coEvery { prefs.voiceAliasEnabled() } returns true
+        coEvery { prefs.voiceAliasName() } returns "Walter Grok"
 
         provisioner.reconcile()
 
-        coVerify { mappingRepository.ensureStaticAssistantMapping("Grok") }
+        // Antwort-Kontakt heißt immer „Grok".
         coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
+        // Sprach-Ansprech-Kontakt mit konfiguriertem Namen.
+        coVerify { contactSyncWriter.upsertContact("+88810000001", "Walter Grok") }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 
     @Test
-    fun `reconcile provisions contact under the configured display name`() = runTest {
-        coEvery { prefs.isPrivacyConsentGiven() } returns true
-        coEvery { apiKeyStore.read() } returns "xai-key"
-        coEvery { prefs.assistantDisplayName() } returns "Walter Grok"
-        coEvery { mappingRepository.ensureStaticAssistantMapping("Walter Grok") } returns staticMapping
+    fun `reconcile uses the configured voice alias name`() = runTest {
+        ready()
+        coEvery { prefs.voiceAliasEnabled() } returns true
+        coEvery { prefs.voiceAliasName() } returns "xAI Grok"
 
         provisioner.reconcile()
 
-        // Die Fake-Adresse bleibt +88810000000, nur der angezeigte Name folgt der Pref.
-        coVerify { contactSyncWriter.upsertContact("+88810000000", "Walter Grok") }
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
+        coVerify { contactSyncWriter.upsertContact("+88810000001", "xAI Grok") }
     }
 
     @Test
-    fun `reconcile removes contact when api key missing`() = runTest {
+    fun `reconcile removes the voice alias when disabled, keeps Grok`() = runTest {
+        ready()
+        coEvery { prefs.voiceAliasEnabled() } returns false
+
+        provisioner.reconcile()
+
+        coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
+        coVerify { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+88810000001", any()) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+    }
+
+    @Test
+    fun `reconcile removes both contacts when api key missing`() = runTest {
         coEvery { prefs.isPrivacyConsentGiven() } returns true
         coEvery { apiKeyStore.read() } returns null
 
         provisioner.reconcile()
 
         coVerify { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify { contactSyncWriter.deleteContact("+88810000001") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
         coVerify(exactly = 0) { contactSyncWriter.upsertContact(any(), any()) }
     }
 
     @Test
-    fun `reconcile removes contact when consent withdrawn`() = runTest {
+    fun `reconcile removes both contacts when consent withdrawn`() = runTest {
         coEvery { prefs.isPrivacyConsentGiven() } returns false
         coEvery { apiKeyStore.read() } returns "xai-key"
 
         provisioner.reconcile()
 
         coVerify { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify { contactSyncWriter.deleteContact("+88810000001") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
     }
 }

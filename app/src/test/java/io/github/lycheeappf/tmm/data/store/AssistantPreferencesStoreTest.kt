@@ -10,10 +10,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Sichert den konfigurierbaren Tesla-Anzeigenamen
- * ([AssistantPreferencesStore.assistantDisplayName]): ein frischer Store liefert den
- * Default „Grok", nach [AssistantPreferencesStore.setAssistantDisplayName] den neuen
- * Wert. DataStore braucht einen echten Context → Robolectric.
+ * Sichert den Antwort-Namen (fest „Grok") und den konfigurierbaren Sprach-Ansprech-
+ * Kontakt: Default aktiv mit Name „Walter Grok", Setter persistieren. DataStore
+ * braucht einen echten Context → Robolectric.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -23,11 +22,22 @@ class AssistantPreferencesStoreTest {
     private val store = AssistantPreferencesStore(context)
 
     @Test
-    fun `assistant display name defaults to Grok and persists updates`() = runTest {
+    fun `assistant reply name defaults to Grok`() = runTest {
         assertThat(store.assistantDisplayName())
             .isEqualTo(AssistantPreferencesStore.DEFAULT_ASSISTANT_NAME)
+        assertThat(store.assistantDisplayName()).isEqualTo("Grok")
+    }
 
-        store.setAssistantDisplayName("Walter Grok")
-        assertThat(store.assistantDisplayName()).isEqualTo("Walter Grok")
+    @Test
+    fun `voice alias defaults enabled to Walter Grok and persists updates`() = runTest {
+        assertThat(store.voiceAliasEnabled()).isTrue()
+        assertThat(store.voiceAliasName())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_VOICE_ALIAS_NAME)
+        assertThat(store.voiceAliasName()).isEqualTo("Walter Grok")
+
+        store.setVoiceAliasName("xAI Grok")
+        store.setVoiceAliasEnabled(false)
+        assertThat(store.voiceAliasName()).isEqualTo("xAI Grok")
+        assertThat(store.voiceAliasEnabled()).isFalse()
     }
 }

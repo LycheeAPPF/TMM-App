@@ -26,7 +26,6 @@ import javax.inject.Inject
 data class AssistantUiState(
     val apiKeyIsSet: Boolean = false,
     val apiKeyDraft: String = "",
-    val assistantName: String = AssistantPreferencesStore.DEFAULT_ASSISTANT_NAME,
     val driverName: String = AssistantPreferencesStore.DEFAULT_DRIVER_NAME,
     val systemPrompt: String = AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT,
     val welcomeMessage: String = AssistantPreferencesStore.DEFAULT_WELCOME,
@@ -38,7 +37,9 @@ data class AssistantUiState(
     val rateLimitPerHour: Int = AssistantPreferencesStore.DEFAULT_RATE_PER_HOUR,
     val privacyConsent: Boolean = false,
     val saving: Boolean = false,
-    val assistantNameApplying: Boolean = false,
+    val voiceAliasEnabled: Boolean = true,
+    val voiceAliasName: String = AssistantPreferencesStore.DEFAULT_VOICE_ALIAS_NAME,
+    val voiceAliasApplying: Boolean = false,
     val triggerInFlight: Boolean = false,
     val lastFeedback: String? = null
 )
@@ -69,7 +70,6 @@ class AssistantViewModel @Inject constructor(
                 AssistantUiState(
                     apiKeyIsSet = apiKeyStore.isSet(),
                     apiKeyDraft = "",
-                    assistantName = prefs.assistantDisplayName(),
                     driverName = prefs.driverName(),
                     systemPrompt = prefs.systemPromptRaw(),
                     welcomeMessage = prefs.welcomeMessageRaw(),
@@ -79,7 +79,9 @@ class AssistantViewModel @Inject constructor(
                     temperature = prefs.temperature(),
                     rateLimitPerMin = prefs.maxRequestsPerMin(),
                     rateLimitPerHour = prefs.maxRequestsPerHour(),
-                    privacyConsent = prefs.isPrivacyConsentGiven()
+                    privacyConsent = prefs.isPrivacyConsentGiven(),
+                    voiceAliasEnabled = prefs.voiceAliasEnabled(),
+                    voiceAliasName = prefs.voiceAliasName()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
@@ -90,7 +92,6 @@ class AssistantViewModel @Inject constructor(
             _uiState.update { cur ->
                 if (persisting) {
                     snapshot.copy(
-                        assistantName = cur.assistantName,
                         driverName = cur.driverName,
                         systemPrompt = cur.systemPrompt,
                         welcomeMessage = cur.welcomeMessage,
@@ -155,25 +156,27 @@ class AssistantViewModel @Inject constructor(
     }
 
     /**
-     * Setzt den Tesla-Anzeigenamen des Grok-Kontakts SOFORT (kein Debounce — der
-     * Preset-Tap bzw. „Anwenden" ist eine diskrete Aktion) und erzwingt einen
-     * Tesla-Kontakt-Sync, damit das Auto den neuen Namen beim nächsten PBAP-Pull
-     * zieht. Erst persistieren, DANN resyncen: der Backfill ruft `reconcile()` →
-     * `ensure()`, das `assistantDisplayName()` liest und den Kontakt umbenennt.
-     * Teslas Sprachsteuerung erkennt einen Kontakt mit Vor- + Nachname am
-     * zuverlässigsten — darum sind die Presets zweiteilige Namen.
+     * Schaltet den zusätzlichen Sprach-Ansprech-Kontakt (+88810000001) ein/aus bzw.
+     * setzt seinen Namen SOFORT (kein Debounce — Preset-Tap/„Aus"/„Anwenden" sind
+     * diskrete Aktionen) und erzwingt einen Tesla-Kontakt-Sync, damit das Auto den
+     * Kontakt beim nächsten PBAP-Pull neu zieht bzw. entfernt. Erst persistieren,
+     * DANN resyncen: der Backfill ruft `reconcile()` → `ensure()`, das die Prefs
+     * liest. Der ANTWORT-Name bleibt unberührt „Grok".
      */
-    fun applyAssistantName(value: String) {
-        val name = value.trim()
-        if (name.isEmpty()) return
+    fun applyVoiceAlias(enabled: Boolean, name: String) {
+        val trimmed = name.trim()
+        if (enabled && trimmed.isEmpty()) return
         viewModelScope.launch(ioDispatcher) {
-            _uiState.update { it.copy(assistantName = name, assistantNameApplying = true) }
-            prefs.setAssistantDisplayName(name)
+            _uiState.update { it.copy(voiceAliasApplying = true) }
+            prefs.setVoiceAliasEnabled(enabled)
+            if (enabled) prefs.setVoiceAliasName(trimmed)
             teslaContactResync.force()
             _uiState.update {
                 it.copy(
-                    assistantNameApplying = false,
-                    lastFeedback = "Name gesetzt — Tesla-Sync läuft. Ggf. Bluetooth neu verbinden."
+                    voiceAliasEnabled = enabled,
+                    voiceAliasName = if (enabled) trimmed else it.voiceAliasName,
+                    voiceAliasApplying = false,
+                    lastFeedback = "Gespeichert — Tesla-Sync läuft. Ggf. Bluetooth neu verbinden."
                 )
             }
         }
@@ -270,10 +273,11 @@ class AssistantViewModel @Inject constructor(
         private const val PERSIST_DEBOUNCE_MS = 350L
 
         /**
-         * Vorgefertigte Tesla-Anzeigenamen. „Grok" = Standard/Zurücksetzen; die
-         * zweiteiligen Namen (Vor- + Nachname) werden von Teslas Sprachsteuerung
-         * zuverlässiger adressiert. Alles andere geht über das freie Custom-Feld.
+         * Vorgefertigte Namen für den Sprach-Ansprech-Kontakt. Zweiteilige Namen
+         * (Vor- + Nachname) werden von Teslas Sprachsteuerung zuverlässiger
+         * adressiert; alles andere geht über das freie Custom-Feld. „Grok" ist hier
+         * bewusst NICHT dabei — das ist der feste Antwort-Name.
          */
-        val PRESET_NAMES = listOf("Grok", "Walter Grok", "xAI Grok")
+        val PRESET_NAMES = listOf("Walter Grok", "xAI Grok")
     }
 }

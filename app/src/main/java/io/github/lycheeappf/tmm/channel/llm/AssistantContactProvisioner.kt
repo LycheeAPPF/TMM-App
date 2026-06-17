@@ -48,6 +48,23 @@ class AssistantContactProvisioner @Inject constructor(
         val mapping = mappingRepository.ensureStaticAssistantMapping(name)
         val ok = contactSyncWriter.upsertContact(mapping.fakeAddress, name)
         logBuffer.info(TAG, "Grok-Auto-Kontakt bereit: ${mapping.fakeAddress} ($name, upsert=$ok)")
+
+        // Zusätzlicher Sprach-Ansprech-Kontakt mit nutzer-konfigurierbarem Namen
+        // (z.B. „Walter Grok") — eigener Kontakt, KEINE DB-Row. Der Classifier lenkt
+        // Diktate an diese Adresse auf die kanonische Grok-Session (id 0) um; die
+        // Antwort kommt damit als „Grok" zurück. Per Schalter („Aus") deaktivierbar;
+        // jeder reconcile() (Boot/Health/Backfill) ehrt das Pref.
+        if (prefs.voiceAliasEnabled() && prefs.voiceAliasName().isNotBlank()) {
+            val aliasName = prefs.voiceAliasName()
+            val aliasOk = contactSyncWriter.upsertContact(AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS, aliasName)
+            logBuffer.info(
+                TAG,
+                "Grok-Sprach-Alias bereit: ${AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS} ($aliasName, upsert=$aliasOk)"
+            )
+        } else {
+            coRunCatching { contactSyncWriter.deleteContact(AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS) }
+            logBuffer.info(TAG, "Grok-Sprach-Alias deaktiviert: ${AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS}")
+        }
     }
 
     private suspend fun remove() {
@@ -55,6 +72,7 @@ class AssistantContactProvisioner @Inject constructor(
         // (nicht ablaufend, ohne Kontakt unsichtbar). Das ermöglicht sofortiges
         // Re-Enable und Kontext-Kontinuität, ohne erneute Migration.
         coRunCatching { contactSyncWriter.deleteContact(AssistantIdentity.STATIC_FAKE_ADDRESS) }
+        coRunCatching { contactSyncWriter.deleteContact(AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS) }
     }
 
     companion object {
