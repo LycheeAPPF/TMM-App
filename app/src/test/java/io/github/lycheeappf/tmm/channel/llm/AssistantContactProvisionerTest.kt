@@ -47,6 +47,7 @@ class AssistantContactProvisionerTest {
         coEvery { prefs.isPrivacyConsentGiven() } returns true
         coEvery { apiKeyStore.read() } returns "xai-key"
         coEvery { prefs.assistantDisplayName() } returns "Grok"
+        coEvery { prefs.isVoiceAliasesEnabled() } returns true
         coEvery { mappingRepository.ensureStaticAssistantMapping("Grok") } returns staticMapping
 
         provisioner.reconcile()
@@ -57,6 +58,27 @@ class AssistantContactProvisionerTest {
         coVerify { contactSyncWriter.upsertContact("+88810000001", "Grog") }
         coVerify { contactSyncWriter.upsertContact("+88810000002", "Grogg") }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
+    }
+
+    @Test
+    fun `reconcile keeps Grok but removes aliases when voice aliases disabled`() = runTest {
+        coEvery { prefs.isPrivacyConsentGiven() } returns true
+        coEvery { apiKeyStore.read() } returns "xai-key"
+        coEvery { prefs.assistantDisplayName() } returns "Grok"
+        coEvery { prefs.isVoiceAliasesEnabled() } returns false
+        coEvery { mappingRepository.ensureStaticAssistantMapping("Grok") } returns staticMapping
+
+        provisioner.reconcile()
+
+        // Grok-Kontakt bleibt bestehen …
+        coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
+        // … aber die beiden Sprach-Aliasse werden entfernt statt angelegt.
+        coVerify { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify { contactSyncWriter.deleteContact("+88810000002") }
+        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+88810000001", any()) }
+        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+88810000002", any()) }
+        // Grok selbst wird NICHT gelöscht (nur die Aliasse).
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
     }
 
     @Test

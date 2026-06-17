@@ -203,6 +203,26 @@ private fun DeveloperSettings(
     }
 
     SettingCard(
+        title = "Sprach-Aliasse (Grog / Grogg)",
+        description = "Zusätzliche Kontakte, die Teslas Sprachsteuerung statt „Grok\" oft " +
+            "besser versteht. Aus = nur „Grok\" als Kontakt (vermeidet das „gro\"-Auswahlmenü " +
+            "im Auto). Das Umschalten erzwingt einen Tesla-Kontakt-Sync."
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Grog + Grogg aktiv", style = MaterialTheme.typography.bodyLarge)
+            Switch(
+                checked = state.voiceAliasesEnabled,
+                enabled = !state.teslaContactsResetting,
+                onCheckedChange = { viewModel.setVoiceAliasesEnabled(it) }
+            )
+        }
+    }
+
+    SettingCard(
         title = "Diagnose-Werkzeuge",
         description = "Mappings, Reply-Verlauf, Live-Log und der Channel-Überblick.",
         variant = MfsCardVariant.Outlined

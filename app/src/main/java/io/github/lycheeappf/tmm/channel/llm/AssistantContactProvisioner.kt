@@ -52,12 +52,25 @@ class AssistantContactProvisioner @Inject constructor(
         // Phonetische Sprach-Aliasse („Grog"/„Grogg") — eigene Kontakte, KEINE
         // Mapping-Rows. Der Classifier lenkt Diktate an diese Adressen auf die
         // kanonische Grok-Session (id 0) um; die Antwort kommt als „Grok" zurück.
+        // Per Debug-Schalter abschaltbar (Default an): aus = nur „Grok" als
+        // Kontakt, um Teslas „gro"-Auswahlmenü zu vermeiden. Da jeder reconcile()
+        // (Boot/Health/Backfill) das Pref liest, kann ein deaktivierter Alias
+        // nicht durch einen Hintergrund-Reconcile wieder auferstehen.
+        val aliasesEnabled = prefs.isVoiceAliasesEnabled()
         for (alias in AssistantIdentity.ALIASES) {
-            val aliasOk = contactSyncWriter.upsertContact(alias.fakeAddress, alias.displayName)
-            logBuffer.info(
-                TAG,
-                "Grok-Alias-Kontakt bereit: ${alias.fakeAddress} (${alias.displayName}, upsert=$aliasOk)"
-            )
+            if (aliasesEnabled) {
+                val aliasOk = contactSyncWriter.upsertContact(alias.fakeAddress, alias.displayName)
+                logBuffer.info(
+                    TAG,
+                    "Grok-Alias-Kontakt bereit: ${alias.fakeAddress} (${alias.displayName}, upsert=$aliasOk)"
+                )
+            } else {
+                coRunCatching { contactSyncWriter.deleteContact(alias.fakeAddress) }
+                logBuffer.info(
+                    TAG,
+                    "Grok-Alias-Kontakt deaktiviert: ${alias.fakeAddress} (${alias.displayName})"
+                )
+            }
         }
     }
 

@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.contact.ContactBackfillWorker
 import io.github.lycheeappf.tmm.contact.ContactSyncWriter
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
@@ -30,13 +31,15 @@ data class SettingsUiState(
     val teslaContactsResetting: Boolean = false,
     val preflightStatus: String? = null,
     val preflightRunning: Boolean = false,
-    val developerMode: Boolean = false
+    val developerMode: Boolean = false,
+    val voiceAliasesEnabled: Boolean = true
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val store: SettingsStore,
+    private val assistantPrefs: AssistantPreferencesStore,
     private val contactSyncWriter: ContactSyncWriter,
     private val preFlightTester: PreFlightTester,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
@@ -67,7 +70,8 @@ class SettingsViewModel @Inject constructor(
                     sendBudget = store.sendBudgetPerDay(),
                     sendCountToday = store.dailySendCount(),
                     preflightStatus = store.preflightResult(),
-                    developerMode = store.isDeveloperMode()
+                    developerMode = store.isDeveloperMode(),
+                    voiceAliasesEnabled = assistantPrefs.isVoiceAliasesEnabled()
                 )
             }
         }
@@ -105,17 +109,39 @@ class SettingsViewModel @Inject constructor(
      * Tesla beim nächsten Connect die Contacts frisch holt.
      */
     fun resetTeslaContacts() {
+        viewModelScope.launch(ioDispatcher) { forceTeslaResync() }
+    }
+
+    /**
+     * Schaltet die phonetischen Sprach-Alias-Kontakte „Grog"/„Grogg" ein bzw. aus
+     * und erzwingt einen Tesla-Kontakt-Sync, damit das Auto den Wechsel beim
+     * nächsten PBAP-Pull übernimmt. Der Backfill ruft `reconcile()` → `ensure()`,
+     * das nun das Pref liest und die Aliasse entsprechend (neu) anlegt oder weglässt.
+     */
+    fun setVoiceAliasesEnabled(value: Boolean) {
         viewModelScope.launch(ioDispatcher) {
-            _uiState.update { it.copy(teslaContactsResetting = true) }
-            io.github.lycheeappf.tmm.core.util.coRunCatching {
-                contactSyncWriter.deleteAllContacts()
-                contactSyncWriter.removeAccount()
-                contactSyncWriter.ensureAccountAndVisibility()
-            }
-            ContactBackfillWorker.enqueue(context)
-            _uiState.update { it.copy(teslaContactsResetting = false) }
-            refresh()
+            assistantPrefs.setVoiceAliasesEnabled(value)
+            _uiState.update { it.copy(voiceAliasesEnabled = value) }
+            forceTeslaResync()
         }
+    }
+
+    /**
+     * Gemeinsamer Force-Resync-Pfad: alle Bridge-Contacts löschen, Account
+     * entfernen (bumpt den `account_changes`-Counter → Tesla zieht neu) und neu
+     * provisionieren lassen. Genutzt vom Reset-Button und vom Alias-Schalter.
+     * Muss aus einem `ioDispatcher`-Scope gerufen werden.
+     */
+    private suspend fun forceTeslaResync() {
+        _uiState.update { it.copy(teslaContactsResetting = true) }
+        io.github.lycheeappf.tmm.core.util.coRunCatching {
+            contactSyncWriter.deleteAllContacts()
+            contactSyncWriter.removeAccount()
+            contactSyncWriter.ensureAccountAndVisibility()
+        }
+        ContactBackfillWorker.enqueue(context)
+        _uiState.update { it.copy(teslaContactsResetting = false) }
+        refresh()
     }
 
     fun setTtlHours(value: Int) {
