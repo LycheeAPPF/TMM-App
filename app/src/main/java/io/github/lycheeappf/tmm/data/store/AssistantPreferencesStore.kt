@@ -153,18 +153,22 @@ class AssistantPreferencesStore @Inject constructor(
     // ---- Sprach-Aliasse (Grog / Grogg) -------------------------------------
 
     /**
-     * Sind die phonetischen Sprach-Alias-Kontakte „Grog"/„Grogg" aktiv? Default
-     * `true` (bisheriges Verhalten). Aus = nur „Grok" als Kontakt, um Teslas
-     * „gro"-Auswahlmenü zu vermeiden. Wird in
+     * Ist der phonetische Sprach-Alias mit dieser [mappingId] (Grog = 1, Grogg = 2)
+     * als Tesla-Kontakt aktiv? Default `true` (bisheriges Verhalten). Jeder Alias
+     * ist EINZELN schaltbar, sodass z.B. nur „Grogg" aktiv bleiben kann. Wird in
      * [io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner] gelesen,
      * sodass jeder reconcile() (Boot/Health/Backfill) den Schalter ehrt.
      */
-    suspend fun isVoiceAliasesEnabled(): Boolean =
-        store.data.first()[KEY_VOICE_ALIASES_ENABLED] ?: true
+    suspend fun isVoiceAliasEnabled(mappingId: Long): Boolean =
+        store.data.first()[voiceAliasEnabledKey(mappingId)] ?: true
 
-    suspend fun setVoiceAliasesEnabled(value: Boolean) {
-        store.edit { it[KEY_VOICE_ALIASES_ENABLED] = value }
+    suspend fun setVoiceAliasEnabled(mappingId: Long, value: Boolean) {
+        store.edit { it[voiceAliasEnabledKey(mappingId)] = value }
     }
+
+    /** Per-Alias-Pref-Key, stabil über die [mappingId] (1 = Grog, 2 = Grogg). */
+    private fun voiceAliasEnabledKey(mappingId: Long) =
+        booleanPreferencesKey("voice_alias_enabled_$mappingId")
 
     companion object {
         const val DEFAULT_MODEL = "grok-4.3"
@@ -240,7 +244,6 @@ class AssistantPreferencesStore @Inject constructor(
         private val KEY_RATE_PER_HOUR = intPreferencesKey("rate_per_hour")
         private val KEY_MAPPING_TTL_HOURS = intPreferencesKey("mapping_ttl_hours")
         private val KEY_PRIVACY_CONSENT = booleanPreferencesKey("privacy_consent")
-        private val KEY_VOICE_ALIASES_ENABLED = booleanPreferencesKey("voice_aliases_enabled")
     }
 }
 

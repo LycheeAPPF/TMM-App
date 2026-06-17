@@ -205,20 +205,24 @@ private fun DeveloperSettings(
     SettingCard(
         title = "Sprach-Aliasse (Grog / Grogg)",
         description = "Zusätzliche Kontakte, die Teslas Sprachsteuerung statt „Grok\" oft " +
-            "besser versteht. Aus = nur „Grok\" als Kontakt (vermeidet das „gro\"-Auswahlmenü " +
-            "im Auto). Das Umschalten erzwingt einen Tesla-Kontakt-Sync."
+            "besser versteht. Jeder Alias einzeln abschaltbar — z.B. nur „Grok\" lassen, um " +
+            "das „gro\"-Auswahlmenü im Auto zu vermeiden. Das Umschalten erzwingt einen " +
+            "Tesla-Kontakt-Sync."
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Grog + Grogg aktiv", style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = state.voiceAliasesEnabled,
-                enabled = !state.teslaContactsResetting,
-                onCheckedChange = { viewModel.setVoiceAliasesEnabled(it) }
-            )
+        state.voiceAliases.forEachIndexed { index, alias ->
+            if (index > 0) HorizontalDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("${alias.displayName} aktiv", style = MaterialTheme.typography.bodyLarge)
+                Switch(
+                    checked = alias.enabled,
+                    enabled = !state.teslaContactsResetting,
+                    onCheckedChange = { viewModel.setVoiceAliasEnabled(alias.mappingId, it) }
+                )
+            }
         }
     }
 

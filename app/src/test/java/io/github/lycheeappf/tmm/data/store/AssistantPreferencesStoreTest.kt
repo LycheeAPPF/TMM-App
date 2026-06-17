@@ -10,9 +10,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Sichert das Sprach-Alias-Pref ([AssistantPreferencesStore.isVoiceAliasesEnabled]):
- * Default ist `true` (bisheriges Verhalten — Grog/Grogg vorhanden), und der Debug-
- * Schalter persistiert ein explizites `false`. DataStore braucht einen echten
+ * Sichert das Per-Alias-Pref ([AssistantPreferencesStore.isVoiceAliasEnabled]):
+ * Default ist `true` (bisheriges Verhalten — Grog/Grogg vorhanden), jeder Alias
+ * (Grog = 1, Grogg = 2) ist UNABHÄNGIG schaltbar. DataStore braucht einen echten
  * Context → Robolectric.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -23,14 +23,17 @@ class AssistantPreferencesStoreTest {
     private val store = AssistantPreferencesStore(context)
 
     @Test
-    fun `voice aliases default to enabled and can be toggled off`() = runTest {
-        // Frischer Store: ungesetztes Pref liest den Default true.
-        assertThat(store.isVoiceAliasesEnabled()).isTrue()
+    fun `each voice alias defaults to enabled and toggles independently`() = runTest {
+        // Frischer Store: beide Aliasse lesen den Default true.
+        assertThat(store.isVoiceAliasEnabled(1L)).isTrue()
+        assertThat(store.isVoiceAliasEnabled(2L)).isTrue()
 
-        store.setVoiceAliasesEnabled(false)
-        assertThat(store.isVoiceAliasesEnabled()).isFalse()
+        // Nur Grogg (id 2) ausschalten — Grog (id 1) bleibt unberührt an.
+        store.setVoiceAliasEnabled(2L, false)
+        assertThat(store.isVoiceAliasEnabled(1L)).isTrue()
+        assertThat(store.isVoiceAliasEnabled(2L)).isFalse()
 
-        store.setVoiceAliasesEnabled(true)
-        assertThat(store.isVoiceAliasesEnabled()).isTrue()
+        store.setVoiceAliasEnabled(2L, true)
+        assertThat(store.isVoiceAliasEnabled(2L)).isTrue()
     }
 }

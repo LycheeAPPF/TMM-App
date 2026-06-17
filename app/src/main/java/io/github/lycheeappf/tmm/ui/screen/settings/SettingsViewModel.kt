@@ -10,6 +10,7 @@ import io.github.lycheeappf.tmm.contact.ContactSyncWriter
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,15 @@ data class SettingsUiState(
     val preflightStatus: String? = null,
     val preflightRunning: Boolean = false,
     val developerMode: Boolean = false,
-    val voiceAliasesEnabled: Boolean = true
+    val voiceAliases: List<AliasToggle> =
+        AssistantIdentity.ALIASES.map { AliasToggle(it.mappingId, it.displayName, true) }
+)
+
+/** Einzeln schaltbarer Sprach-Alias (Grog/Grogg) für die Settings-UI. */
+data class AliasToggle(
+    val mappingId: Long,
+    val displayName: String,
+    val enabled: Boolean
 )
 
 @HiltViewModel
@@ -71,7 +80,9 @@ class SettingsViewModel @Inject constructor(
                     sendCountToday = store.dailySendCount(),
                     preflightStatus = store.preflightResult(),
                     developerMode = store.isDeveloperMode(),
-                    voiceAliasesEnabled = assistantPrefs.isVoiceAliasesEnabled()
+                    voiceAliases = AssistantIdentity.ALIASES.map {
+                        AliasToggle(it.mappingId, it.displayName, assistantPrefs.isVoiceAliasEnabled(it.mappingId))
+                    }
                 )
             }
         }
@@ -113,15 +124,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Schaltet die phonetischen Sprach-Alias-Kontakte „Grog"/„Grogg" ein bzw. aus
-     * und erzwingt einen Tesla-Kontakt-Sync, damit das Auto den Wechsel beim
-     * nächsten PBAP-Pull übernimmt. Der Backfill ruft `reconcile()` → `ensure()`,
-     * das nun das Pref liest und die Aliasse entsprechend (neu) anlegt oder weglässt.
+     * Schaltet EINEN phonetischen Sprach-Alias (Grog = 1, Grogg = 2) einzeln ein
+     * bzw. aus und erzwingt einen Tesla-Kontakt-Sync, damit das Auto den Wechsel
+     * beim nächsten PBAP-Pull übernimmt. Der Backfill ruft `reconcile()` →
+     * `ensure()`, das je Alias das Pref liest und den Kontakt (neu) anlegt oder
+     * weglässt.
      */
-    fun setVoiceAliasesEnabled(value: Boolean) {
+    fun setVoiceAliasEnabled(mappingId: Long, value: Boolean) {
         viewModelScope.launch(ioDispatcher) {
-            assistantPrefs.setVoiceAliasesEnabled(value)
-            _uiState.update { it.copy(voiceAliasesEnabled = value) }
+            assistantPrefs.setVoiceAliasEnabled(mappingId, value)
+            _uiState.update { s ->
+                s.copy(voiceAliases = s.voiceAliases.map {
+                    if (it.mappingId == mappingId) it.copy(enabled = value) else it
+                })
+            }
             forceTeslaResync()
         }
     }
