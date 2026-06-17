@@ -35,7 +35,7 @@ object AssistantIdentity {
 
     /**
      * Reservierte Mapping-Id des zusätzlichen Sprach-Ansprech-Kontakts (Id 1).
-     * Dieser Kontakt trägt einen NUTZER-konfigurierbaren Namen (z.B. „Walter Grok");
+     * Dieser Kontakt trägt einen NUTZER-konfigurierbaren Namen (z.B. „Elon Musk");
      * diktiert der User an ihn, lenkt der
      * [io.github.lycheeappf.tmm.sms.outbound.OutboundSmsClassifier] die ausgehende SMS
      * auf die KANONISCHE Grok-Session ([RESERVED_MAPPING_ID]) um — Grok antwortet damit

@@ -50,7 +50,7 @@ class AssistantContactProvisioner @Inject constructor(
         logBuffer.info(TAG, "Grok-Auto-Kontakt bereit: ${mapping.fakeAddress} ($name, upsert=$ok)")
 
         // Zusätzlicher Sprach-Ansprech-Kontakt mit nutzer-konfigurierbarem Namen
-        // (z.B. „Walter Grok") — eigener Kontakt, KEINE DB-Row. Der Classifier lenkt
+        // (z.B. „Elon Musk") — eigener Kontakt, KEINE DB-Row. Der Classifier lenkt
         // Diktate an diese Adresse auf die kanonische Grok-Session (id 0) um; die
         // Antwort kommt damit als „Grok" zurück. Per Schalter („Aus") deaktivierbar;
         // jeder reconcile() (Boot/Health/Backfill) ehrt das Pref.

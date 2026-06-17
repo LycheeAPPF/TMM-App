@@ -101,7 +101,7 @@ class OutboundSmsClassifierTest {
 
     @Test
     fun `voice alias bracket form redirects to canonical Grok id 0`() = runBlocking {
-        val result = classifier.classify(row(address = "Walter Grok <+88810000001>"))
+        val result = classifier.classify(row(address = "Elon Musk <+88810000001>"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 0L,

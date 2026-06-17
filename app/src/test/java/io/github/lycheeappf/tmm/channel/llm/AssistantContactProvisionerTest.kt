@@ -55,14 +55,14 @@ class AssistantContactProvisionerTest {
     fun `reconcile provisions Grok plus enabled voice alias`() = runTest {
         ready()
         coEvery { prefs.voiceAliasEnabled() } returns true
-        coEvery { prefs.voiceAliasName() } returns "Walter Grok"
+        coEvery { prefs.voiceAliasName() } returns "Elon Musk"
 
         provisioner.reconcile()
 
         // Antwort-Kontakt heißt immer „Grok".
         coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
         // Sprach-Ansprech-Kontakt mit konfiguriertem Namen.
-        coVerify { contactSyncWriter.upsertContact("+88810000001", "Walter Grok") }
+        coVerify { contactSyncWriter.upsertContact("+88810000001", "Elon Musk") }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 

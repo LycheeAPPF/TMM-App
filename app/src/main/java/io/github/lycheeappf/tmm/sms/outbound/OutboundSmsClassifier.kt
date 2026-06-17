@@ -38,7 +38,7 @@ class OutboundSmsClassifier @Inject constructor(
     suspend fun classify(row: OutboundSmsRow): Classification {
         if (row.address.isBlank()) return Classification.NotOurs
 
-        // Sprach-Ansprech-Kontakt (z.B. „Walter Grok"): exakte Alias-Adresse → auf die
+        // Sprach-Ansprech-Kontakt (z.B. „Elon Musk"): exakte Alias-Adresse → auf die
         // KANONISCHE Grok-Session (id 0) umlenken. Muss VOR findByFakeAddress und dem
         // FakeAddress.parse-Fallback stehen: der Alias hat keine DB-Row, parse würde
         // ihn sonst auf ein Phantom-Mapping (id 1) auflösen → „Konversation abgelaufen".
@@ -66,7 +66,7 @@ class OutboundSmsClassifier @Inject constructor(
     /**
      * Normalisiert eine ADDRESS-Spalte auf reine `+E.164`-Form (analog
      * [FakeAddress.parse]): entfernt alles außer `+`/Ziffern und wandelt ein
-     * führendes `00` in `+`. Toleriert damit Bracket-Form (`"Walter Grok <+888…>"`)
+     * führendes `00` in `+`. Toleriert damit Bracket-Form (`"Elon Musk <+888…>"`)
      * und `00`-Präfix beim Alias-Match.
      */
     private fun normalizeAddress(raw: String): String {
