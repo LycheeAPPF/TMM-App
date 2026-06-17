@@ -7,10 +7,12 @@ import io.github.lycheeappf.tmm.data.db.MappingDao
 import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.PayloadJson
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
@@ -222,6 +224,16 @@ class MappingRepositoryImplTest {
         assertThat(mapping.expiresAt).isEqualTo(Long.MAX_VALUE)
         assertThat(inserted.captured.mappingId).isEqualTo(0L)
         assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
+        // Contract-tragend: der conversationKey keyt die gemeinsame id-0-Session
+        // (120 s-Kontextfenster im LlmConversationStore), replyable=true ist
+        // Voraussetzung für die Reply-Injection, und der Anzeigename fließt in
+        // den Payload (sonst stünde im Auto „AI Assistant" statt „Grok").
+        assertThat(inserted.captured.conversationKey).isEqualTo(AssistantIdentity.CONVERSATION_KEY)
+        assertThat(inserted.captured.replyable).isTrue()
+        val payload = PayloadJson.decode(inserted.captured.payloadJson) as ChannelPayload.Llm
+        assertThat(payload.providerId).isEqualTo("grok")
+        assertThat(payload.assistantDisplayName).isEqualTo("Grok")
+        assertThat(payload.conversationKey).isEqualTo(AssistantIdentity.CONVERSATION_KEY)
     }
 
     @Test
@@ -249,6 +261,13 @@ class MappingRepositoryImplTest {
 
         assertThat(mapping.mappingId).isEqualTo(0L)
         assertThat(updated.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
+        // Auch der In-Place-Update muss den kanonischen LLM-Payload schreiben
+        // (conversationKey/replyable), sonst risse ein Re-Provision die geteilte
+        // id-0-Session oder die Reply-Fähigkeit ab.
+        assertThat(updated.captured.replyable).isTrue()
+        val updatedPayload = PayloadJson.decode(updated.captured.payloadJson) as ChannelPayload.Llm
+        assertThat(updatedPayload.assistantDisplayName).isEqualTo("Grok")
+        assertThat(updatedPayload.conversationKey).isEqualTo(AssistantIdentity.CONVERSATION_KEY)
         coVerify(exactly = 0) { dao.insert(any()) }
         coVerify(exactly = 0) { dao.deleteById(any(), any()) }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
@@ -280,8 +299,11 @@ class MappingRepositoryImplTest {
         assertThat(mapping.mappingId).isEqualTo(0L)
         assertThat(mapping.fakeAddress).isEqualTo("+88810000000")
         assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
-        coVerify { contactSyncWriter.deleteContact("+88810000005") }
-        coVerify { dao.deleteById(5L, ChannelId.LLM.code) }
+        // Reihenfolge-Invariante: ZUERST Kontakt (Lookup-Key = fakeAddress), DANN Row.
+        coVerifyOrder {
+            contactSyncWriter.deleteContact("+88810000005")
+            dao.deleteById(5L, ChannelId.LLM.code)
+        }
     }
 
     @Test
@@ -305,9 +327,45 @@ class MappingRepositoryImplTest {
         val removed = repository.sweepStaleAssistantMappings()
 
         assertThat(removed).isEqualTo(1)
-        coVerify { contactSyncWriter.deleteContact("+88810000003") }
-        coVerify { dao.deleteById(3L, ChannelId.LLM.code) }
+        // Reihenfolge-Invariante: ZUERST Kontakt (Lookup-Key = fakeAddress), DANN Row.
+        coVerifyOrder {
+            contactSyncWriter.deleteContact("+88810000003")
+            dao.deleteById(3L, ChannelId.LLM.code)
+        }
         // Reservierte id 0 bleibt unangetastet.
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
+    }
+
+    @Test
+    fun `sweepStaleAssistantMappings removes EVERY non-reserved LLM row and counts each`() = runTest {
+        val now = System.currentTimeMillis()
+        fun llm(id: Long) = MappingEntity(
+            mappingId = id,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+8881" + id.toString().padStart(7, '0'),
+            conversationKey = if (id == 0L) "default-assistant" else "default-assistant-$id",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        // Zwei Altlast-Rows neben der reservierten id 0 → beide müssen weg (count == 2).
+        // Schützt gegen eine break-/return-nach-erstem-Regression, die nur 1 entfernte.
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(llm(0L), llm(3L), llm(4L))
+        coEvery { dao.deleteById(3L, ChannelId.LLM.code) } returns 1
+        coEvery { dao.deleteById(4L, ChannelId.LLM.code) } returns 1
+
+        val removed = repository.sweepStaleAssistantMappings()
+
+        assertThat(removed).isEqualTo(2)
+        coVerify { contactSyncWriter.deleteContact("+88810000003") }
+        coVerify { contactSyncWriter.deleteContact("+88810000004") }
+        coVerify { dao.deleteById(3L, ChannelId.LLM.code) }
+        coVerify { dao.deleteById(4L, ChannelId.LLM.code) }
+        // Reservierte id 0 unangetastet.
         coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
     }

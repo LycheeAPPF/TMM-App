@@ -13,11 +13,17 @@ import javax.inject.Singleton
  * abgesendet hat.
  *
  * Resolution-Reihenfolge:
- *  1. **DB-Lookup** über [MappingRepository.findByFakeAddress] — der primäre
+ *  1. **Alias-Redirect** — die phonetischen Sprach-Aliasse („Grog"/„Grogg",
+ *     [AssistantIdentity.ALIAS_FAKE_ADDRESSES]) werden VOR allen DB-/Parse-
+ *     Lookups auf die kanonische Grok-Session
+ *     ([AssistantIdentity.RESERVED_MAPPING_ID]) umgelenkt. Sie haben KEINE
+ *     eigene DB-Row; ein späterer `FakeAddress.parse` würde sie sonst auf ein
+ *     Phantom-Mapping (id 1/2) auflösen → „Konversation abgelaufen".
+ *  2. **DB-Lookup** über [MappingRepository.findByFakeAddress] — der primäre
  *     Pfad. `mapping.fakeAddress` enthält bei neuen Mappings den Display-
  *     Namen (z.B. `"Grok"`, `"Anna · WhatsApp"`), den das Tesla in der
  *     Outbox 1:1 wieder zurückschreibt.
- *  2. **`FakeAddress.parse`-Fallback** für Legacy-Mappings, die noch das
+ *  3. **`FakeAddress.parse`-Fallback** für Legacy-Mappings, die noch das
  *     numerische `+99942x...`-Schema in `fakeAddress` haben (vor der
  *     Migration zu Display-Adresses).
  *
