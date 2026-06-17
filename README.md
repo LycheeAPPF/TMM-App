@@ -28,6 +28,15 @@ You dictate a question (car reply function)        ──►  app captures it
 
 The LLM conversation context is in-memory only and expires after ~120 s of inactivity.
 
+### Voice-addressable contacts
+
+When the Grok assistant is set up, TMM adds a hidden, Tesla-visible **“Grok”** contact so the car
+can message it by name. It can also add one optional **voice-address contact** (default
+**“xAI Grok”**) — Tesla's voice control recognises a full name more reliably; talking to it is
+routed to Grok, which still answers as **“Grok.”** Both contacts exist only while the assistant is
+enabled and disappear when you turn it off or remove the API key. Pick a preset, set a custom name,
+or disable the extra contact under **Settings → Grok assistant**.
+
 ## Requirements
 
 - Android 13+ (minSdk 33).

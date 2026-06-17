@@ -35,3 +35,27 @@ committed**.
 
 The release build **fails fast** if `keystore.properties` is missing — it never produces an
 unsigned APK.
+
+## 4. Cut a release (every shipped version)
+
+Never publish silently: every build that reaches `main` must carry a distinct `versionCode`, a
+`CHANGELOG.md` entry, and a git tag, so installs upgrade cleanly and field diagnostics can
+identify the build.
+
+1. **Bump the version** in `app/build.gradle.kts` — increment `versionCode` (Android keys updates
+   off it) and `versionName` (semver, e.g. `0.2.0`).
+2. **Update [`CHANGELOG.md`](../CHANGELOG.md)** with an entry for the new version.
+3. **Verify** `./gradlew :app:testDebugUnitTest` is green and build the signed APK (step 3 above).
+4. **Tag** the release commit on `main` and push it:
+
+   ```bash
+   git tag v0.2.0
+   git push origin main v0.2.0
+   ```
+
+5. **Publish** a GitHub release for the tag and attach the signed APK:
+
+   ```bash
+   gh release create v0.2.0 app/build/outputs/apk/release/app-release.apk \
+     --title "v0.2.0" --notes "See CHANGELOG.md for this release's changes."
+   ```
