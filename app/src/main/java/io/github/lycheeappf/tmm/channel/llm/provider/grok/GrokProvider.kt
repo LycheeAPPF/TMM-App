@@ -122,7 +122,6 @@ class GrokProvider @Inject constructor(
         return when (code) {
             401, 403 -> LlmProviderError.Auth(detail)
             429 -> LlmProviderError.RateLimit(retryAfterHeader?.toIntOrNull())
-            in 500..599 -> LlmProviderError.Server(code, body)
             else -> LlmProviderError.Server(code, body)
         }
     }

@@ -16,8 +16,8 @@ import javax.inject.Singleton
 
 /**
  * `MessagingChannel`-Implementation für Grok. Wird vom [ReplyDispatcher]
- * aufgerufen, wenn das Tesla einen Reply an `+9994210000001` (oder die jeweilige
- * `+xxx 1 …`-Adresse, je nach AddressScheme) schickt.
+ * aufgerufen, wenn das Tesla einen Reply an die Grok-Adresse `+888 1 …`
+ * (z.B. `+88810000000`) schickt.
  *
  *  - [handleTeslaReply] delegiert sofort an den [LlmTurnRunner], damit die
  *    komplette Turn-Logik (Mutex, TTL, Rate-Limit, Provider-Call, History-

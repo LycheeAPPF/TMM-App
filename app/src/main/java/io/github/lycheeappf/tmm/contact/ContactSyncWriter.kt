@@ -449,7 +449,7 @@ class ContactSyncWriter @Inject constructor(
                 .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, fakeAddress)
                 // NORMALIZED_NUMBER explizit setzen — `phone_lookup`-Index nutzt
                 // die normalized Variante. Wenn null, fällt der Index leer, und
-                // PhoneLookup(+9994...) findet nichts.
+                // PhoneLookup(+888...) findet nichts.
                 .withValue(
                     ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER,
                     fakeAddress

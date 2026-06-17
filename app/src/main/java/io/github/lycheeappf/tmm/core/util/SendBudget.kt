@@ -14,7 +14,7 @@ import javax.inject.Singleton
 /**
  * Cost-Cap: verhindert, dass die App in einem Tag mehr Notifications ans Tesla
  * forwarded als das Settings-Budget erlaubt. Schützt vor Runaway-Loops (Messenger-Spam)
- * und vor unwahrscheinlichem Carrier-Routing der `+99942`-Test-Range.
+ * und vor unwahrscheinlichem Carrier-Routing der `+888`-Range (ITU TDR).
  *
  * Zählt jeden erfolgreichen `injectIncoming`-Call. Bei Budget-Überlauf wird eine
  * persistente Notification gepostet und der Aufruf returnt false.

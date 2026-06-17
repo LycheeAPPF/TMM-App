@@ -17,17 +17,17 @@ data class FakeAddress(
         }
     }
 
-    /** Formatiert die Adresse mit dem angegebenen Schema. */
-    fun toE164(scheme: AddressScheme = AddressScheme.Itu888): String =
-        scheme.prefix + channel.code.toString() + mappingId.toString().padStart(ID_DIGITS, '0')
+    /** Formatiert die Adresse im aktiven [AddressScheme] (Itu888 / +888). */
+    fun toE164(): String =
+        AddressScheme.Itu888.prefix + channel.code.toString() + mappingId.toString().padStart(ID_DIGITS, '0')
 
     companion object {
         const val ID_DIGITS = 7
         const val MAX_MAPPING_ID = 10_000_000L
 
         /**
-         * Parsed eine rohe Adress-String. Probiert alle bekannten [AddressScheme]s.
-         * Returnt null, wenn keine matched.
+         * Parsed eine rohe Adress-String gegen das aktive [AddressScheme] (Itu888).
+         * Returnt null, wenn es nicht matched.
          */
         fun parse(raw: String): FakeAddress? {
             var clean = raw.replace("[^+0-9]".toRegex(), "")
@@ -36,11 +36,7 @@ data class FakeAddress(
             // Schema-Match um, sonst werden eigene Fake-Adressen als "NotOurs"
             // klassifiziert und der Reply geht ins Leere.
             if (clean.startsWith("00")) clean = "+" + clean.substring(2)
-            for (scheme in AddressScheme.entries) {
-                val parsed = tryParseWith(clean, scheme)
-                if (parsed != null) return parsed
-            }
-            return null
+            return tryParseWith(clean, AddressScheme.Itu888)
         }
 
         private fun tryParseWith(clean: String, scheme: AddressScheme): FakeAddress? {

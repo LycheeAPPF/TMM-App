@@ -28,10 +28,10 @@ object AssistantIdentity {
 
     /**
      * Reservierte Fake-Adresse `+88810000000` (Channel-Digit 1 = [ChannelId.LLM], Id 0).
-     * `itu_888` ist das einzige aktive Schema (siehe [AddressScheme]).
+     * `+888` ist das einzige aktive Schema (siehe [AddressScheme]).
      */
     val STATIC_FAKE_ADDRESS: String =
-        FakeAddress(ChannelId.LLM, RESERVED_MAPPING_ID).toE164(AddressScheme.Itu888)
+        FakeAddress(ChannelId.LLM, RESERVED_MAPPING_ID).toE164()
 
     /**
      * Reservierte Mapping-Id des zusätzlichen Sprach-Ansprech-Kontakts (Id 1).
@@ -48,7 +48,7 @@ object AssistantIdentity {
      * Id 1) — kann per Konstruktion nie die NOTIFICATION-Kontakte (Digit 0) treffen.
      */
     val VOICE_ALIAS_FAKE_ADDRESS: String =
-        FakeAddress(ChannelId.LLM, VOICE_ALIAS_MAPPING_ID).toE164(AddressScheme.Itu888)
+        FakeAddress(ChannelId.LLM, VOICE_ALIAS_MAPPING_ID).toE164()
 
     /**
      * Reservierte Mapping-Ids, die [io.github.lycheeappf.tmm.data.store.SettingsStore.nextMappingId]

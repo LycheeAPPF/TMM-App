@@ -51,17 +51,16 @@ class OutboundSmsClassifierTest {
 
     @Test
     fun `legacy fake-address falls through to FakeAddress-parse`() = runBlocking {
-        // Bestehende Mappings vor der Migration haben "+9994200000042" als
-        // fakeAddress. Der DB-Lookup matched die Outbox-Address direkt,
-        // selbst ohne den FakeAddress.parse-Fallback.
+        // Ein Mapping speichert seine numerische fakeAddress; der DB-Lookup
+        // matched die Outbox-Address direkt, noch vor dem FakeAddress.parse-Fallback.
         repo.put(
             mapping(
                 mappingId = 42L,
                 channel = ChannelId.NOTIFICATION,
-                fakeAddress = "+9994200000042"
+                fakeAddress = "+88800000042"
             )
         )
-        val result = classifier.classify(row(address = "+9994200000042"))
+        val result = classifier.classify(row(address = "+88800000042"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 42L,
@@ -76,7 +75,7 @@ class OutboundSmsClassifierTest {
         // klassifiziert (ggf. Mapping inzwischen via TTL gelöscht; Dispatcher
         // returnt dann Expired). Wichtig: Adresse darf nicht NotOurs werden,
         // sonst dispatchen wir nie und der Cleanup räumt nicht auf.
-        val result = classifier.classify(row(address = "+9994210000007"))
+        val result = classifier.classify(row(address = "+88810000007"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 7L,
@@ -217,7 +216,6 @@ class OutboundSmsClassifierTest {
         override suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId) {}
         override suspend fun deleteExpired(now: Long) {}
         override suspend fun delete(mappingId: Long, channel: ChannelId) {}
-        override suspend fun deleteAll() {}
         override suspend fun allMappings(): List<ChannelMapping> = byAddress.values.toList()
     }
 }

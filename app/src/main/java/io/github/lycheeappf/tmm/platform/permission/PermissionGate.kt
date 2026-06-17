@@ -33,6 +33,22 @@ class PermissionGate @Inject constructor(
         ) == PackageManager.PERMISSION_GRANTED
 
     /**
+     * READ_SMS für die echte-SMS-Inbox (Lesen aus `content://sms`). Wird durch
+     * die ROLE_SMS-Default-Rolle impliziert, hier aber explizit geprüft, um den
+     * Fall „App nicht (mehr) Default" sauber im SMS-Screen zu behandeln.
+     */
+    fun hasReadSms(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /** SEND_SMS für das Senden echter SMS aus der App. Durch ROLE_SMS impliziert. */
+    fun hasSendSms(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.SEND_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
      * READ + WRITE Contacts werden benötigt, um den Tesla-Bridge-Account zu
      * pflegen (Sender-Name-Auflösung für MAP/PBAP). Optional — ohne Permission
      * fallen wir auf Anzeige der Rohnummer zurück.

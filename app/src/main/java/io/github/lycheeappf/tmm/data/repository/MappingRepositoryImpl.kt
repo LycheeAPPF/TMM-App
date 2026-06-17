@@ -67,7 +67,7 @@ class MappingRepositoryImpl @Inject constructor(
             // auf einen Klartext-Namen ("Grok", "Anna") gesetzt. Das bricht
             // den Reply-Pfad (Tesla schreibt outbox-Row nicht zuverlässig mit
             // unserem String). Wir migrieren zurück auf die deterministische
-            // numerische `+9994x...`-Form, damit `FakeAddress.parse(outbox)`
+            // numerische `+888x...`-Form, damit `FakeAddress.parse(outbox)`
             // wieder zuverlässig zur mappingId resolved. SmsContentProvider-
             // Writer wickelt die Number dann in "Display <Number>" ein, damit
             // Tesla wenigstens den Namen mit anzeigt.
@@ -81,9 +81,8 @@ class MappingRepositoryImpl @Inject constructor(
             ).toDomain()
         }
 
-        @Suppress("DEPRECATION")
         val newId = settings.nextMappingId()
-        val fakeAddress = FakeAddress(channel, newId).toE164(settings.addressScheme())
+        val fakeAddress = FakeAddress(channel, newId).toE164()
         val entity = MappingEntity(
             mappingId = newId,
             channel = channel.code,
@@ -102,7 +101,7 @@ class MappingRepositoryImpl @Inject constructor(
 
     /**
      * Wenn das existing-Mapping einen Display-Only-fakeAddress hat (z.B. "Grok"),
-     * migrieren wir es zurück auf die numerische `+9994x...`-Form. Das ist
+     * migrieren wir es zurück auf die numerische `+888x...`-Form. Das ist
      * die rollback-Migration zum letzten working Reply-Pfad — Display-only
      * brach den Outbox-Roundtrip. Die numerische Form wird vom Provider-
      * Writer in ein "Display <Number>"-Format eingewickelt, damit Tesla
@@ -116,7 +115,7 @@ class MappingRepositoryImpl @Inject constructor(
             channel = io.github.lycheeappf.tmm.core.model.ChannelId.fromCode(existing.channel)
                 ?: return existing.fakeAddress,
             mappingId = existing.mappingId
-        ).toE164(settings.addressScheme())
+        ).toE164()
         dao.updateFakeAddress(existing.mappingId, existing.channel, numeric)
         return numeric
     }
@@ -198,11 +197,6 @@ class MappingRepositoryImpl @Inject constructor(
         val entity = dao.findById(mappingId, channel.code) ?: return
         coRunCatching { contactSyncWriter.deleteContact(entity.fakeAddress) }
         dao.deleteById(mappingId, channel.code)
-    }
-
-    override suspend fun deleteAll() {
-        coRunCatching { contactSyncWriter.deleteAllContacts() }
-        dao.deleteAll()
     }
 
     override suspend fun allMappings(): List<ChannelMapping> =

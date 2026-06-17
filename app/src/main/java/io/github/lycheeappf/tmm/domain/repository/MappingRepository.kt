@@ -70,12 +70,6 @@ interface MappingRepository {
     suspend fun delete(mappingId: Long, channel: ChannelId)
 
     /**
-     * Löscht ALLE Mappings. Wird beim Wechsel des Number-Schema gerufen, sodass
-     * alte fakeAddresses (im alten Schema-Prefix) nicht mehr aktiv sind.
-     */
-    suspend fun deleteAll()
-
-    /**
      * Alle aktiven Mappings. Wird vom ContactBackfillWorker iteriert, um
      * RawContacts für bereits existierende Mappings nachzulegen.
      */

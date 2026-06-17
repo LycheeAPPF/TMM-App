@@ -34,7 +34,7 @@ class LlmChannelTest {
     private val llmMapping = ChannelMapping(
         mappingId = 7L,
         channel = ChannelId.LLM,
-        fakeAddress = "+9994210000007",
+        fakeAddress = "+88810000007",
         conversationKey = "default-assistant",
         payload = ChannelPayload.Llm(
             providerId = "grok",
@@ -109,7 +109,7 @@ class LlmChannelTest {
 
         coVerify {
             smsWriter.injectIncoming(
-                fakeAddress = "+9994210000007",
+                fakeAddress = "+88810000007",
                 body = "Antwort von Grok",
                 timestamp = any(),
                 displayName = "Grok"
@@ -152,7 +152,7 @@ class LlmChannelTest {
         )
         coVerify {
             smsWriter.injectIncoming(
-                fakeAddress = "+9994210000007",
+                fakeAddress = "+88810000007",
                 body = match { it.contains("Entschuldige") && it.contains("kein Internetzugriff.") },
                 timestamp = any(),
                 displayName = "Grok"
