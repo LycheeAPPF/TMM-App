@@ -56,25 +56,7 @@ Requirements: JDK 17 and the Android SDK (API 36).
 # → app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Signed release build
-
-1. Create a release keystore once (keep it backed up — losing it means you can no longer ship
-   updates under the same signature):
-   ```bash
-   keytool -genkeypair -v -keystore tmm-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias tmm
-   ```
-2. Copy the template and fill in your values:
-   ```bash
-   cp keystore.properties.example keystore.properties
-   ```
-3. Build:
-   ```bash
-   ./gradlew :app:assembleRelease
-   # → app/build/outputs/apk/release/app-release.apk
-   ```
-
-`keystore.properties` and the `*.jks` keystore are gitignored and must never be committed. The
-release build **fails fast** if `keystore.properties` is missing — it never produces an unsigned APK.
+Maintainers building a **signed release** APK: see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Tests
 
