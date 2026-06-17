@@ -150,26 +150,6 @@ class AssistantPreferencesStore @Inject constructor(
     fun privacyConsentFlow(): Flow<Boolean> =
         store.data.map { it[KEY_PRIVACY_CONSENT] ?: false }
 
-    // ---- Sprach-Aliasse (Grog / Grogg) -------------------------------------
-
-    /**
-     * Ist der phonetische Sprach-Alias mit dieser [mappingId] (Grog = 1, Grogg = 2)
-     * als Tesla-Kontakt aktiv? Default `true` (bisheriges Verhalten). Jeder Alias
-     * ist EINZELN schaltbar, sodass z.B. nur „Grogg" aktiv bleiben kann. Wird in
-     * [io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner] gelesen,
-     * sodass jeder reconcile() (Boot/Health/Backfill) den Schalter ehrt.
-     */
-    suspend fun isVoiceAliasEnabled(mappingId: Long): Boolean =
-        store.data.first()[voiceAliasEnabledKey(mappingId)] ?: true
-
-    suspend fun setVoiceAliasEnabled(mappingId: Long, value: Boolean) {
-        store.edit { it[voiceAliasEnabledKey(mappingId)] = value }
-    }
-
-    /** Per-Alias-Pref-Key, stabil über die [mappingId] (1 = Grog, 2 = Grogg). */
-    private fun voiceAliasEnabledKey(mappingId: Long) =
-        booleanPreferencesKey("voice_alias_enabled_$mappingId")
-
     companion object {
         const val DEFAULT_MODEL = "grok-4.3"
         const val DEFAULT_ASSISTANT_NAME = "Grok"

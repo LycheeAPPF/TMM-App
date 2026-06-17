@@ -48,29 +48,6 @@ class AssistantContactProvisioner @Inject constructor(
         val mapping = mappingRepository.ensureStaticAssistantMapping(name)
         val ok = contactSyncWriter.upsertContact(mapping.fakeAddress, name)
         logBuffer.info(TAG, "Grok-Auto-Kontakt bereit: ${mapping.fakeAddress} ($name, upsert=$ok)")
-
-        // Phonetische Sprach-Aliasse („Grog"/„Grogg") — eigene Kontakte, KEINE
-        // Mapping-Rows. Der Classifier lenkt Diktate an diese Adressen auf die
-        // kanonische Grok-Session (id 0) um; die Antwort kommt als „Grok" zurück.
-        // Per Debug-Schalter JE ALIAS einzeln abschaltbar (Default an): so lässt
-        // sich z.B. nur „Grok" lassen, um Teslas „gro"-Auswahlmenü zu vermeiden.
-        // Da jeder reconcile() (Boot/Health/Backfill) das Pref liest, kann ein
-        // deaktivierter Alias nicht durch einen Hintergrund-Reconcile auferstehen.
-        for (alias in AssistantIdentity.ALIASES) {
-            if (prefs.isVoiceAliasEnabled(alias.mappingId)) {
-                val aliasOk = contactSyncWriter.upsertContact(alias.fakeAddress, alias.displayName)
-                logBuffer.info(
-                    TAG,
-                    "Grok-Alias-Kontakt bereit: ${alias.fakeAddress} (${alias.displayName}, upsert=$aliasOk)"
-                )
-            } else {
-                coRunCatching { contactSyncWriter.deleteContact(alias.fakeAddress) }
-                logBuffer.info(
-                    TAG,
-                    "Grok-Alias-Kontakt deaktiviert: ${alias.fakeAddress} (${alias.displayName})"
-                )
-            }
-        }
     }
 
     private suspend fun remove() {
@@ -78,9 +55,6 @@ class AssistantContactProvisioner @Inject constructor(
         // (nicht ablaufend, ohne Kontakt unsichtbar). Das ermöglicht sofortiges
         // Re-Enable und Kontext-Kontinuität, ohne erneute Migration.
         coRunCatching { contactSyncWriter.deleteContact(AssistantIdentity.STATIC_FAKE_ADDRESS) }
-        for (alias in AssistantIdentity.ALIASES) {
-            coRunCatching { contactSyncWriter.deleteContact(alias.fakeAddress) }
-        }
     }
 
     companion object {

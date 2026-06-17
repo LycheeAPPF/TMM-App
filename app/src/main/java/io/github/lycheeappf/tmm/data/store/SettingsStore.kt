@@ -43,10 +43,10 @@ class SettingsStore @Inject constructor(
             val legacyMax = (0..9).maxOfOrNull { code ->
                 prefs[longPreferencesKey("next_mapping_id_$code")] ?: 0L
             } ?: 0L
-            // Reservierte Ids (statische Grok-Identität id 0 + Sprach-Aliasse) NIE
-            // dynamisch vergeben — sonst bekäme ein Messenger-Mapping eine reservierte
-            // Fake-Adresse. Die Schleifen sind für reale Counter-Werte (zweistellig)
-            // No-ops und verschieben keinen bestehenden Kontakt.
+            // Reservierte Ids (statische Grok-Identität id 0) NIE dynamisch vergeben —
+            // sonst bekäme ein Messenger-Mapping eine reservierte Fake-Adresse. Die
+            // Schleifen sind für reale Counter-Werte (zweistellig) No-ops und
+            // verschieben keinen bestehenden Kontakt.
             var cur = (prefs[key] ?: 1L).coerceAtLeast(legacyMax)
             while (cur in AssistantIdentity.RESERVED_MAPPING_IDS) cur++
             assigned = cur

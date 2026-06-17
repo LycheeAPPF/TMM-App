@@ -2,6 +2,8 @@ package io.github.lycheeappf.tmm.ui.screen.assistant
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +44,7 @@ import io.github.lycheeappf.tmm.ui.component.SettingCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AssistantScreen(
     bottomBar: @Composable () -> Unit,
@@ -173,15 +177,50 @@ fun AssistantScreen(
             }
 
             SettingCard(
-                title = "Anzeigename im Tesla",
-                description = "So nennt dein Tesla den Assistenten beim Vorlesen ('Nachricht von …')."
+                title = "Name im Tesla (Sprachsteuerung)",
+                description = "So heißt Grok als Kontakt im Auto. Teslas Sprachsteuerung erkennt " +
+                    "einen VOR- + NACHNAMEN am zuverlässigsten. Auswählen bzw. Anwenden " +
+                    "synchronisiert den Namen direkt zum Tesla."
             ) {
-                OutlinedTextField(
-                    value = state.assistantName,
-                    onValueChange = viewModel::setAssistantName,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                val isCustom = state.assistantName !in AssistantViewModel.PRESET_NAMES
+                var customMode by remember(state.assistantName) { mutableStateOf(isCustom) }
+                var customDraft by remember(state.assistantName) {
+                    mutableStateOf(if (isCustom) state.assistantName else "")
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
+                    AssistantViewModel.PRESET_NAMES.forEach { preset ->
+                        FilterChip(
+                            selected = !customMode && state.assistantName == preset,
+                            enabled = !state.assistantNameApplying,
+                            onClick = {
+                                customMode = false
+                                viewModel.applyAssistantName(preset)
+                            },
+                            label = { Text(preset) }
+                        )
+                    }
+                    FilterChip(
+                        selected = customMode,
+                        enabled = !state.assistantNameApplying,
+                        onClick = { customMode = true },
+                        label = { Text("Eigener Name") }
+                    )
+                }
+                if (customMode) {
+                    OutlinedTextField(
+                        value = customDraft,
+                        onValueChange = { customDraft = it },
+                        singleLine = true,
+                        label = { Text("z.B. Viktor Grok") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { viewModel.applyAssistantName(customDraft) },
+                        enabled = customDraft.isNotBlank() && !state.assistantNameApplying
+                    ) {
+                        Text(if (state.assistantNameApplying) "läuft…" else "Anwenden & zum Tesla syncen")
+                    }
+                }
             }
 
             SettingCard(

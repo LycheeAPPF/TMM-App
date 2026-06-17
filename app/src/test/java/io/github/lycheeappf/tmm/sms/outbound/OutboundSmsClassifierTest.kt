@@ -85,56 +85,9 @@ class OutboundSmsClassifierTest {
         )
     }
 
-    // --- Phonetische Sprach-Aliasse („Grog"/„Grogg") → kanonische Grok-Session (id 0) ---
-
     @Test
-    fun `alias address Grog (+88810000001) redirects to canonical Grok id 0`() = runBlocking {
-        // Bewusst KEIN Mapping im Repo — der Redirect darf nicht von der DB abhängen.
-        val result = classifier.classify(row(address = "+88810000001"))
-        assertThat(result).isEqualTo(
-            OutboundSmsClassifier.Classification.TeslaReply(
-                mappingId = 0L,
-                channelCode = ChannelId.LLM.code
-            )
-        )
-    }
-
-    @Test
-    fun `alias address Grogg (+88810000002) redirects to canonical Grok id 0`() = runBlocking {
-        val result = classifier.classify(row(address = "+88810000002"))
-        assertThat(result).isEqualTo(
-            OutboundSmsClassifier.Classification.TeslaReply(
-                mappingId = 0L,
-                channelCode = ChannelId.LLM.code
-            )
-        )
-    }
-
-    @Test
-    fun `alias bracket form redirects to canonical Grok id 0`() = runBlocking {
-        val result = classifier.classify(row(address = "Grogg <+88810000002>"))
-        assertThat(result).isEqualTo(
-            OutboundSmsClassifier.Classification.TeslaReply(
-                mappingId = 0L,
-                channelCode = ChannelId.LLM.code
-            )
-        )
-    }
-
-    @Test
-    fun `alias 00-prefix form redirects to canonical Grok id 0`() = runBlocking {
-        val result = classifier.classify(row(address = "0088810000001"))
-        assertThat(result).isEqualTo(
-            OutboundSmsClassifier.Classification.TeslaReply(
-                mappingId = 0L,
-                channelCode = ChannelId.LLM.code
-            )
-        )
-    }
-
-    @Test
-    fun `non-alias LLM address routes by its own id, not redirected`() = runBlocking {
-        // +88810000009 ist KEIN Alias (id 9) → über FakeAddress.parse als (LLM, 9).
+    fun `LLM address routes by its own id via parse`() = runBlocking {
+        // +88810000009 → über FakeAddress.parse als (LLM, 9).
         val result = classifier.classify(row(address = "+88810000009"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(

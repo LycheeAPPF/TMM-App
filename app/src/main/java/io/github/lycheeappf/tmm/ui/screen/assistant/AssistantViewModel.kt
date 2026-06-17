@@ -7,6 +7,7 @@ import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
+import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.coRunCatching
@@ -37,6 +38,7 @@ data class AssistantUiState(
     val rateLimitPerHour: Int = AssistantPreferencesStore.DEFAULT_RATE_PER_HOUR,
     val privacyConsent: Boolean = false,
     val saving: Boolean = false,
+    val assistantNameApplying: Boolean = false,
     val triggerInFlight: Boolean = false,
     val lastFeedback: String? = null
 )
@@ -47,6 +49,7 @@ class AssistantViewModel @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
     private val coordinator: AssistantTriggerCoordinator,
     private val contactProvisioner: AssistantContactProvisioner,
+    private val teslaContactResync: TeslaContactResync,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -151,8 +154,30 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
-    fun setAssistantName(value: String) =
-        edit("assistant_name", { it.copy(assistantName = value) }) { prefs.setAssistantDisplayName(value) }
+    /**
+     * Setzt den Tesla-Anzeigenamen des Grok-Kontakts SOFORT (kein Debounce — der
+     * Preset-Tap bzw. „Anwenden" ist eine diskrete Aktion) und erzwingt einen
+     * Tesla-Kontakt-Sync, damit das Auto den neuen Namen beim nächsten PBAP-Pull
+     * zieht. Erst persistieren, DANN resyncen: der Backfill ruft `reconcile()` →
+     * `ensure()`, das `assistantDisplayName()` liest und den Kontakt umbenennt.
+     * Teslas Sprachsteuerung erkennt einen Kontakt mit Vor- + Nachname am
+     * zuverlässigsten — darum sind die Presets zweiteilige Namen.
+     */
+    fun applyAssistantName(value: String) {
+        val name = value.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update { it.copy(assistantName = name, assistantNameApplying = true) }
+            prefs.setAssistantDisplayName(name)
+            teslaContactResync.force()
+            _uiState.update {
+                it.copy(
+                    assistantNameApplying = false,
+                    lastFeedback = "Name gesetzt — Tesla-Sync läuft. Ggf. Bluetooth neu verbinden."
+                )
+            }
+        }
+    }
 
     fun setDriverName(value: String) =
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
@@ -243,5 +268,12 @@ class AssistantViewModel @Inject constructor(
 
     companion object {
         private const val PERSIST_DEBOUNCE_MS = 350L
+
+        /**
+         * Vorgefertigte Tesla-Anzeigenamen. „Grok" = Standard/Zurücksetzen; die
+         * zweiteiligen Namen (Vor- + Nachname) werden von Teslas Sprachsteuerung
+         * zuverlässiger adressiert. Alles andere geht über das freie Custom-Feld.
+         */
+        val PRESET_NAMES = listOf("Grok", "Walter Grok", "xAI Grok")
     }
 }

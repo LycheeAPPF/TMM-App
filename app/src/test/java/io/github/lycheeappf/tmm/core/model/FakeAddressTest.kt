@@ -26,21 +26,9 @@ class FakeAddressTest {
         // Single source of truth für den statischen Grok-Auto-Kontakt.
         assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.STATIC_FAKE_ADDRESS)
             .isEqualTo("+88810000000")
-    }
-
-    @Test
-    fun `alias addresses round-trip and match AssistantIdentity ALIASES`() {
-        val grog = FakeAddress(ChannelId.LLM, 1L)
-        val grogg = FakeAddress(ChannelId.LLM, 2L)
-        assertThat(grog.toE164()).isEqualTo("+88810000001")
-        assertThat(grogg.toE164()).isEqualTo("+88810000002")
-        assertThat(FakeAddress.parse("+88810000001")).isEqualTo(grog)
-        assertThat(FakeAddress.parse("+88810000002")).isEqualTo(grogg)
-        // Single source of truth für die Sprach-Aliasse.
-        assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.ALIAS_FAKE_ADDRESSES)
-            .containsExactly("+88810000001", "+88810000002")
+        // Nur die Grok-Id (0) ist reserviert — keine Sprach-Aliasse mehr.
         assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_IDS)
-            .containsExactly(0L, 1L, 2L)
+            .containsExactly(0L)
     }
 
     @Test

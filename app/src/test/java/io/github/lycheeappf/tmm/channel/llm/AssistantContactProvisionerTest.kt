@@ -16,7 +16,8 @@ import org.junit.Test
 
 /**
  * Gate-Logik des statischen Grok-Auto-Kontakts: er existiert genau dann, wenn der
- * Assistent einsatzbereit ist (Datenschutz-Einwilligung gegeben UND API-Key gesetzt).
+ * Assistent einsatzbereit ist (Datenschutz-Einwilligung gegeben UND API-Key gesetzt),
+ * und trägt den konfigurierten Anzeigenamen.
  */
 class AssistantContactProvisionerTest {
 
@@ -47,40 +48,27 @@ class AssistantContactProvisionerTest {
         coEvery { prefs.isPrivacyConsentGiven() } returns true
         coEvery { apiKeyStore.read() } returns "xai-key"
         coEvery { prefs.assistantDisplayName() } returns "Grok"
-        coEvery { prefs.isVoiceAliasEnabled(any()) } returns true
         coEvery { mappingRepository.ensureStaticAssistantMapping("Grok") } returns staticMapping
 
         provisioner.reconcile()
 
         coVerify { mappingRepository.ensureStaticAssistantMapping("Grok") }
         coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
-        // Beide phonetischen Sprach-Aliasse werden mitgeführt.
-        coVerify { contactSyncWriter.upsertContact("+88810000001", "Grog") }
-        coVerify { contactSyncWriter.upsertContact("+88810000002", "Grogg") }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 
     @Test
-    fun `reconcile toggles each voice alias individually`() = runTest {
+    fun `reconcile provisions contact under the configured display name`() = runTest {
         coEvery { prefs.isPrivacyConsentGiven() } returns true
         coEvery { apiKeyStore.read() } returns "xai-key"
-        coEvery { prefs.assistantDisplayName() } returns "Grok"
-        coEvery { mappingRepository.ensureStaticAssistantMapping("Grok") } returns staticMapping
-        // Grog (id 1) an, Grogg (id 2) aus → unabhängige Schalter.
-        coEvery { prefs.isVoiceAliasEnabled(1L) } returns true
-        coEvery { prefs.isVoiceAliasEnabled(2L) } returns false
+        coEvery { prefs.assistantDisplayName() } returns "Walter Grok"
+        coEvery { mappingRepository.ensureStaticAssistantMapping("Walter Grok") } returns staticMapping
 
         provisioner.reconcile()
 
-        // Grok-Kontakt bleibt bestehen …
-        coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
-        // … Grog wird angelegt, Grogg entfernt.
-        coVerify { contactSyncWriter.upsertContact("+88810000001", "Grog") }
-        coVerify { contactSyncWriter.deleteContact("+88810000002") }
-        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+88810000002", any()) }
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
-        // Grok selbst wird NICHT gelöscht (nur deaktivierte Aliasse).
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+        // Die Fake-Adresse bleibt +88810000000, nur der angezeigte Name folgt der Pref.
+        coVerify { contactSyncWriter.upsertContact("+88810000000", "Walter Grok") }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 
     @Test
@@ -91,8 +79,6 @@ class AssistantContactProvisionerTest {
         provisioner.reconcile()
 
         coVerify { contactSyncWriter.deleteContact("+88810000000") }
-        coVerify { contactSyncWriter.deleteContact("+88810000001") }
-        coVerify { contactSyncWriter.deleteContact("+88810000002") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
         coVerify(exactly = 0) { contactSyncWriter.upsertContact(any(), any()) }
     }
@@ -105,8 +91,6 @@ class AssistantContactProvisionerTest {
         provisioner.reconcile()
 
         coVerify { contactSyncWriter.deleteContact("+88810000000") }
-        coVerify { contactSyncWriter.deleteContact("+88810000001") }
-        coVerify { contactSyncWriter.deleteContact("+88810000002") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
     }
 }
