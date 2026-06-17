@@ -19,6 +19,22 @@ class FakeAddressTest {
     }
 
     @Test
+    fun `reserved Grok address +88810000000 round-trips to (LLM, 0)`() {
+        val reserved = FakeAddress(ChannelId.LLM, 0L)
+        assertThat(reserved.toE164()).isEqualTo("+88810000000")
+        assertThat(FakeAddress.parse("+88810000000")).isEqualTo(reserved)
+        // Single source of truth für den statischen Grok-Auto-Kontakt.
+        assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.STATIC_FAKE_ADDRESS)
+            .isEqualTo("+88810000000")
+        // Zusätzlicher Sprach-Ansprech-Kontakt (Id 1).
+        assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS)
+            .isEqualTo("+88810000001")
+        // Reserviert: Grok-Id (0) + Sprach-Alias-Id (1).
+        assertThat(io.github.lycheeappf.tmm.domain.channel.AssistantIdentity.RESERVED_MAPPING_IDS)
+            .containsExactly(0L, 1L)
+    }
+
+    @Test
     fun `toE164 formats system channel address (default +888)`() {
         val addr = FakeAddress(ChannelId.SYSTEM, 1).toE164()
         assertThat(addr).isEqualTo("+88890000001")
@@ -120,7 +136,7 @@ class FakeAddressTest {
 
     @Test
     fun `parse extracts embedded number from display-name combined format`() {
-        // Hybrid-Address-Format: Tesla zeigt 'Grok' als Sender, weil das im
+        // Bracket-Address-Format: Tesla zeigt 'Grok' als Sender, weil das im
         // Display-Teil steht, Reply-Routing klappt via dem in spitzen Klammern
         // eingebetteten +99942...-Token.
         val parsed = FakeAddress.parse("Grok <+9994210000007>")

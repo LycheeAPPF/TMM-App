@@ -8,6 +8,7 @@ import io.github.lycheeappf.tmm.data.db.MappingDao
 import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.PayloadJson
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
@@ -49,12 +50,17 @@ class MappingRepositoryImpl @Inject constructor(
             // soll der Chat weiter beantwortbar bleiben.
             val effectiveReplyable = existing.replyable || newReplyable
             val newPayloadJson = PayloadJson.encode(payload)
+            // Reuse verlängert die TTL, verkürzt sie aber NIE. Wichtig fürs statische
+            // Grok-Mapping (expiresAt = Long.MAX_VALUE): ein Button-Start
+            // (`allocateOrReuse`) darf es nicht auf now+ttl herunterziehen und damit
+            // wieder ablaufbar machen.
+            val effectiveExpiry = maxOf(existing.expiresAt, newExpiry)
             dao.refreshOnReuse(
                 mappingId = existing.mappingId,
                 channel = channel.code,
                 payloadJson = newPayloadJson,
                 replyable = effectiveReplyable,
-                newExpiresAt = newExpiry,
+                newExpiresAt = effectiveExpiry,
                 now = now
             )
             // Migration: ein vorheriger Display-only-Versuch hat fakeAddress
@@ -67,7 +73,7 @@ class MappingRepositoryImpl @Inject constructor(
             // Tesla wenigstens den Namen mit anzeigt.
             val migratedAddress = maybeMigrateDisplayBackToNumeric(existing)
             return existing.copy(
-                expiresAt = newExpiry,
+                expiresAt = effectiveExpiry,
                 lastUsedAt = now,
                 payloadJson = newPayloadJson,
                 replyable = effectiveReplyable,
@@ -113,6 +119,64 @@ class MappingRepositoryImpl @Inject constructor(
         ).toE164(settings.addressScheme())
         dao.updateFakeAddress(existing.mappingId, existing.channel, numeric)
         return numeric
+    }
+
+    override suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping {
+        // Erst alle veralteten dynamischen LLM-Mappings (+ ihre Kontakte) abräumen.
+        // Danach kann höchstens noch die reservierte id-0-Row existieren — der
+        // Unique-Index (channel, conversationKey) ist damit garantiert frei.
+        sweepStaleAssistantMappings()
+
+        val now = System.currentTimeMillis()
+        val payloadJson = PayloadJson.encode(
+            ChannelPayload.Llm(
+                providerId = "grok",
+                assistantDisplayName = displayName,
+                conversationKey = AssistantIdentity.CONVERSATION_KEY
+            )
+        )
+        val existing = dao.findById(AssistantIdentity.RESERVED_MAPPING_ID, ChannelId.LLM.code)
+
+        // Bereits reserviert (id 0) → nur Adresse/Name aktualisieren und
+        // Nicht-Ablaufen (expiresAt = MAX) sicherstellen. Idempotent.
+        if (existing != null) {
+            val updated = existing.copy(
+                fakeAddress = AssistantIdentity.STATIC_FAKE_ADDRESS,
+                payloadJson = payloadJson,
+                expiresAt = Long.MAX_VALUE,
+                replyable = true
+            )
+            dao.update(updated)
+            return updated.toDomain()
+        }
+
+        val entity = MappingEntity(
+            mappingId = AssistantIdentity.RESERVED_MAPPING_ID,
+            channel = ChannelId.LLM.code,
+            fakeAddress = AssistantIdentity.STATIC_FAKE_ADDRESS,
+            conversationKey = AssistantIdentity.CONVERSATION_KEY,
+            payloadJson = payloadJson,
+            createdAt = now,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        dao.insert(entity)
+        return entity.toDomain()
+    }
+
+    override suspend fun sweepStaleAssistantMappings(): Int {
+        var removed = 0
+        val llmRows = dao.findByChannel(ChannelId.LLM.code)
+        for (entity in llmRows) {
+            if (entity.mappingId == AssistantIdentity.RESERVED_MAPPING_ID) continue
+            // ZUERST Kontakt löschen (fakeAddress als Lookup-Key), DANN die Row.
+            coRunCatching { contactSyncWriter.deleteContact(entity.fakeAddress) }
+            dao.deleteById(entity.mappingId, ChannelId.LLM.code)
+            removed++
+        }
+        return removed
     }
 
     override suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId) {

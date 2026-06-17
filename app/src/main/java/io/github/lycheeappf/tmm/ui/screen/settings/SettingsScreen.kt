@@ -14,9 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -33,7 +30,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.BuildConfig
-import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.ui.component.MfsCardVariant
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -154,47 +150,6 @@ private fun DeveloperSettings(
     onOpenChannels: () -> Unit
 ) {
     SectionHeader("Entwickler")
-
-    SettingCard(
-        title = "Nummern-Schema",
-        description = "Tesla-sichtbare Fake-Adressen nutzen +888 (ITU TDR): von Android " +
-            "auflösbar (Tesla zeigt den Namen) UND vom Carrier kostenlos abgelehnt."
-    ) {
-        Text(
-            "Aktiv: +888 (ITU TDR)",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-
-    SettingCard(
-        title = "Sender-Anzeige-Modus",
-        description = "Wie wird der Sender im Tesla angezeigt? Tesla MCU2 zeigt die rohe " +
-            "ADDRESS-Spalte verbatim. 'Nur Nummer' + Contact-Sync ergibt den saubersten Namen."
-    ) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = state.displayMode == SettingsStore.DISPLAY_HYBRID,
-                onClick = { viewModel.setDisplayMode(SettingsStore.DISPLAY_HYBRID) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
-            ) { Text("Hybrid") }
-            SegmentedButton(
-                selected = state.displayMode == SettingsStore.DISPLAY_PADDING,
-                onClick = { viewModel.setDisplayMode(SettingsStore.DISPLAY_PADDING) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
-            ) { Text("Padding*") }
-            SegmentedButton(
-                selected = state.displayMode == SettingsStore.DISPLAY_NUMERIC,
-                onClick = { viewModel.setDisplayMode(SettingsStore.DISPLAY_NUMERIC) },
-                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
-            ) { Text("Nur Nummer") }
-        }
-        Text(
-            "Nur Nummer (Default): ADDRESS = reine Fake-Number; sauberer Name nur, wenn der " +
-                "Tesla-Bridge-Kontakt via PBAP gesynct wurde (WRITE_CONTACTS + Bluetooth-Reconnect).",
-            style = MaterialTheme.typography.bodySmall
-        )
-    }
 
     SettingCard(
         title = "Netz-Test (Pre-Flight)",

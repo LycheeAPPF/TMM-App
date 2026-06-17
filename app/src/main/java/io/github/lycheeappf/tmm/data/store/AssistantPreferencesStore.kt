@@ -59,12 +59,9 @@ class AssistantPreferencesStore @Inject constructor(
         store.edit { it[KEY_SYSTEM_PROMPT] = value }
     }
 
+    /** Antwort-Name des kanonischen Grok-Kontakts. Fest „Grok" (nicht über die UI editierbar). */
     suspend fun assistantDisplayName(): String =
         store.data.first()[KEY_ASSISTANT_NAME] ?: DEFAULT_ASSISTANT_NAME
-
-    suspend fun setAssistantDisplayName(value: String) {
-        store.edit { it[KEY_ASSISTANT_NAME] = value }
-    }
 
     /** Optionaler Fahrername; wird für {driver} in Prompt + Welcome eingesetzt. Leer = neutrale Anrede. */
     suspend fun driverName(): String =
@@ -150,9 +147,32 @@ class AssistantPreferencesStore @Inject constructor(
     fun privacyConsentFlow(): Flow<Boolean> =
         store.data.map { it[KEY_PRIVACY_CONSENT] ?: false }
 
+    // ---- Sprach-Ansprech-Kontakt (zusätzlicher Alias) ----------------------
+
+    /**
+     * Ist der zusätzliche Sprach-Ansprech-Kontakt ([AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS],
+     * +88810000001) aktiv? Default `true`. Trägt [voiceAliasName] und lenkt Diktate auf die
+     * kanonische Grok-Session um; „Aus" entfernt den Zusatzkontakt.
+     */
+    suspend fun voiceAliasEnabled(): Boolean =
+        store.data.first()[KEY_VOICE_ALIAS_ENABLED] ?: true
+
+    suspend fun setVoiceAliasEnabled(value: Boolean) {
+        store.edit { it[KEY_VOICE_ALIAS_ENABLED] = value }
+    }
+
+    /** Anzeigename des Sprach-Ansprech-Kontakts (Default „xAI Grok" — neutral). */
+    suspend fun voiceAliasName(): String =
+        store.data.first()[KEY_VOICE_ALIAS_NAME] ?: DEFAULT_VOICE_ALIAS_NAME
+
+    suspend fun setVoiceAliasName(value: String) {
+        store.edit { it[KEY_VOICE_ALIAS_NAME] = value }
+    }
+
     companion object {
         const val DEFAULT_MODEL = "grok-4.3"
         const val DEFAULT_ASSISTANT_NAME = "Grok"
+        const val DEFAULT_VOICE_ALIAS_NAME = "xAI Grok"
         const val DEFAULT_DRIVER_NAME = ""
         const val DEFAULT_WELCOME =
             "Hey {driver}, hier ist Grok. Stell mir einfach deine Frage, ich antworte kurz und freihändig."
@@ -224,6 +244,8 @@ class AssistantPreferencesStore @Inject constructor(
         private val KEY_RATE_PER_HOUR = intPreferencesKey("rate_per_hour")
         private val KEY_MAPPING_TTL_HOURS = intPreferencesKey("mapping_ttl_hours")
         private val KEY_PRIVACY_CONSENT = booleanPreferencesKey("privacy_consent")
+        private val KEY_VOICE_ALIAS_ENABLED = booleanPreferencesKey("voice_alias_enabled")
+        private val KEY_VOICE_ALIAS_NAME = stringPreferencesKey("voice_alias_name")
     }
 }
 

@@ -22,6 +22,9 @@ interface MappingDao {
     @Query("SELECT * FROM mappings WHERE channel = :channel ORDER BY createdAt DESC LIMIT :limit")
     fun observeByChannel(channel: Int, limit: Int = 100): Flow<List<MappingEntity>>
 
+    @Query("SELECT * FROM mappings WHERE channel = :channel")
+    suspend fun findByChannel(channel: Int): List<MappingEntity>
+
     @Query("SELECT * FROM mappings")
     suspend fun findAll(): List<MappingEntity>
 

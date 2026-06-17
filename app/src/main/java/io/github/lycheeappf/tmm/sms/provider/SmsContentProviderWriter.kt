@@ -36,25 +36,16 @@ class SmsContentProviderWriter @Inject constructor(
 ) {
 
     /**
-     * Schreibt eine fake inbound SMS. Die `fakeAddress` (numerisch, +9994x...)
-     * wird in einen **Hybrid-Form** "Display <Number>" eingewickelt, falls
-     * `displayName` gesetzt ist. Resultat ist ein RFC-822-Mailbox-ähnliches
-     * `Telephony.Sms.ADDRESS`-Feld wie `"Grok <+9994210000007>"`.
+     * Schreibt eine fake inbound SMS. Im Default-Modus
+     * [SettingsStore.DISPLAY_NUMERIC] landet nur die reine `fakeAddress`
+     * (+9994x...) in `Telephony.Sms.ADDRESS`; der Name kommt über den
+     * Contact-Sync-Pfad (PBAP), sodass Tesla z.B. "Grok" sauber zeigt.
      *
-     * Hintergrund: Display-only-ADDRESS (`"Grok"`) bricht den Reply-Path —
-     * Tesla/AOSP-MAP scheint die TEL-Form zu validieren oder zu strippen, sodass
-     * keine deterministisch erkennbare Outbox-Row für unsere App-Adressen
-     * entsteht. Mit der Hybrid-Form bleibt die `+9994x...`-Substring drin und
-     * [FakeAddress.parse] kann sie aus dem Tesla-Outbox-Roundtrip wieder
-     * herauspopeln, selbst wenn Tesla die ganze Address durchreicht oder
-     * extrahiert.
-     *
-     * Trade-off: Tesla MCU2 zeigt aktuell die *ganze* Hybrid-Form als Sender,
-     * also `"Grok <+9994210000007>"` statt nur `"Grok"`. Das ist hässlicher
-     * als das vorherige Display-only-Experiment, aber sicherer für den
-     * Reply-Pfad. Saubereres Display bleibt offen — wir loggen jetzt die
-     * Outbox-Rows in den LogBuffer, um datengetrieben einen anderen Trick zu
-     * finden (Unicode-Trennzeichen, vCard-Manipulation, etc.).
+     * Für Legacy-/Nicht-Numeric-Werte wird der Name als RFC-822-Mailbox-ähnliche
+     * Bracket-Form `"Grok <+9994210000007>"` eingewickelt. Dort bleibt die
+     * `+9994x...`-Substring erhalten und [FakeAddress.parse] kann sie aus dem
+     * Tesla-Outbox-Roundtrip wieder herauspopeln, selbst wenn Tesla die ganze
+     * Address durchreicht oder extrahiert.
      *
      * @return Uri der eingefügten Row oder null bei Fehler. Null wird auch
      *   returnt, wenn die App nicht Default SMS App ist — der Insert würde
@@ -89,15 +80,15 @@ class SmsContentProviderWriter @Inject constructor(
 
         // Im NUMERIC-Modus ist Display nur "+999..." in der ADDRESS-Spalte —
         // damit Tesla trotzdem "Grok" oder "Anna" zeigt, brauchen wir einen
-        // Contact-Eintrag, den Tesla per PBAP-Cache pullen kann. Im Hybrid/
-        // Padding-Modus brauchen wir ContactSync nicht (Name ist schon in der
-        // ADDRESS verpackt). Permission-Check + Account-Setup macht der
+        // Contact-Eintrag, den Tesla per PBAP-Cache pullen kann. Bei der
+        // Legacy-Bracket-Form steckt der Name schon in der ADDRESS, dann ist
+        // ContactSync unnötig. Permission-Check + Account-Setup macht der
         // ContactSyncWriter idempotent; ohne Permission gracefully no-op.
         if (mode == SettingsStore.DISPLAY_NUMERIC && !displayName.isNullOrBlank()) {
             contactSyncWriter.upsertContact(fakeAddress, displayName)
         }
 
-        val addressForInsert = composeDisplayAddress(displayName, fakeAddress, mode)
+        val addressForInsert = composeDisplayAddressPure(displayName, fakeAddress, mode)
         val firstAttempt = doInsert(addressForInsert, fakeAddress, body, timestamp, requireThreadId = true)
         if (firstAttempt != null) {
             // Echo-Ledger auf der PURE FakeNumber registrieren — die Outbox-Address
@@ -117,12 +108,6 @@ class SmsContentProviderWriter @Inject constructor(
         return retried
     }
 
-    private fun composeDisplayAddress(
-        displayName: String?,
-        fakeAddress: String,
-        mode: String
-    ): String = composeDisplayAddressPure(displayName, fakeAddress, mode)
-
     private fun doInsert(
         addressForProvider: String,
         threadKey: String,
@@ -130,7 +115,7 @@ class SmsContentProviderWriter @Inject constructor(
         timestamp: Long,
         requireThreadId: Boolean
     ): Uri? {
-        // Thread-Lookup IMMER mit der pure Fake-Number — der Hybrid-String
+        // Thread-Lookup IMMER mit der pure Fake-Number — die Bracket-Form
         // würde von `Telephony.Threads.getOrCreateThreadId` ggf. mit
         // IllegalArgumentException quittiert (manche AOSP-Branches normalisieren
         // hart). Threads sind nur an die Number gebunden, der Display-Teil ist
@@ -187,37 +172,15 @@ class SmsContentProviderWriter @Inject constructor(
         0
     }
 
-    /**
-     * Löscht alle SMS-Rows, deren ADDRESS die Fake-Number ENTHÄLT — egal ob pure
-     * (`"+9994..."`) oder eingebettet in eine HYBRID/PADDING-Form
-     * (`"Grok <+9994...>"`). Nötig beim Wechsel des Display-Modus: ein reiner
-     * Exact-Match (`deleteByAddress`) würde die alten Hybrid-Rows NICHT treffen,
-     * und Tesla zeigt die gecachte `"Grok <+999...>"`-ADDRESS sonst weiter an.
-     *
-     * Fake-Numbers (`+9994x...`) sind eindeutige Substrings ohne LIKE-Sonderzeichen,
-     * daher ist der `%number%`-Match sicher gegen Kollisionen mit echten SMS.
-     */
-    fun deleteByFakeNumber(fakeNumber: String): Int = try {
-        context.contentResolver.delete(
-            Telephony.Sms.CONTENT_URI,
-            "${Telephony.Sms.ADDRESS} LIKE ?",
-            arrayOf("%$fakeNumber%")
-        )
-    } catch (e: Exception) {
-        Log.w(TAG, "deleteByFakeNumber failed: $fakeNumber", e)
-        0
-    }
-
     companion object {
         private const val TAG = "SmsProviderWriter"
         internal const val MAX_DISPLAY_CHARS = 40
-        internal const val PADDING_SPACES = 40
 
         /**
          * Liefert den gelesenen Display-Modus, oder bei Lese-Fehler den DEFAULT
-         * ([SettingsStore.DEFAULT_DISPLAY_MODE] = NUMERIC). Bewusst NICHT HYBRID:
-         * ein transienter DataStore-Fehler darf den User nicht stumm aus dem
-         * Clean-Name-Modus werfen. Pure-Funktion für Unit-Tests.
+         * ([SettingsStore.DEFAULT_DISPLAY_MODE] = NUMERIC): ein transienter
+         * DataStore-Fehler darf den User nicht stumm aus dem Clean-Name-Modus
+         * werfen. Pure-Funktion für Unit-Tests.
          */
         internal fun displayModeOrFallback(read: Result<String>): String =
             read.getOrElse { SettingsStore.DEFAULT_DISPLAY_MODE }
@@ -226,15 +189,12 @@ class SmsContentProviderWriter @Inject constructor(
          * Reine String→String-Logik für die ADDRESS-Form je nach
          * [SettingsStore.displayMode]. Ausgelagert für Unit-Tests.
          *
-         *   - `DISPLAY_HYBRID` (default, sicher): `"Name <+999...>"` — Number
-         *     sichtbar, aber Tesla hat einen RFC-822-ähnlichen Bracket-Anker für
-         *     Reply-Extract via AOSP `PhoneNumberUtils.extractNetworkPortion`.
-         *   - `DISPLAY_PADDING` (experimentell): `"Name" + 40 spaces + "<+999...>"`
-         *     — Hoffnung dass Tesla MCU2 die Display-Spalte nach ~20 Chars
-         *     truncated und nur "Name" anzeigt. Reply identisch zu Hybrid.
-         *   - `DISPLAY_NUMERIC` (für Contact-Sync-Pfad): nur die Number. Display
-         *     zeigt "+999..." es sei denn Tesla pulled unseren RawContact über
-         *     PBAP-Cache → dann zeigt es den Contact-DisplayName.
+         *   - [SettingsStore.DISPLAY_NUMERIC] (Default, Contact-Sync-Pfad): nur die
+         *     Number. Display zeigt "+999..." es sei denn Tesla pulled unseren
+         *     RawContact über PBAP-Cache → dann zeigt es den Contact-DisplayName.
+         *   - Jeder andere (Legacy-)Wert: `"Name <+999...>"`-Bracket-Form — Number
+         *     sichtbar, mit RFC-822-ähnlichem Bracket-Anker für Reply-Extract via
+         *     AOSP `PhoneNumberUtils.extractNetworkPortion`.
          *
          * Sanitization am displayName: entfernt `<` `>` `,` `;` `"` `\` und
          * Control-Chars, kollabiert Whitespace, capt auf 40 Zeichen.
@@ -253,11 +213,7 @@ class SmsContentProviderWriter @Inject constructor(
                 .trim()
                 .take(MAX_DISPLAY_CHARS)
             if (sanitized.isBlank()) return fakeAddress
-            return when (mode) {
-                SettingsStore.DISPLAY_PADDING ->
-                    "$sanitized" + " ".repeat(PADDING_SPACES) + "<$fakeAddress>"
-                else -> "$sanitized <$fakeAddress>"  // DISPLAY_HYBRID (default)
-            }
+            return "$sanitized <$fakeAddress>"
         }
     }
 }

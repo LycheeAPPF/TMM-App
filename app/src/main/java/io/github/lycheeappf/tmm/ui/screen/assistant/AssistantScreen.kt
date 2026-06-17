@@ -2,6 +2,8 @@ package io.github.lycheeappf.tmm.ui.screen.assistant
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +44,7 @@ import io.github.lycheeappf.tmm.ui.component.SettingCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AssistantScreen(
     bottomBar: @Composable () -> Unit,
@@ -173,15 +177,64 @@ fun AssistantScreen(
             }
 
             SettingCard(
-                title = "Anzeigename im Tesla",
-                description = "So nennt dein Tesla den Assistenten beim Vorlesen ('Nachricht von …')."
+                title = "Zusätzlicher Name für Sprachsteuerung",
+                description = "Zusätzlicher Kontakt zum Ansprechen per Sprache ('Text an …'). " +
+                    "Leitet auf Grok um — Grok antwortet weiterhin als 'Grok'. Teslas " +
+                    "Sprachsteuerung erkennt einen VOR- + NACHNAMEN am zuverlässigsten. 'Aus' " +
+                    "entfernt den Zusatzkontakt; Auswählen bzw. Anwenden synchronisiert direkt zum Tesla."
             ) {
-                OutlinedTextField(
-                    value = state.assistantName,
-                    onValueChange = viewModel::setAssistantName,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                val isCustom = state.voiceAliasEnabled &&
+                    state.voiceAliasName !in AssistantViewModel.PRESET_NAMES
+                var customMode by remember(state.voiceAliasName, state.voiceAliasEnabled) {
+                    mutableStateOf(isCustom)
+                }
+                var customDraft by remember(state.voiceAliasName) {
+                    mutableStateOf(if (isCustom) state.voiceAliasName else "")
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
+                    FilterChip(
+                        selected = !state.voiceAliasEnabled,
+                        enabled = !state.voiceAliasApplying,
+                        onClick = {
+                            customMode = false
+                            viewModel.applyVoiceAlias(false, state.voiceAliasName)
+                        },
+                        label = { Text("Aus") }
+                    )
+                    AssistantViewModel.PRESET_NAMES.forEach { preset ->
+                        FilterChip(
+                            selected = state.voiceAliasEnabled && !customMode &&
+                                state.voiceAliasName == preset,
+                            enabled = !state.voiceAliasApplying,
+                            onClick = {
+                                customMode = false
+                                viewModel.applyVoiceAlias(true, preset)
+                            },
+                            label = { Text(preset) }
+                        )
+                    }
+                    FilterChip(
+                        selected = customMode,
+                        enabled = !state.voiceAliasApplying,
+                        onClick = { customMode = true },
+                        label = { Text("Eigener Name") }
+                    )
+                }
+                if (customMode) {
+                    OutlinedTextField(
+                        value = customDraft,
+                        onValueChange = { customDraft = it },
+                        singleLine = true,
+                        label = { Text("z.B. Viktor Grok") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { viewModel.applyVoiceAlias(true, customDraft) },
+                        enabled = customDraft.isNotBlank() && !state.voiceAliasApplying
+                    ) {
+                        Text(if (state.voiceAliasApplying) "läuft…" else "Anwenden & zum Tesla syncen")
+                    }
+                }
             }
 
             SettingCard(

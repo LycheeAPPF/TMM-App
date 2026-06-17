@@ -85,6 +85,66 @@ class OutboundSmsClassifierTest {
         )
     }
 
+    // --- Sprach-Ansprech-Kontakt (+88810000001) → kanonische Grok-Session (id 0) ---
+
+    @Test
+    fun `voice alias address redirects to canonical Grok id 0`() = runBlocking {
+        // Bewusst KEIN Mapping im Repo — der Redirect darf nicht von der DB abhängen.
+        val result = classifier.classify(row(address = "+88810000001"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `voice alias bracket form redirects to canonical Grok id 0`() = runBlocking {
+        val result = classifier.classify(row(address = "Elon Musk <+88810000001>"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `voice alias 00-prefix form redirects to canonical Grok id 0`() = runBlocking {
+        val result = classifier.classify(row(address = "0088810000001"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `LLM address routes by its own id via parse`() = runBlocking {
+        // +88810000009 → über FakeAddress.parse als (LLM, 9).
+        val result = classifier.classify(row(address = "+88810000009"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 9L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `notification address is not treated as alias`() = runBlocking {
+        // +88800000001 ist Channel-Digit 0 (NOTIFICATION, id 1) — kein Alias.
+        val result = classifier.classify(row(address = "+88800000001"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 1L,
+                channelCode = ChannelId.NOTIFICATION.code
+            )
+        )
+    }
+
     @Test
     fun `unknown plain address classified as not ours`() = runBlocking {
         val result = classifier.classify(row(address = "+4915123456789"))
@@ -148,6 +208,11 @@ class OutboundSmsClassifierTest {
             payload: ChannelPayload,
             ttlMillis: Long
         ): ChannelMapping = throw NotImplementedError()
+
+        override suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping =
+            throw NotImplementedError()
+
+        override suspend fun sweepStaleAssistantMappings(): Int = 0
 
         override suspend fun recordReplyAttempt(mappingId: Long, channel: ChannelId) {}
         override suspend fun deleteExpired(now: Long) {}

@@ -3,11 +3,14 @@ package io.github.lycheeappf.tmm.ui.screen.assistant
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
+import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
+import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -23,7 +26,6 @@ import javax.inject.Inject
 data class AssistantUiState(
     val apiKeyIsSet: Boolean = false,
     val apiKeyDraft: String = "",
-    val assistantName: String = AssistantPreferencesStore.DEFAULT_ASSISTANT_NAME,
     val driverName: String = AssistantPreferencesStore.DEFAULT_DRIVER_NAME,
     val systemPrompt: String = AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT,
     val welcomeMessage: String = AssistantPreferencesStore.DEFAULT_WELCOME,
@@ -35,6 +37,9 @@ data class AssistantUiState(
     val rateLimitPerHour: Int = AssistantPreferencesStore.DEFAULT_RATE_PER_HOUR,
     val privacyConsent: Boolean = false,
     val saving: Boolean = false,
+    val voiceAliasEnabled: Boolean = true,
+    val voiceAliasName: String = AssistantPreferencesStore.DEFAULT_VOICE_ALIAS_NAME,
+    val voiceAliasApplying: Boolean = false,
     val triggerInFlight: Boolean = false,
     val lastFeedback: String? = null
 )
@@ -44,6 +49,8 @@ class AssistantViewModel @Inject constructor(
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
     private val coordinator: AssistantTriggerCoordinator,
+    private val contactProvisioner: AssistantContactProvisioner,
+    private val teslaContactResync: TeslaContactResync,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -63,7 +70,6 @@ class AssistantViewModel @Inject constructor(
                 AssistantUiState(
                     apiKeyIsSet = apiKeyStore.isSet(),
                     apiKeyDraft = "",
-                    assistantName = prefs.assistantDisplayName(),
                     driverName = prefs.driverName(),
                     systemPrompt = prefs.systemPromptRaw(),
                     welcomeMessage = prefs.welcomeMessageRaw(),
@@ -73,7 +79,9 @@ class AssistantViewModel @Inject constructor(
                     temperature = prefs.temperature(),
                     rateLimitPerMin = prefs.maxRequestsPerMin(),
                     rateLimitPerHour = prefs.maxRequestsPerHour(),
-                    privacyConsent = prefs.isPrivacyConsentGiven()
+                    privacyConsent = prefs.isPrivacyConsentGiven(),
+                    voiceAliasEnabled = prefs.voiceAliasEnabled(),
+                    voiceAliasName = prefs.voiceAliasName()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
@@ -84,7 +92,6 @@ class AssistantViewModel @Inject constructor(
             _uiState.update { cur ->
                 if (persisting) {
                     snapshot.copy(
-                        assistantName = cur.assistantName,
                         driverName = cur.driverName,
                         systemPrompt = cur.systemPrompt,
                         welcomeMessage = cur.welcomeMessage,
@@ -120,6 +127,8 @@ class AssistantViewModel @Inject constructor(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 false to "Speichern fehlgeschlagen: ${e::class.simpleName}"
             }
+            // Key gesetzt → statischen Grok-Auto-Kontakt anlegen (sofern Consent da).
+            if (apiKeyIsSet) coRunCatching { contactProvisioner.reconcile() }
             _uiState.update {
                 it.copy(
                     saving = false,
@@ -134,6 +143,8 @@ class AssistantViewModel @Inject constructor(
     fun clearApiKey() {
         viewModelScope.launch(ioDispatcher) {
             apiKeyStore.clear()
+            // Key weg → Grok-Auto-Kontakt entfernen.
+            coRunCatching { contactProvisioner.reconcile() }
             _uiState.update {
                 it.copy(
                     apiKeyIsSet = false,
@@ -144,8 +155,32 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
-    fun setAssistantName(value: String) =
-        edit("assistant_name", { it.copy(assistantName = value) }) { prefs.setAssistantDisplayName(value) }
+    /**
+     * Schaltet den zusätzlichen Sprach-Ansprech-Kontakt (+88810000001) ein/aus bzw.
+     * setzt seinen Namen SOFORT (kein Debounce — Preset-Tap/„Aus"/„Anwenden" sind
+     * diskrete Aktionen) und erzwingt einen Tesla-Kontakt-Sync, damit das Auto den
+     * Kontakt beim nächsten PBAP-Pull neu zieht bzw. entfernt. Erst persistieren,
+     * DANN resyncen: der Backfill ruft `reconcile()` → `ensure()`, das die Prefs
+     * liest. Der ANTWORT-Name bleibt unberührt „Grok".
+     */
+    fun applyVoiceAlias(enabled: Boolean, name: String) {
+        val trimmed = name.trim()
+        if (enabled && trimmed.isEmpty()) return
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update { it.copy(voiceAliasApplying = true) }
+            prefs.setVoiceAliasEnabled(enabled)
+            if (enabled) prefs.setVoiceAliasName(trimmed)
+            teslaContactResync.force()
+            _uiState.update {
+                it.copy(
+                    voiceAliasEnabled = enabled,
+                    voiceAliasName = if (enabled) trimmed else it.voiceAliasName,
+                    voiceAliasApplying = false,
+                    lastFeedback = "Gespeichert — Tesla-Sync läuft. Ggf. Bluetooth neu verbinden."
+                )
+            }
+        }
+    }
 
     fun setDriverName(value: String) =
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
@@ -187,6 +222,8 @@ class AssistantViewModel @Inject constructor(
     fun setPrivacyConsent(granted: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             prefs.setPrivacyConsentGiven(granted)
+            // Consent-Wechsel → Grok-Auto-Kontakt anlegen (an) bzw. entfernen (aus).
+            coRunCatching { contactProvisioner.reconcile() }
             _uiState.update { it.copy(privacyConsent = granted) }
         }
     }
@@ -234,5 +271,13 @@ class AssistantViewModel @Inject constructor(
 
     companion object {
         private const val PERSIST_DEBOUNCE_MS = 350L
+
+        /**
+         * Vorgefertigte Namen für den Sprach-Ansprech-Kontakt. Zweiteilige Namen
+         * (Vor- + Nachname) werden von Teslas Sprachsteuerung zuverlässiger
+         * adressiert; alles andere geht über das freie Custom-Feld. „Grok" ist hier
+         * bewusst NICHT dabei — das ist der feste Antwort-Name.
+         */
+        val PRESET_NAMES = listOf("xAI Grok", "Elon Musk")
     }
 }

@@ -9,6 +9,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
+import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
 
@@ -23,7 +25,8 @@ class ContactBackfillWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val mappingRepository: MappingRepository,
-    private val contactSyncWriter: ContactSyncWriter
+    private val contactSyncWriter: ContactSyncWriter,
+    private val contactProvisioner: AssistantContactProvisioner
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -35,11 +38,21 @@ class ContactBackfillWorker @AssistedInject constructor(
         }.getOrElse { return Result.retry() }
 
         for (mapping in mappings) {
+            // LLM-Mappings überspringen: Grok + Sprach-Aliasse gehören ALLEIN dem
+            // AssistantContactProvisioner (siehe reconcile() unten). Sonst würde der
+            // Backfill ein veraltetes Grok-Duplikat aus einer Altlast-Row wieder
+            // materialisieren und den Anzeige-Namen am Provisioner vorbei setzen.
+            if (mapping.channel == ChannelId.LLM) continue
             val displayName = displayNameFor(mapping.payload) ?: continue
             io.github.lycheeappf.tmm.core.util.coRunCatching {
                 contactSyncWriter.upsertContact(mapping.fakeAddress, displayName)
             }
         }
+
+        // Grok + Sprach-Aliasse konsistent (re-)provisionieren bzw. entfernen —
+        // gegated auf Einwilligung + API-Key. So sind nach „Tesla-Kontakte neu
+        // synchronisieren" auch die Assistenten-Kontakte wieder korrekt da.
+        io.github.lycheeappf.tmm.core.util.coRunCatching { contactProvisioner.reconcile() }
         return Result.success()
     }
 

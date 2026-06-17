@@ -1,8 +1,9 @@
 package io.github.lycheeappf.tmm.core.model
 
 /**
- * Format-Schema für Fake-Telefonnummern. Wird vom Settings-Toggle gewechselt,
- * falls der Carrier das ITU-Test-Range routet.
+ * Format-Schema für Fake-Telefonnummern. Aktiv ist fix [Itu888] (+888); die
+ * abgelösten Schemata [Itu999]/[De32] bleiben nur noch für das Parsing von
+ * Alt-Mappings in [entries] erhalten.
  */
 enum class AddressScheme(
     val key: String,

@@ -42,15 +42,15 @@ class InjectedMessageLedgerTest {
         assertThat(ledger.shouldIgnoreOutbound("+9994210000001", "Hallo")).isTrue()
     }
 
-    @Test fun `mark with pure number matches outbound with hybrid display+number`() {
+    @Test fun `mark with pure number matches outbound with bracket display+number`() {
         // Inject registriert die pure FakeNumber, Tesla schickt aber die
-        // hybrid ADDRESS-Form ("Grok <+999...>") zurück. Normalisierung muss
+        // Bracket-ADDRESS-Form ("Grok <+999...>") zurück. Normalisierung muss
         // beide Wege strippen.
         ledger.markInjected("+9994210000007", "Welcome")
         assertThat(ledger.shouldIgnoreOutbound("Grok <+9994210000007>", "Welcome")).isTrue()
     }
 
-    @Test fun `mark with hybrid form matches outbound with pure number`() {
+    @Test fun `mark with bracket form matches outbound with pure number`() {
         ledger.markInjected("Grok <+9994210000007>", "Welcome")
         assertThat(ledger.shouldIgnoreOutbound("+9994210000007", "Welcome")).isTrue()
     }

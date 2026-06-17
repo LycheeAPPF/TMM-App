@@ -420,7 +420,7 @@ private fun technicalVerdict(
     r.contactId == null ->
         "contactId ist NULL. AGGREGATION_MODE_DISABLED erzeugt keine Aggregat-Contact-Zeile, daher bricht der PhoneLookup-JOIN."
     r.computedE164 == null ->
-        "contactId OK, aber E164=null (Test-Range ohne gültigen Ländercode) → Strict-Match tot. Fix: Nummernschema."
+        "contactId OK, aber E164=null (+888-Range ohne gültigen Ländercode) → Strict-Match tot, Auflösung läuft über den min_match/PhoneLookup-Fallback."
     else ->
         "contactId+E164 OK, Lookup scheitert dennoch — Details im Live-Log (storedNorm / min_match)."
 }
