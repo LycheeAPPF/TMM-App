@@ -1,10 +1,14 @@
 package io.github.lycheeappf.tmm.ui.screen.sms
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.domain.sms.SmsInboxReader
 import io.github.lycheeappf.tmm.domain.sms.SmsMessage
 import io.github.lycheeappf.tmm.domain.sms.SmsSendResult
@@ -33,6 +37,7 @@ data class SmsThreadUiState(
 
 @HiltViewModel
 class SmsThreadViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
     private val reader: SmsInboxReader,
     private val sender: SmsSender,
@@ -81,7 +86,7 @@ class SmsThreadViewModel @Inject constructor(
                 it.copy(
                     sending = false,
                     draft = if (result is SmsSendResult.Enqueued) "" else it.draft,
-                    feedback = smsSendFeedback(result)
+                    feedback = smsSendFeedback(context, result)
                 )
             }
             // Neue OUTBOX-Row erscheint via ContentObserver → reload zeigt sie.
@@ -100,7 +105,7 @@ class SmsThreadViewModel @Inject constructor(
             it.copy(
                 messages = messages,
                 address = address,
-                title = name ?: address.ifBlank { "SMS" },
+                title = name ?: address.ifBlank { context.localizedString(R.string.sms_thread_title_fallback) },
                 loading = false
             )
         }

@@ -14,6 +14,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import io.github.lycheeappf.tmm.MainActivity
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 
 /**
  * Empfängt eingehende MMS, wenn unsere App Default-SMS-App ist.
@@ -52,14 +54,11 @@ class DeliverMmsReceiver : BroadcastReceiver() {
 
         val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_FALLBACK)
             .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("MMS empfangen — nicht anzeigbar")
-            .setContentText("Diese App unterstützt keine MMS")
+            .setContentTitle(context.localizedString(R.string.mms_received_title))
+            .setContentText(context.localizedString(R.string.mms_received_text))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Eine MMS wurde empfangen, kann aber nicht angezeigt werden, " +
-                        "weil 'Tesla Messages Manager' als Default-SMS-App MMS nicht " +
-                        "verarbeitet. Setze Google Messages temporär als Default, falls " +
-                        "du die MMS sehen willst."
+                    context.localizedString(R.string.mms_received_big)
                 )
             )
             .setContentIntent(pi)

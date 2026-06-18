@@ -33,11 +33,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.db.MappingEntity
@@ -62,7 +64,7 @@ fun DiagnosticsScreen(
     var tab by remember { mutableStateOf(0) }
 
     io.github.lycheeappf.tmm.ui.component.MfsScaffold(
-        title = "Diagnose",
+        title = stringResource(R.string.diagnostics_title),
         onBack = onBack,
         actions = {
             if (state.exportInFlight) {
@@ -72,7 +74,7 @@ fun DiagnosticsScreen(
                 onClick = { viewModel.exportDiagnostics() },
                 enabled = !state.exportInFlight
             ) {
-                Icon(Icons.Outlined.Download, contentDescription = "Export")
+                Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.diagnostics_export_action))
             }
         }
     ) { inner ->
@@ -85,7 +87,7 @@ fun DiagnosticsScreen(
         ) {
             state.lastExportPath?.let { path ->
                 Text(
-                    "Letzter Export: $path",
+                    stringResource(R.string.diagnostics_last_export, path),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -94,9 +96,9 @@ fun DiagnosticsScreen(
             SenderResolutionCard(state = state, onTest = viewModel::runSenderResolutionTest)
 
             PrimaryTabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Mappings") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Reply-Verlauf") })
-                Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Live-Log") })
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.diagnostics_tab_mappings)) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.diagnostics_tab_reply_history)) })
+                Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text(stringResource(R.string.diagnostics_tab_live_log)) })
             }
 
             AnimatedContent(targetState = tab, label = "diagTab") { current ->
@@ -122,12 +124,12 @@ private fun MappingsTab(state: DiagnosticsUiState, onSelectChannel: (ChannelId) 
                 FilterChip(
                     selected = state.selectedChannel == ch,
                     onClick = { onSelectChannel(ch) },
-                    label = { Text(ch.label) }
+                    label = { Text(channelLabel(ch)) }
                 )
             }
         }
         if (state.mappings.isEmpty()) {
-            EmptyHint("Keine Mappings für ${state.selectedChannel.label}. Wird befüllt, sobald Notifications eintreffen.")
+            EmptyHint(stringResource(R.string.diagnostics_mappings_empty, channelLabel(state.selectedChannel)))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
                 items(state.mappings, key = { it.mappingId }) { MappingRow(it, Modifier.animateItem()) }
@@ -135,6 +137,16 @@ private fun MappingsTab(state: DiagnosticsUiState, onSelectChannel: (ChannelId) 
         }
     }
 }
+
+/** Lokalisierter Channel-Anzeigename (ChannelId bleibt Android-frei). */
+@Composable
+private fun channelLabel(id: ChannelId): String = stringResource(
+    when (id) {
+        ChannelId.NOTIFICATION -> R.string.channel_notification_label
+        ChannelId.LLM -> R.string.channel_llm_label
+        ChannelId.SYSTEM -> R.string.channel_system_label
+    }
+)
 
 @Composable
 private fun MappingRow(entity: MappingEntity, modifier: Modifier = Modifier) {
@@ -155,13 +167,23 @@ private fun MappingRow(entity: MappingEntity, modifier: Modifier = Modifier) {
             )
             HorizontalDivider()
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("created: ${formatTs(entity.createdAt)}", style = MaterialTheme.typography.labelSmall)
-                Text("expires: ${formatTs(entity.expiresAt)}", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    stringResource(R.string.diagnostics_mapping_created, formatTs(entity.createdAt)),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    stringResource(R.string.diagnostics_mapping_expires, formatTs(entity.expiresAt)),
+                    style = MaterialTheme.typography.labelSmall
+                )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("replies: ${entity.replyCount}", style = MaterialTheme.typography.labelSmall)
                 Text(
-                    if (entity.replyable) "replyable" else "read-only",
+                    stringResource(R.string.diagnostics_mapping_replies, entity.replyCount),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    if (entity.replyable) stringResource(R.string.diagnostics_mapping_replyable)
+                    else stringResource(R.string.diagnostics_mapping_read_only),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (entity.replyable) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.outline
@@ -174,7 +196,7 @@ private fun MappingRow(entity: MappingEntity, modifier: Modifier = Modifier) {
 @Composable
 private fun ReplyHistoryTab(history: List<ReplyHistoryEntity>) {
     if (history.isEmpty()) {
-        EmptyHint("Noch keine Reply-Versuche. Diktiere im Tesla eine Antwort, um diese Liste zu füllen.")
+        EmptyHint(stringResource(R.string.diagnostics_reply_history_empty))
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
             items(history, key = { it.id }) { ReplyHistoryRow(it, Modifier.animateItem()) }
@@ -189,7 +211,8 @@ private fun ReplyHistoryRow(entity: ReplyHistoryEntity, modifier: Modifier = Mod
         "PI_CANCELED", "EXPIRED", "NO_ACTION" -> MfsStatus.Error
         else -> MfsStatus.Neutral
     }
-    val channelLabel = ChannelId.fromCode(entity.channel)?.label ?: "Unknown ${entity.channel}"
+    val channelText = ChannelId.fromCode(entity.channel)?.let { channelLabel(it) }
+        ?: stringResource(R.string.diagnostics_reply_history_unknown_channel, entity.channel)
     Card(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(MfsSpacing.md),
@@ -209,7 +232,7 @@ private fun ReplyHistoryRow(entity: ReplyHistoryEntity, modifier: Modifier = Mod
             }
             Text(entity.text, style = MaterialTheme.typography.bodyMedium, maxLines = 3)
             Text(
-                "$channelLabel · mapping ${entity.mappingId}",
+                "$channelText · mapping ${entity.mappingId}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = FontFamily.Monospace
@@ -233,16 +256,16 @@ private fun LogTab(logs: List<LogBuffer.LogEntry>) {
             FilterChip(
                 selected = !filterErrors,
                 onClick = { filterErrors = false },
-                label = { Text("Alle") }
+                label = { Text(stringResource(R.string.diagnostics_log_filter_all)) }
             )
             FilterChip(
                 selected = filterErrors,
                 onClick = { filterErrors = true },
-                label = { Text("Nur Warnungen/Fehler") }
+                label = { Text(stringResource(R.string.diagnostics_log_filter_warnings_errors)) }
             )
         }
         if (shown.isEmpty()) {
-            EmptyHint("Log ist leer. Sobald Notifications oder Tesla-Antworten eintreffen, erscheinen hier die Events.")
+            EmptyHint(stringResource(R.string.diagnostics_log_empty))
         } else {
             // Kein content-basierter key: Burst-Logs können dieselbe Millisekunde +
             // Tag + message.hashCode() teilen → doppelte LazyColumn-Keys → Compose-
@@ -297,7 +320,7 @@ private fun SenderResolutionCard(state: DiagnosticsUiState, onTest: () -> Unit) 
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Sender-Test", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.diagnostics_sender_test_title), style = MaterialTheme.typography.titleSmall)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
@@ -306,32 +329,31 @@ private fun SenderResolutionCard(state: DiagnosticsUiState, onTest: () -> Unit) 
                         CircularProgressIndicator(modifier = Modifier.size(18.dp))
                     }
                     io.github.lycheeappf.tmm.ui.component.PrimaryActionButton(
-                        text = "Testen",
+                        text = stringResource(R.string.diagnostics_sender_test_action),
                         onClick = onTest,
                         loading = state.senderTestRunning
                     )
                 }
             }
             Text(
-                "Prüft, ob dein Tesla für die Grok-Adresse den Namen statt der Nummer bekommt. " +
-                    "Es wird keine SMS gesendet.",
+                stringResource(R.string.diagnostics_sender_test_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             val test = state.senderTest
             if (test?.error != null) {
-                StatusPill(text = "Fehler beim Test", status = MfsStatus.Error)
+                StatusPill(text = stringResource(R.string.diagnostics_sender_test_error), status = MfsStatus.Error)
                 Text(test.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             } else if (test?.result != null) {
                 val r = test.result
                 val (verdictLabel, verdictStatus) = when {
                     r.phoneLookupFound && r.resolvedName == test.displayName ->
-                        "Tesla zeigt den Namen korrekt" to MfsStatus.Success
+                        stringResource(R.string.diagnostics_sender_test_verdict_name_ok) to MfsStatus.Success
                     !r.hasWrite ->
-                        "Schreibrecht für Kontakte fehlt" to MfsStatus.Warning
+                        stringResource(R.string.diagnostics_sender_test_verdict_no_write) to MfsStatus.Warning
                     else ->
-                        "Tesla zeigt nur die Nummer" to MfsStatus.Error
+                        stringResource(R.string.diagnostics_sender_test_verdict_number_only) to MfsStatus.Error
                 }
                 StatusPill(text = verdictLabel, status = verdictStatus)
 
@@ -341,32 +363,39 @@ private fun SenderResolutionCard(state: DiagnosticsUiState, onTest: () -> Unit) 
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = { showDetails = !showDetails }) {
-                        Text(if (showDetails) "Details verbergen" else "Details")
+                        Text(
+                            if (showDetails) stringResource(R.string.diagnostics_sender_test_details_hide)
+                            else stringResource(R.string.diagnostics_sender_test_details_show)
+                        )
                     }
                     IconButton(onClick = {
                         clipboard.setText(AnnotatedString(buildSenderTestReport(state)))
                     }) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Kopieren")
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.diagnostics_sender_test_copy))
                     }
                 }
 
                 AnimatedVisibility(visible = showDetails, enter = mfsExpandEnter(), exit = mfsExpandExit()) {
+                    val yes = stringResource(R.string.diagnostics_sender_test_yes)
+                    val no = stringResource(R.string.diagnostics_sender_test_no)
                     Column(verticalArrangement = Arrangement.spacedBy(MfsSpacing.xs)) {
                         HorizontalDivider()
                         Text(test.fakeAddress, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                        KeyValueRow("READ_CONTACTS", if (r.hasRead) "ja" else "nein", ok = r.hasRead)
-                        KeyValueRow("WRITE_CONTACTS", if (r.hasWrite) "ja" else "nein", ok = r.hasWrite)
-                        KeyValueRow("Kontakte im Account", r.contactCount.toString(), ok = r.contactCount > 0)
-                        KeyValueRow("Kontakt angelegt", if (r.upsertOk) "ja" else "nein", ok = r.upsertOk)
+                        KeyValueRow("READ_CONTACTS", if (r.hasRead) yes else no, ok = r.hasRead)
+                        KeyValueRow("WRITE_CONTACTS", if (r.hasWrite) yes else no, ok = r.hasWrite)
+                        KeyValueRow(stringResource(R.string.diagnostics_sender_test_contacts_in_account), r.contactCount.toString(), ok = r.contactCount > 0)
+                        KeyValueRow(stringResource(R.string.diagnostics_sender_test_contact_created), if (r.upsertOk) yes else no, ok = r.upsertOk)
                         KeyValueRow("contactId (JOIN)", r.contactId?.toString() ?: "NULL", ok = r.contactId != null)
                         KeyValueRow(
-                            "E164 (nur Abkürzung)",
-                            r.computedE164 ?: if (r.phoneLookupFound) "null — egal (Lookup ok)" else "null",
+                            stringResource(R.string.diagnostics_sender_test_e164_label),
+                            r.computedE164 ?: if (r.phoneLookupFound) stringResource(R.string.diagnostics_sender_test_e164_null_irrelevant)
+                            else stringResource(R.string.diagnostics_sender_test_e164_null),
                             ok = r.computedE164 != null || r.phoneLookupFound
                         )
                         KeyValueRow(
                             "PhoneLookup",
-                            if (r.phoneLookupFound) "→ ${r.resolvedName}" else "nicht gefunden",
+                            if (r.phoneLookupFound) stringResource(R.string.diagnostics_sender_test_phonelookup_found, r.resolvedName ?: "")
+                            else stringResource(R.string.diagnostics_sender_test_phonelookup_not_found),
                             ok = r.phoneLookupFound && r.resolvedName == test.displayName
                         )
                         Text(
@@ -403,19 +432,20 @@ private fun EmptyHint(text: String) {
     )
 }
 
+@Composable
 private fun technicalVerdict(
     r: io.github.lycheeappf.tmm.contact.SenderResolutionResult
 ): String = when {
     !r.hasWrite ->
-        "WRITE_CONTACTS fehlt — ohne das kann kein Kontakt angelegt werden."
+        stringResource(R.string.diagnostics_verdict_no_write)
     r.phoneLookupFound && r.resolvedName != null ->
-        "Telefonseite OK. Falls Tesla weiter die Nummer zeigt: 'Tesla-Kontakte neu synchronisieren' + Bluetooth neu verbinden."
+        stringResource(R.string.diagnostics_verdict_phone_ok)
     r.contactId == null ->
-        "contactId ist NULL. AGGREGATION_MODE_DISABLED erzeugt keine Aggregat-Contact-Zeile, daher bricht der PhoneLookup-JOIN."
+        stringResource(R.string.diagnostics_verdict_contact_id_null)
     r.computedE164 == null ->
-        "contactId OK, aber E164=null (+888-Range ohne gültigen Ländercode) → Strict-Match tot, Auflösung läuft über den min_match/PhoneLookup-Fallback."
+        stringResource(R.string.diagnostics_verdict_e164_null)
     else ->
-        "contactId+E164 OK, Lookup scheitert dennoch — Details im Live-Log (storedNorm / min_match)."
+        stringResource(R.string.diagnostics_verdict_lookup_fails)
 }
 
 private fun buildSenderTestReport(state: DiagnosticsUiState): String {

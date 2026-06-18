@@ -25,7 +25,8 @@ class LlmRateLimiter @Inject constructor(
 
     sealed class Decision {
         data object Allow : Decision()
-        data class Reject(val reason: Reason, val message: String) : Decision()
+        /** Abgelehnt; [reason] wird erst im [LlmChannel] zu lokalisiertem TTS-Text aufgelöst. */
+        data class Reject(val reason: Reason) : Decision()
     }
 
     enum class Reason { PER_MINUTE, PER_HOUR }
@@ -48,14 +49,8 @@ class LlmRateLimiter @Inject constructor(
 
             val countInWindow = q.count { it >= now - MINUTE_MS }
             when {
-                countInWindow >= maxPerMin -> Decision.Reject(
-                    Reason.PER_MINUTE,
-                    "Zu viele Anfragen — bitte einen Moment warten."
-                )
-                q.size >= maxPerHour -> Decision.Reject(
-                    Reason.PER_HOUR,
-                    "Stündliches Anfrage-Limit für den Assistenten erreicht."
-                )
+                countInWindow >= maxPerMin -> Decision.Reject(Reason.PER_MINUTE)
+                q.size >= maxPerHour -> Decision.Reject(Reason.PER_HOUR)
                 else -> {
                     q.addLast(now)
                     Decision.Allow

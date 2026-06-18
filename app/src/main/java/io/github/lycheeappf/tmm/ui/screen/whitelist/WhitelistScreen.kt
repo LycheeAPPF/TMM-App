@@ -20,8 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
@@ -40,7 +43,7 @@ fun WhitelistScreen(
                 it.packageName.contains(state.filter, ignoreCase = true)
         }
 
-    MfsScaffold(title = "Freigegebene Apps", onBack = onBack) { inner ->
+    MfsScaffold(title = stringResource(R.string.whitelist_title), onBack = onBack) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -49,7 +52,7 @@ fun WhitelistScreen(
             verticalArrangement = Arrangement.spacedBy(MfsSpacing.md)
         ) {
             Text(
-                "Diese Apps werden erfasst und an dein Tesla weitergeleitet.",
+                stringResource(R.string.whitelist_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -58,7 +61,7 @@ fun WhitelistScreen(
                 value = state.filter,
                 onValueChange = viewModel::setFilter,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Suchen…") },
+                placeholder = { Text(stringResource(R.string.whitelist_search_hint)) },
                 singleLine = true
             )
 
@@ -69,9 +72,16 @@ fun WhitelistScreen(
                 FilterChip(
                     selected = state.showSystemApps,
                     onClick = { viewModel.toggleSystemApps() },
-                    label = { Text("System-Apps zeigen") }
+                    label = { Text(stringResource(R.string.whitelist_show_system_apps_label)) }
                 )
-                Text("${filtered.size} sichtbar", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    pluralStringResource(
+                        R.plurals.whitelist_visible_count,
+                        filtered.size,
+                        filtered.size
+                    ),
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
 
             when {
@@ -81,7 +91,7 @@ fun WhitelistScreen(
                 ) { CircularProgressIndicator() }
 
                 filtered.isEmpty() -> Text(
-                    "Keine App gefunden.",
+                    stringResource(R.string.whitelist_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = MfsSpacing.lg)

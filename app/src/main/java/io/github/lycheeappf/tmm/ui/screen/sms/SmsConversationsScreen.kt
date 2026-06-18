@@ -23,9 +23,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.component.MfsStatus
@@ -55,11 +57,11 @@ fun SmsConversationsScreen(
     ) { viewModel.refresh() }
 
     MfsScaffold(
-        title = "SMS",
+        title = stringResource(R.string.sms_list_title),
         bottomBar = bottomBar,
         actions = {
             IconButton(onClick = onCompose) {
-                Icon(Icons.Filled.Edit, contentDescription = "Neue SMS")
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.sms_compose_action))
             }
         }
     ) { inner ->
@@ -72,19 +74,18 @@ fun SmsConversationsScreen(
         ) {
             when {
                 !state.isDefaultSmsApp -> StatusCard(
-                    title = "Standard-SMS-App nötig",
-                    description = "Damit deine echten SMS angezeigt werden können, muss diese App " +
-                        "die Standard-SMS-App sein.",
+                    title = stringResource(R.string.sms_list_default_app_title),
+                    description = stringResource(R.string.sms_list_default_app_desc),
                     isGranted = false,
-                    actionLabel = "Setzen",
+                    actionLabel = stringResource(R.string.sms_list_default_app_action),
                     onAction = { viewModel.defaultSmsIntent()?.let { roleLauncher.launch(it) } }
                 )
 
                 !state.hasReadSms -> StatusCard(
-                    title = "SMS-Zugriff nötig",
-                    description = "Erlaube den Lesezugriff auf SMS, um deinen Verlauf anzuzeigen.",
+                    title = stringResource(R.string.sms_list_read_permission_title),
+                    description = stringResource(R.string.sms_list_read_permission_desc),
                     isGranted = false,
-                    actionLabel = "Erlauben",
+                    actionLabel = stringResource(R.string.sms_list_read_permission_action),
                     onAction = { readSmsLauncher.launch(android.Manifest.permission.READ_SMS) }
                 )
 
@@ -94,7 +95,7 @@ fun SmsConversationsScreen(
                 ) { CircularProgressIndicator() }
 
                 state.items.isEmpty() -> Text(
-                    "Keine SMS.",
+                    stringResource(R.string.sms_list_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = MfsSpacing.lg)

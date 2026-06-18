@@ -16,8 +16,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.hilt.navigation.compose.hiltViewModel
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.model.AddressScheme
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.component.MfsStatus
@@ -32,7 +34,7 @@ fun ChannelsScreen(
 ) {
     val rows = remember { viewModel.rows() }
 
-    MfsScaffold(title = "Channels", onBack = onBack) { inner ->
+    MfsScaffold(title = stringResource(R.string.nav_channels_label), onBack = onBack) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -42,24 +44,21 @@ fun ChannelsScreen(
             verticalArrangement = Arrangement.spacedBy(MfsSpacing.lg)
         ) {
             Text(
-                "Jede Tesla-sichtbare Konversation gehört zu einem Channel. Die Channel-ID ist " +
-                    "in der Fake-Telefonnummer kodiert.",
+                stringResource(R.string.channels_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             rows.forEach { row -> ChannelCard(row) }
 
-            SectionHeader("Adress-Schema")
+            SectionHeader(stringResource(R.string.channels_address_scheme_header))
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = MaterialTheme.shapes.small,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    "+888 X YYYYYYY\n" +
-                        "       │ └─── Mapping-ID (7-stellig)\n" +
-                        "       └───── Channel-ID (1=LLM ist V2-reserved)",
+                    stringResource(R.string.channels_address_scheme_diagram),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.padding(MfsSpacing.md)
@@ -86,8 +85,9 @@ private fun ChannelCard(row: ChannelRow) {
                     modifier = Modifier.weight(1f)
                 )
                 StatusPill(
-                    text = if (row.isReserved) "V2 reserviert"
-                    else if (row.isRegistered) "Aktiv" else "Channel ${row.id.code}",
+                    text = if (row.isReserved) stringResource(R.string.channels_status_reserved)
+                    else if (row.isRegistered) stringResource(R.string.channels_status_active)
+                    else stringResource(R.string.channels_status_channel, row.id.code),
                     status = if (row.isRegistered) MfsStatus.Success else MfsStatus.Neutral
                 )
             }
@@ -97,7 +97,12 @@ private fun ChannelCard(row: ChannelRow) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "${AddressScheme.Itu888.displayLabel}: ${AddressScheme.Itu888.prefix}${row.id.code}XXXXXXX",
+                stringResource(
+                    R.string.channels_address_line,
+                    AddressScheme.Itu888.displayLabel,
+                    AddressScheme.Itu888.prefix,
+                    row.id.code
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

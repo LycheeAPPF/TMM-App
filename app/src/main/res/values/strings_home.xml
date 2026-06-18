@@ -1,0 +1,56 @@
+<resources>
+    <!-- Hero status -->
+    <string name="home_hero_ready_title">Ready</string>
+    <string name="home_hero_ready_body">Messages are forwarded to your Tesla.</string>
+    <string name="home_hero_setup_title">Setup needed</string>
+    <string name="home_hero_setup_body">Grant the following permissions to get started.</string>
+
+    <!-- Permission cards -->
+    <string name="home_perm_sms_title">Default SMS app</string>
+    <string name="home_perm_sms_desc">So your Tesla can display the forwarded messages.</string>
+    <string name="home_perm_sms_action">Set</string>
+    <string name="home_perm_listener_title">Notification access</string>
+    <string name="home_perm_listener_desc">Allows reading notifications from your messengers.</string>
+    <string name="home_perm_listener_action">Enable</string>
+    <string name="home_perm_post_title">This app\'s notifications</string>
+    <string name="home_perm_post_desc">For status and error messages.</string>
+    <string name="home_perm_post_action">Allow</string>
+    <string name="home_perm_all_granted">All permissions granted</string>
+
+    <!-- Status card -->
+    <string name="home_status_title">Status</string>
+    <string name="home_status_mapping_label">Mapping valid</string>
+    <plurals name="home_status_mapping_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <string name="home_status_forwarded_label">Forwarded today</string>
+    <string name="home_status_forwarded_value">%1$d / %2$d</string>
+    <string name="home_status_preflight_label">Carrier test</string>
+    <string name="home_status_preflight_pending">not run yet</string>
+
+    <!-- Assistant trigger card -->
+    <string name="home_assistant_title">Grok assistant</string>
+    <string name="home_assistant_body_ready">Start the conversation in your Tesla: dictate as usual, Grok replies and your Tesla reads the answer aloud.</string>
+    <string name="home_assistant_body_no_key">First add an xAI API key in the assistant settings.</string>
+    <string name="home_assistant_action_start">Start chat</string>
+    <string name="home_assistant_action_settings">Settings</string>
+
+    <!-- Consent dialog -->
+    <string name="home_consent_confirm">Understood, start</string>
+    <string name="home_consent_dismiss">Cancel</string>
+    <string name="home_consent_title">Dictations are sent to Grok</string>
+    <string name="home_consent_body">When you start this conversation, the app sends every Tesla dictation to the xAI Grok API. xAI thereby receives the content of your dictations.\n\nWe set \"store: false\" — xAI does not store the conversation long-term — but we cannot control short-term logging practices.\n\nThe conversation history lives only in this app\'s memory and is discarded after a short period of inactivity.</string>
+
+    <!-- Whitelist entry -->
+    <string name="home_whitelist_title">Approved apps</string>
+    <string name="home_whitelist_subtitle">Which apps are forwarded to your Tesla</string>
+
+    <!-- Assistant trigger feedback (ViewModel) -->
+    <string name="home_trigger_feedback_success">AI conversation started — dictate in your Tesla to reply.</string>
+    <string name="home_trigger_feedback_no_key">Please add the xAI API key in the assistant settings first.</string>
+    <string name="home_trigger_feedback_not_default">App is not the default SMS app — please set it up above.</string>
+    <string name="home_trigger_feedback_budget">Daily limit reached — adjust the send budget in settings.</string>
+    <string name="home_trigger_feedback_injection_failed">Welcome inject failed — please check the logs.</string>
+    <string name="home_trigger_feedback_consent_missing">Privacy notice not confirmed.</string>
+</resources>

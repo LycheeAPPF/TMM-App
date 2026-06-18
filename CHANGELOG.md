@@ -4,6 +4,27 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-06-18
+
+### Added
+- **English + German, with an in-app language switcher.** The whole interface is now
+  fully localized — it was German-only before. **Settings → Language** offers
+  **System / Deutsch / English**, and the same choice is exposed through the Android 13+
+  per-app language picker (**Settings › Apps › TMM › Language**); the two stay in sync.
+  English is the fallback for other system languages, while existing users keep German.
+- **Localized Grok assistant.** The assistant’s spoken answers, status and error
+  messages, and the default system prompt and welcome now follow the app language, so an
+  English UI yields English replies read aloud. A system prompt or welcome you have
+  customized is preserved across a language change; only an unedited default flips along
+  with the language.
+
+### Changed
+- All user-facing text — screens, notifications, notification-channel names, toasts and
+  the read-aloud Grok strings — now resolves through string resources / the active per-app
+  locale instead of hard-coded German. Notification-channel names refresh on a language
+  change from either the in-app switch or the OS picker, and SMS-bubble timestamps follow
+  the chosen language.
+
 ## [0.3.0] — 2026-06-17
 
 ### Added
@@ -69,5 +90,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Signal, …) to a Tesla over Bluetooth MAP and routes dictated replies back to the
   originating app.
 
+[0.4.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.4.0
 [0.3.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.3.0
 [0.2.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.2.0

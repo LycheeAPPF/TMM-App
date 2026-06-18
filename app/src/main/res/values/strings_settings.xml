@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+
+    <string name="settings_section_forwarding">Forwarding</string>
+
+    <string name="settings_ttl_title">Mapping validity</string>
+    <string name="settings_ttl_desc">How long does the app remember which Tesla address belongs to which chat?</string>
+    <plurals name="settings_ttl_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <string name="settings_ttl_slider_min">1 h</string>
+    <string name="settings_ttl_slider_max">7 days</string>
+
+    <string name="settings_budget_title">Daily limit</string>
+    <string name="settings_budget_desc">Maximum number of forwarded messages per day — a safety net.</string>
+    <plurals name="settings_budget_messages">
+        <item quantity="one">%1$d message</item>
+        <item quantity="other">%1$d messages</item>
+    </plurals>
+    <string name="settings_budget_today">today: %1$d</string>
+
+    <string name="settings_section_apps">Apps</string>
+    <string name="settings_whitelist_title">Allowed apps</string>
+    <string name="settings_whitelist_desc">Choose which apps are forwarded to your Tesla.</string>
+    <string name="settings_whitelist_open">Open list</string>
+
+    <string name="settings_section_language">Language</string>
+    <string name="settings_language_title">App language</string>
+    <string name="settings_language_desc">Choose the app language. \'System default\' follows your device setting.</string>
+    <string name="settings_language_system">System default</string>
+    <string name="settings_language_german">Deutsch</string>
+    <string name="settings_language_english">English</string>
+
+    <string name="settings_section_developer">Developer</string>
+
+    <string name="settings_preflight_title">Network test (pre-flight)</string>
+    <string name="settings_preflight_desc">Sends a test SMS to the +888 system address and checks whether the network rejects it for free. \'Safely rejected\' = +888 is usable.</string>
+    <string name="settings_preflight_run">Run test</string>
+    <string name="settings_preflight_reset">Reset</string>
+
+    <string name="settings_contacts_title">Tesla bridge contacts</string>
+    <string name="settings_contacts_desc">An invisible contact is created per conversation so Tesla shows the name instead of the number. If there are problems: force a new sync.</string>
+    <plurals name="settings_contacts_count">
+        <item quantity="one">%1$d synced contact</item>
+        <item quantity="other">%1$d synced contacts</item>
+    </plurals>
+    <string name="settings_contacts_perm_missing">Contact permission missing (read + write) — Tesla only shows numbers</string>
+    <string name="settings_contacts_write_missing">Write permission for contacts missing — Tesla only shows numbers</string>
+    <string name="settings_contacts_read_missing">Read permission for contacts missing — Tesla only shows numbers</string>
+    <string name="settings_contacts_resyncing">running…</string>
+    <string name="settings_contacts_resync">Re-sync Tesla contacts</string>
+
+    <string name="settings_diagnostics_title">Diagnostic tools</string>
+    <string name="settings_diagnostics_desc">Mappings, reply history, live log and the channel overview.</string>
+    <string name="settings_diagnostics_item_title">Diagnostics</string>
+    <string name="settings_diagnostics_item_subtitle">Mappings, reply history, live log, sender test</string>
+    <string name="settings_channels_item_title">Channels</string>
+    <string name="settings_channels_item_subtitle">Notification (V1) + Grok LLM (V2)</string>
+
+    <string name="settings_devmode_title">Developer mode</string>
+    <string name="settings_devmode_desc">Shows diagnostics, channels and the expert settings. Turning it off hides them again; the version label below remains the way back in.</string>
+    <string name="settings_devmode_active">Developer mode active</string>
+    <string name="settings_devmode_enabled_toast">Developer mode activated</string>
+
+    <string name="settings_version_label">Version %1$s</string>
+</resources>

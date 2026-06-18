@@ -1,14 +1,18 @@
 package io.github.lycheeappf.tmm.ui.screen.assistant
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
@@ -46,6 +50,7 @@ data class AssistantUiState(
 
 @HiltViewModel
 class AssistantViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
     private val coordinator: AssistantTriggerCoordinator,
@@ -118,14 +123,19 @@ class AssistantViewModel @Inject constructor(
             _uiState.update { it.copy(saving = true) }
             val (apiKeyIsSet, feedback) = try {
                 apiKeyStore.write(value)
-                true to "API-Key gespeichert."
+                true to context.localizedString(R.string.assistant_feedback_key_saved)
             } catch (e: IllegalArgumentException) {
                 // KeystoreApiKeyStore validiert auf Newline/Whitespace — bei Verletzung
                 // bekommen wir IllegalArgumentException. Sauber an die UI returnen.
-                false to "API-Key abgelehnt: ${e.message ?: "ungültig"}."
+                val reason = e.message
+                    ?: context.localizedString(R.string.assistant_feedback_key_rejected_reason_invalid)
+                false to context.localizedString(R.string.assistant_feedback_key_rejected, reason)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                false to "Speichern fehlgeschlagen: ${e::class.simpleName}"
+                false to context.localizedString(
+                    R.string.assistant_feedback_save_failed,
+                    e::class.simpleName ?: ""
+                )
             }
             // Key gesetzt → statischen Grok-Auto-Kontakt anlegen (sofern Consent da).
             if (apiKeyIsSet) coRunCatching { contactProvisioner.reconcile() }
@@ -149,7 +159,7 @@ class AssistantViewModel @Inject constructor(
                 it.copy(
                     apiKeyIsSet = false,
                     apiKeyDraft = "",
-                    lastFeedback = "API-Key entfernt."
+                    lastFeedback = context.localizedString(R.string.assistant_feedback_key_removed)
                 )
             }
         }
@@ -176,7 +186,7 @@ class AssistantViewModel @Inject constructor(
                     voiceAliasEnabled = enabled,
                     voiceAliasName = if (enabled) trimmed else it.voiceAliasName,
                     voiceAliasApplying = false,
-                    lastFeedback = "Gespeichert — Tesla-Sync läuft. Ggf. Bluetooth neu verbinden."
+                    lastFeedback = context.localizedString(R.string.assistant_feedback_voicealias_saved)
                 )
             }
         }
@@ -234,14 +244,20 @@ class AssistantViewModel @Inject constructor(
             val result = coordinator.trigger(AssistantTriggerSource.MANUAL_BUTTON)
             val msg = when (result) {
                 is LlmStarter.StartResult.Success ->
-                    "AI-Konversation gestartet (${result.fakeAddress})."
-                LlmStarter.StartResult.NoApiKey -> "Bitte zuerst API-Key eintragen."
+                    context.localizedString(
+                        R.string.assistant_feedback_start_success,
+                        result.fakeAddress
+                    )
+                LlmStarter.StartResult.NoApiKey ->
+                    context.localizedString(R.string.assistant_feedback_start_no_key)
                 LlmStarter.StartResult.NotDefaultSmsApp ->
-                    "App ist nicht Default-SMS — Setup im Home prüfen."
-                LlmStarter.StartResult.BudgetExceeded -> "Tages-Send-Budget erreicht."
-                LlmStarter.StartResult.InjectionFailed -> "Welcome-Inject fehlgeschlagen."
+                    context.localizedString(R.string.assistant_feedback_start_not_default_sms)
+                LlmStarter.StartResult.BudgetExceeded ->
+                    context.localizedString(R.string.assistant_feedback_start_budget)
+                LlmStarter.StartResult.InjectionFailed ->
+                    context.localizedString(R.string.assistant_feedback_start_injection_failed)
                 LlmStarter.StartResult.ConsentMissing ->
-                    "Bitte zuerst den Privacy-Hinweis bestätigen."
+                    context.localizedString(R.string.assistant_feedback_start_consent_missing)
             }
             _uiState.update { it.copy(triggerInFlight = false, lastFeedback = msg) }
         }

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Einstellungen</string>
+
+    <string name="settings_section_forwarding">Weiterleitung</string>
+
+    <string name="settings_ttl_title">Gültigkeit der Zuordnung</string>
+    <string name="settings_ttl_desc">Wie lange merkt sich die App, welche Tesla-Adresse zu welchem Chat gehört?</string>
+    <plurals name="settings_ttl_hours">
+        <item quantity="one">%1$d Stunde</item>
+        <item quantity="other">%1$d Stunden</item>
+    </plurals>
+    <string name="settings_ttl_slider_min">1 h</string>
+    <string name="settings_ttl_slider_max">7 Tage</string>
+
+    <string name="settings_budget_title">Tageslimit</string>
+    <string name="settings_budget_desc">Maximale Anzahl weitergeleiteter Nachrichten pro Tag — ein Sicherheitsnetz.</string>
+    <plurals name="settings_budget_messages">
+        <item quantity="one">%1$d Nachricht</item>
+        <item quantity="other">%1$d Nachrichten</item>
+    </plurals>
+    <string name="settings_budget_today">heute: %1$d</string>
+
+    <string name="settings_section_apps">Apps</string>
+    <string name="settings_whitelist_title">Freigegebene Apps</string>
+    <string name="settings_whitelist_desc">Lege fest, welche Apps an dein Tesla weitergeleitet werden.</string>
+    <string name="settings_whitelist_open">Liste öffnen</string>
+
+    <string name="settings_section_language">Sprache</string>
+    <string name="settings_language_title">App-Sprache</string>
+    <string name="settings_language_desc">Wähle die App-Sprache. \'Systemstandard\' folgt der Geräteeinstellung.</string>
+    <string name="settings_language_system">Systemstandard</string>
+    <string name="settings_language_german">Deutsch</string>
+    <string name="settings_language_english">English</string>
+
+    <string name="settings_section_developer">Entwickler</string>
+
+    <string name="settings_preflight_title">Netz-Test (Pre-Flight)</string>
+    <string name="settings_preflight_desc">Sendet eine Test-SMS an die +888-Systemadresse und prüft, ob das Netz sie kostenlos ablehnt. \'Sicher abgelehnt\' = +888 ist verwendbar.</string>
+    <string name="settings_preflight_run">Test ausführen</string>
+    <string name="settings_preflight_reset">Zurücksetzen</string>
+
+    <string name="settings_contacts_title">Tesla-Bridge-Kontakte</string>
+    <string name="settings_contacts_desc">Pro Gespräch wird ein unsichtbarer Kontakt angelegt, damit Tesla den Namen statt der Nummer anzeigt. Bei Problemen: Sync neu erzwingen.</string>
+    <plurals name="settings_contacts_count">
+        <item quantity="one">%1$d synchronisierter Kontakt</item>
+        <item quantity="other">%1$d synchronisierte Kontakte</item>
+    </plurals>
+    <string name="settings_contacts_perm_missing">Kontakt-Berechtigung fehlt (Lesen + Schreiben) — Tesla zeigt nur Nummern</string>
+    <string name="settings_contacts_write_missing">Schreibrecht für Kontakte fehlt — Tesla zeigt nur Nummern</string>
+    <string name="settings_contacts_read_missing">Leserecht für Kontakte fehlt — Tesla zeigt nur Nummern</string>
+    <string name="settings_contacts_resyncing">läuft…</string>
+    <string name="settings_contacts_resync">Tesla-Kontakte neu synchronisieren</string>
+
+    <string name="settings_diagnostics_title">Diagnose-Werkzeuge</string>
+    <string name="settings_diagnostics_desc">Mappings, Reply-Verlauf, Live-Log und der Channel-Überblick.</string>
+    <string name="settings_diagnostics_item_title">Diagnose</string>
+    <string name="settings_diagnostics_item_subtitle">Mappings, Reply-Verlauf, Live-Log, Sender-Test</string>
+    <string name="settings_channels_item_title">Channels</string>
+    <string name="settings_channels_item_subtitle">Notification (V1) + Grok-LLM (V2)</string>
+
+    <string name="settings_devmode_title">Entwicklermodus</string>
+    <string name="settings_devmode_desc">Blendet Diagnose, Channels und die Experten-Einstellungen ein. Ausschalten versteckt sie wieder; das Versions-Label unten bleibt der Wieder-Einstieg.</string>
+    <string name="settings_devmode_active">Entwicklermodus aktiv</string>
+    <string name="settings_devmode_enabled_toast">Entwicklermodus aktiviert</string>
+
+    <string name="settings_version_label">Version %1$s</string>
+</resources>

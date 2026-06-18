@@ -1,14 +1,18 @@
 package io.github.lycheeappf.tmm.ui.screen.home
 
+import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.data.store.SettingsStore
@@ -49,6 +53,7 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val roleManager: DefaultSmsRoleManager,
     private val permissionGate: PermissionGate,
     private val settingsStore: SettingsStore,
@@ -151,17 +156,17 @@ class HomeViewModel @Inject constructor(
             val result = coordinator.trigger(AssistantTriggerSource.MANUAL_BUTTON)
             val feedback = when (result) {
                 is LlmStarter.StartResult.Success ->
-                    "AI-Konversation gestartet — diktiere im Tesla, um zu antworten."
+                    context.localizedString(R.string.home_trigger_feedback_success)
                 LlmStarter.StartResult.NoApiKey ->
-                    "Bitte zuerst den xAI API-Key in den Assistant-Settings eintragen."
+                    context.localizedString(R.string.home_trigger_feedback_no_key)
                 LlmStarter.StartResult.NotDefaultSmsApp ->
-                    "App ist nicht Default-SMS-App — bitte oben einrichten."
+                    context.localizedString(R.string.home_trigger_feedback_not_default)
                 LlmStarter.StartResult.BudgetExceeded ->
-                    "Tageslimit aufgebraucht — Send-Budget in Einstellungen anpassen."
+                    context.localizedString(R.string.home_trigger_feedback_budget)
                 LlmStarter.StartResult.InjectionFailed ->
-                    "Welcome-Inject hat nicht geklappt — bitte Logs prüfen."
+                    context.localizedString(R.string.home_trigger_feedback_injection_failed)
                 LlmStarter.StartResult.ConsentMissing ->
-                    "Privacy-Hinweis nicht bestätigt."
+                    context.localizedString(R.string.home_trigger_feedback_consent_missing)
             }
             _uiState.update { it.copy(triggerInFlight = false, triggerFeedback = feedback) }
             refresh()

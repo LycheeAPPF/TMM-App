@@ -1,7 +1,10 @@
 package io.github.lycheeappf.tmm.channel.llm
 
+import android.content.Context
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
@@ -18,11 +21,19 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 private val FAKE_OK_URI: Uri = mockk(relaxed = true)
 
+// Robolectric: LlmChannel löst seine TTS-Texte über einen echten Context auf
+// (lokalisierte String-Ressourcen), daher braucht der Test einen App-Context.
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class LlmChannelTest {
 
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val turnRunner: LlmTurnRunner = mockk()
     private val smsWriter: SmsContentProviderWriter = mockk()
     private val sendBudget: SendBudget = mockk()
@@ -49,7 +60,7 @@ class LlmChannelTest {
     )
 
     @Before fun setup() {
-        channel = LlmChannel(turnRunner, smsWriter, sendBudget, prefs, apiKeyStore, logBuffer)
+        channel = LlmChannel(turnRunner, smsWriter, sendBudget, prefs, apiKeyStore, logBuffer, context)
         coEvery { sendBudget.checkAndIncrement() } returns true
         coEvery { sendBudget.rollback() } returns Unit
         // Default: Assistent aktiv (Consent gegeben + Key gesetzt).
@@ -147,13 +158,16 @@ class LlmChannelTest {
             smsWriter.injectIncoming(any(), any(), any(), any())
         } returns FAKE_OK_URI
 
+        val detail = "kein Internetzugriff."
         channel.maybeInjectFollowUp(
-            llmMapping, "user", ReplyResult.ProviderError("kein Internetzugriff.")
+            llmMapping, "user", ReplyResult.ProviderError(detail)
         )
+        // Locale-agnostisch: der Wrapper-Text wird über dieselbe Ressource aufgelöst.
+        val expected = context.getString(R.string.llm_error_wrapper, detail)
         coVerify {
             smsWriter.injectIncoming(
                 fakeAddress = "+88810000007",
-                body = match { it.contains("Entschuldige") && it.contains("kein Internetzugriff.") },
+                body = expected,
                 timestamp = any(),
                 displayName = "Grok"
             )

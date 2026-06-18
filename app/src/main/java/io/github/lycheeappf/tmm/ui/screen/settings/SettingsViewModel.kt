@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.lycheeappf.tmm.contact.ContactSyncWriter
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.locale.AppLocaleManager
+import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,7 +30,9 @@ data class SettingsUiState(
     val teslaContactsResetting: Boolean = false,
     val preflightStatus: String? = null,
     val preflightRunning: Boolean = false,
-    val developerMode: Boolean = false
+    val developerMode: Boolean = false,
+    /** Aktive App-Sprache: "" = Systemsprache folgen, sonst BCP-47-Tag ("de"/"en"). */
+    val languageTag: String = ""
 )
 
 @HiltViewModel
@@ -37,6 +41,8 @@ class SettingsViewModel @Inject constructor(
     private val contactSyncWriter: ContactSyncWriter,
     private val teslaContactResync: TeslaContactResync,
     private val preFlightTester: PreFlightTester,
+    private val appLocaleManager: AppLocaleManager,
+    private val notificationChannels: AppNotificationChannels,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -65,7 +71,8 @@ class SettingsViewModel @Inject constructor(
                     sendBudget = store.sendBudgetPerDay(),
                     sendCountToday = store.dailySendCount(),
                     preflightStatus = store.preflightResult(),
-                    developerMode = store.isDeveloperMode()
+                    developerMode = store.isDeveloperMode(),
+                    languageTag = appLocaleManager.currentTag()
                 )
             }
         }
@@ -94,6 +101,17 @@ class SettingsViewModel @Inject constructor(
             store.setDeveloperMode(value)
             refreshSettings()
         }
+    }
+
+    /**
+     * Setzt die App-Sprache ("" = Systemsprache). Läuft synchron auf dem Main-Thread:
+     * [AppLocaleManager.setLanguageTag] triggert (API 33+) automatisch das Activity-
+     * Recreate. Danach werden die Notification-Channels mit den neuen lokalisierten
+     * Namen neu angelegt — das System cacht die Channel-Namen sonst in der alten Sprache.
+     */
+    fun setLanguage(tag: String) {
+        appLocaleManager.setLanguageTag(tag)
+        notificationChannels.ensure()
     }
 
     /**

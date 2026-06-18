@@ -6,6 +6,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
@@ -22,6 +23,7 @@ fun MfsBottomBar(navController: NavController) {
     NavigationBar {
         MfsBottomNavItem.entries.forEach { item ->
             val selected = currentRoute == item.destination.route
+            val label = stringResource(item.labelRes)
             NavigationBarItem(
                 selected = selected,
                 onClick = {
@@ -30,10 +32,10 @@ fun MfsBottomBar(navController: NavController) {
                 icon = {
                     Icon(
                         imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.label
+                        contentDescription = label
                     )
                 },
-                label = { Text(item.label) }
+                label = { Text(label) }
             )
         }
     }

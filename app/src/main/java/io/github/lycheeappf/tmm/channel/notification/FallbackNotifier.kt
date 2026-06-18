@@ -10,6 +10,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,7 +42,7 @@ class FallbackNotifier @Inject constructor(
 
         val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_FALLBACK)
             .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("Reply nicht zugestellt: ${payload.conversationLabel}")
+            .setContentTitle(context.localizedString(R.string.notif_fallback_title, payload.conversationLabel))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(copyIntent)

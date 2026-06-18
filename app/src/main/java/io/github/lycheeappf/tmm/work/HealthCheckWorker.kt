@@ -12,9 +12,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import io.github.lycheeappf.tmm.MainActivity
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
@@ -41,8 +42,8 @@ class HealthCheckWorker @AssistedInject constructor(
 
         if (!roleManager.isDefault()) {
             postIssue(nm, NOTIF_ID_ROLE,
-                title = "Default SMS App nicht gesetzt",
-                body = "Tap zum Setzen — sonst werden keine Nachrichten ans Tesla weitergeleitet",
+                title = context.localizedString(R.string.health_role_title),
+                body = context.localizedString(R.string.health_role_body),
                 settingsAction = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
             )
         } else {
@@ -51,8 +52,8 @@ class HealthCheckWorker @AssistedInject constructor(
 
         if (!permissionGate.hasNotificationListenerAccess()) {
             postIssue(nm, NOTIF_ID_NLS,
-                title = "Notification Access fehlt",
-                body = "Tap um Notification-Listener zu aktivieren",
+                title = context.localizedString(R.string.health_listener_title),
+                body = context.localizedString(R.string.health_listener_body),
                 settingsAction = permissionGate.openNotificationListenerSettings()
             )
         } else {
@@ -64,8 +65,8 @@ class HealthCheckWorker @AssistedInject constructor(
         // Daher posten wir nur einen Hinweis, keinen Alarm.
         if (!permissionGate.hasContactsAccess()) {
             postIssue(nm, NOTIF_ID_CONTACTS,
-                title = "Tesla zeigt nur Nummern",
-                body = "Contact-Berechtigung fehlt — Tap zum Erteilen",
+                title = context.localizedString(R.string.health_contacts_title),
+                body = context.localizedString(R.string.health_contacts_body),
                 settingsAction = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = android.net.Uri.parse("package:${context.packageName}")
                 }

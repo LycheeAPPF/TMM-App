@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_listener_label">Tesla Messages Manager — Benachrichtigungs-Bridge</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_role">Standard-SMS-App</string>
+    <string name="onboarding_body_role">Diese App muss Standard-SMS-App sein, damit sie SMS-Nachrichten in den Provider schreiben kann, die das Tesla-Infotainment via Bluetooth liest.</string>
+    <string name="onboarding_action_set_role">Als Standard setzen</string>
+
+    <string name="onboarding_title_listener">Notification Access</string>
+    <string name="onboarding_body_listener">Aktiviere den Notification-Listener, damit die App Nachrichten aus WhatsApp, Telegram, Signal etc. erfassen kann.</string>
+    <string name="onboarding_action_open_listener_settings">Notification-Settings öffnen</string>
+
+    <string name="onboarding_title_post_notifications">Benachrichtigungen</string>
+    <string name="onboarding_body_post_notifications">Erlaubnis zum Anzeigen von Status-, Fehler- und Diagnose-Benachrichtigungen der App.</string>
+    <string name="onboarding_action_grant_post_notifications">Erlauben</string>
+
+    <string name="onboarding_title_preflight">Carrier-Test</string>
+    <string name="onboarding_body_preflight">Wir senden eine Test-SMS an eine reservierte Nummer (+888…). Dein Mobilfunkanbieter sollte sie ablehnen — das verhindert spätere Kosten bei Tesla-Antworten.</string>
+    <string name="onboarding_action_run_preflight">Test starten</string>
+
+    <string name="onboarding_title_whitelist">Apps freigeben</string>
+    <string name="onboarding_body_whitelist">Wähle die Messenger-Apps (z. B. WhatsApp, Telegram, Signal), deren Notifications ans Tesla weitergeleitet werden sollen. Standardmäßig ist keine App aktiv.</string>
+    <string name="onboarding_action_configure_whitelist">Whitelist konfigurieren</string>
+
+    <!-- Channels -->
+    <string name="channel_notification_label">Benachrichtigungs-Antwort</string>
+    <string name="channel_llm_label">KI-Assistent</string>
+    <string name="channel_system_label">System</string>
+
+    <!-- Contacts account -->
+    <string name="contacts_account_label">Tesla Messages Manager Kontakte</string>
+
+    <!-- Notification channels (for app's own notifications) -->
+    <string name="notif_channel_status_name">Status</string>
+    <string name="notif_channel_status_desc">Permanente Status- und Health-Hinweise</string>
+    <string name="notif_channel_fallback_name">Reply-Fehler</string>
+    <string name="notif_channel_fallback_desc">Wird angezeigt, wenn ein Tesla-Reply nicht zugestellt werden konnte</string>
+    <string name="notif_channel_diagnostic_name">Diagnostik</string>
+    <string name="notif_channel_diagnostic_desc">Hinweise zu Carrier-Tests, Permissions und Konfiguration</string>
+
+    <!-- Grok assistant: spoken (TTS) status & error messages -->
+    <string name="llm_inactive">Der Assistent ist nicht aktiv. Bitte Einwilligung und API-Key in der App bestätigen.</string>
+    <string name="llm_empty_response">Grok hat keine Antwort gesendet.</string>
+    <string name="llm_conversation_expired">Entschuldige — die Konversation ist abgelaufen.</string>
+    <string name="llm_error_wrapper">Entschuldige, ich kann das gerade nicht beantworten — %1$s</string>
+    <string name="llm_ratelimit_per_min">Zu viele Anfragen — bitte einen Moment warten.</string>
+    <string name="llm_ratelimit_per_hour">Stündliches Anfrage-Limit für den Assistenten erreicht.</string>
+    <string name="llm_error_no_network">kein Internetzugriff.</string>
+    <string name="llm_error_missing_key">kein API-Key konfiguriert.</string>
+    <string name="llm_error_auth">der API-Key wurde abgelehnt.</string>
+    <string name="llm_error_ratelimit">Grok ist zu beschäftigt, bitte gleich nochmal.</string>
+    <string name="llm_error_server">Grok-Server-Fehler (%1$d).</string>
+    <string name="llm_error_network">die Verbindung zu Grok hat nicht geklappt.</string>
+    <string name="llm_error_parse">Grok-Antwort war unverständlich.</string>
+
+    <!-- Navigation: destination & tab labels -->
+    <string name="nav_onboarding_label">Setup</string>
+    <string name="nav_home_label">Start</string>
+    <string name="nav_whitelist_label">Freigegebene Apps</string>
+    <string name="nav_channels_label">Channels</string>
+    <string name="nav_settings_label">Einstellungen</string>
+    <string name="nav_assistant_label">Grok-Assistent</string>
+    <string name="nav_diagnostics_label">Diagnose</string>
+    <string name="nav_sms_label">SMS</string>
+    <string name="nav_sms_thread_label">Konversation</string>
+    <string name="nav_sms_compose_label">Neue SMS</string>
+
+    <!-- Health-check worker notifications -->
+    <string name="health_role_title">Default SMS App nicht gesetzt</string>
+    <string name="health_role_body">Tap zum Setzen — sonst werden keine Nachrichten ans Tesla weitergeleitet</string>
+    <string name="health_listener_title">Notification Access fehlt</string>
+    <string name="health_listener_body">Tap um Notification-Listener zu aktivieren</string>
+    <string name="health_contacts_title">Tesla zeigt nur Nummern</string>
+    <string name="health_contacts_body">Contact-Berechtigung fehlt — Tap zum Erteilen</string>
+
+    <!-- Send budget notification -->
+    <string name="budget_reached_title">Send-Budget erreicht</string>
+    <string name="budget_reached_text">Tageslimit von %1$d Forwards aufgebraucht.</string>
+    <string name="budget_reached_big">Tageslimit von %1$d forwarded Notifications aufgebraucht. Weitere Nachrichten werden bis Mitternacht ignoriert. In den App-Einstellungen kann das Budget erhöht werden.</string>
+
+    <!-- Reply fallback notification -->
+    <string name="notif_fallback_title">Reply nicht zugestellt: %1$s</string>
+    <string name="clipboard_copied_toast">Antwort kopiert</string>
+
+    <!-- Carrier routing warning -->
+    <string name="carrier_warning_title">Carrier hat Test-Nummer geroutet!</string>
+    <string name="carrier_warning_text">%1$s wurde nicht abgewiesen — mögliche SMS-Kosten</string>
+    <string name="carrier_warning_big">Dein Mobilfunkanbieter hat eine SMS an %1$s tatsächlich gesendet, statt sie als ungültige Test-Nummer abzulehnen. Das kann Kosten verursachen. Wechsle in den App-Einstellungen das Number-Schema oder deaktiviere die Tesla-Bridge bis das geklärt ist.</string>
+
+    <!-- Default-SMS shell components -->
+    <string name="sms_incoming_title">SMS von %1$s</string>
+    <string name="mms_received_title">MMS empfangen — nicht anzeigbar</string>
+    <string name="mms_received_text">Diese App unterstützt keine MMS</string>
+    <string name="mms_received_big">Eine MMS wurde empfangen, kann aber nicht angezeigt werden, weil \'Tesla Messages Manager\' als Default-SMS-App MMS nicht verarbeitet. Setze Google Messages temporär als Default, falls du die MMS sehen willst.</string>
+    <string name="quickreply_failed_title">Quick-Reply nicht zugestellt</string>
+    <string name="quickreply_failed_text_to">Wollte an %1$s senden — tap um in Google Messages zu öffnen</string>
+    <string name="quickreply_failed_text_generic">Tap, um SMS in Google Messages zu öffnen</string>
+    <string name="quickreply_failed_big">Das System hat über diese App eine Quick-Reply-SMS senden wollen (z.B. aus der Anruf-UI). Diese App sendet keine SMS — bitte öffne Google Messages und sende den Text manuell.\n\n%1$s</string>
+    <string name="shell_not_full_client_toast">Tesla Messages Manager ist kein vollwertiger SMS-Client. Installiere Google Messages, um echte SMS zu senden.</string>
+</resources>

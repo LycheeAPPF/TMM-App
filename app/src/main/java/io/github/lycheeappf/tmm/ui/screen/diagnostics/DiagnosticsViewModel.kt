@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
 import io.github.lycheeappf.tmm.contact.ContactDiagnostics
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.contact.SenderResolutionResult
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.model.ChannelId
@@ -139,7 +141,10 @@ class DiagnosticsViewModel @Inject constructor(
                         result = contactDiagnostics.testSenderResolution(mapping.fakeAddress, displayName)
                     )
                 }.getOrElse { e ->
-                    SenderTestUi(error = e.message ?: e::class.simpleName ?: "unbekannter Fehler")
+                    SenderTestUi(
+                        error = e.message ?: e::class.simpleName
+                            ?: context.localizedString(R.string.diagnostics_sender_test_unknown_error)
+                    )
                 }
             }
             transient.value = transient.value.copy(senderTestRunning = false, senderTest = outcome)

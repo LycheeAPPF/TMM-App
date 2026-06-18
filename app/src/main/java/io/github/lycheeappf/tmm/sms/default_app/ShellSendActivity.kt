@@ -6,6 +6,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 
 /**
  * Aktivität, die SEND/SENDTO-Intents (smsto://, mmsto://, text/plain) entgegennimmt,
@@ -61,8 +63,7 @@ class ShellSendActivity : Activity() {
     private fun showFallbackToast() {
         Toast.makeText(
             this,
-            "Tesla Messages Manager ist kein vollwertiger SMS-Client. " +
-                "Installiere Google Messages, um echte SMS zu senden.",
+            localizedString(R.string.shell_not_full_client_toast),
             Toast.LENGTH_LONG
         ).show()
     }

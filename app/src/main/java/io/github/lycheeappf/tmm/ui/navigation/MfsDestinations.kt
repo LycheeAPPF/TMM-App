@@ -1,5 +1,6 @@
 package io.github.lycheeappf.tmm.ui.navigation
 
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Home
@@ -10,18 +11,21 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.ui.graphics.vector.ImageVector
+import io.github.lycheeappf.tmm.R
 
-enum class MfsDestination(val route: String, val label: String) {
-    Onboarding("onboarding", "Setup"),
-    Home("home", "Start"),
-    Whitelist("whitelist", "Freigegebene Apps"),
-    Channels("channels", "Channels"),
-    Settings("settings", "Einstellungen"),
-    Assistant("assistant", "Grok-Assistent"),
-    Diagnostics("diagnostics", "Diagnose"),
-    Sms("sms", "SMS"),
-    SmsThread("sms_thread/{$ARG_THREAD_ID}", "Konversation"),
-    SmsCompose("sms_compose", "Neue SMS")
+// Labels als @StringRes (nicht als String): ein String würde beim enum-Class-Load
+// in der damaligen Sprache eingefroren — die Resource-ID löst pro Render korrekt auf.
+enum class MfsDestination(val route: String, @StringRes val labelRes: Int) {
+    Onboarding("onboarding", R.string.nav_onboarding_label),
+    Home("home", R.string.nav_home_label),
+    Whitelist("whitelist", R.string.nav_whitelist_label),
+    Channels("channels", R.string.nav_channels_label),
+    Settings("settings", R.string.nav_settings_label),
+    Assistant("assistant", R.string.nav_assistant_label),
+    Diagnostics("diagnostics", R.string.nav_diagnostics_label),
+    Sms("sms", R.string.nav_sms_label),
+    SmsThread("sms_thread/{$ARG_THREAD_ID}", R.string.nav_sms_thread_label),
+    SmsCompose("sms_compose", R.string.nav_sms_compose_label)
 }
 
 /** Arg-Key der SMS-Thread-Route (eine echte Nav-Argument-Route). */
@@ -37,12 +41,12 @@ fun smsThreadRoute(threadId: Long): String = "sms_thread/$threadId"
  */
 enum class MfsBottomNavItem(
     val destination: MfsDestination,
-    val label: String,
+    @StringRes val labelRes: Int,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
-    Home(MfsDestination.Home, "Start", Icons.Filled.Home, Icons.Outlined.Home),
-    Sms(MfsDestination.Sms, "SMS", Icons.Filled.Sms, Icons.Outlined.Sms),
-    Assistant(MfsDestination.Assistant, "Grok", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
-    Settings(MfsDestination.Settings, "Einstellungen", Icons.Filled.Settings, Icons.Outlined.Settings)
+    Home(MfsDestination.Home, R.string.nav_home_label, Icons.Filled.Home, Icons.Outlined.Home),
+    Sms(MfsDestination.Sms, R.string.nav_sms_label, Icons.Filled.Sms, Icons.Outlined.Sms),
+    Assistant(MfsDestination.Assistant, R.string.nav_tab_assistant, Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
+    Settings(MfsDestination.Settings, R.string.nav_settings_label, Icons.Filled.Settings, Icons.Outlined.Settings)
 }

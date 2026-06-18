@@ -43,7 +43,8 @@ class LlmTurnRunner @Inject constructor(
 
     sealed class TurnResult {
         data class Success(val assistantText: String, val usage: TokenUsage?) : TurnResult()
-        data class RateLimited(val message: String) : TurnResult()
+        /** Rate-Limit; [reason] wird im [LlmChannel] zu lokalisiertem TTS-Text aufgelöst. */
+        data class RateLimited(val reason: LlmRateLimiter.Reason) : TurnResult()
         data class ProviderFailed(val error: LlmProviderError) : TurnResult()
         data object EmptyResponse : TurnResult()
     }
@@ -60,8 +61,8 @@ class LlmTurnRunner @Inject constructor(
             when (val decision = rateLimiter.checkAndAcquire(mappingId)) {
                 LlmRateLimiter.Decision.Allow -> {}
                 is LlmRateLimiter.Decision.Reject -> {
-                    logBuffer.warn(TAG, "Rate-limited (${decision.reason}): ${decision.message}")
-                    return@withLock TurnResult.RateLimited(decision.message)
+                    logBuffer.warn(TAG, "Rate-limited (${decision.reason})")
+                    return@withLock TurnResult.RateLimited(decision.reason)
                 }
             }
 
