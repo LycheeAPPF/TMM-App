@@ -1,6 +1,10 @@
 package io.github.lycheeappf.tmm.channel.llm
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.LogBuffer
@@ -34,7 +38,8 @@ class LlmChannel @Inject constructor(
     private val sendBudget: SendBudget,
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
-    private val logBuffer: LogBuffer
+    private val logBuffer: LogBuffer,
+    @ApplicationContext private val context: Context
 ) : MessagingChannel {
 
     override val id: ChannelId = ChannelId.LLM
@@ -56,19 +61,17 @@ class LlmChannel @Inject constructor(
         // via gecachtem Tesla-Kontakt weiter einen echten xAI-Turn auslösen.
         if (!prefs.isPrivacyConsentGiven() || apiKeyStore.read().isNullOrBlank()) {
             logBuffer.warn(TAG, "Tesla-reply für LLM, aber Assistent inaktiv (Consent/Key) — Turn abgelehnt")
-            return ReplyResult.ProviderError(
-                "Der Assistent ist nicht aktiv. Bitte Einwilligung und API-Key in der App bestätigen."
-            )
+            return ReplyResult.ProviderError(context.localizedString(R.string.llm_inactive))
         }
         return when (val outcome = turnRunner.run(mapping.mappingId, replyText)) {
             is LlmTurnRunner.TurnResult.Success ->
                 ReplyResult.FollowUp(outcome.assistantText)
             is LlmTurnRunner.TurnResult.RateLimited ->
-                ReplyResult.ProviderError(outcome.message)
+                ReplyResult.ProviderError(rateLimitMessage(outcome.reason))
             is LlmTurnRunner.TurnResult.ProviderFailed ->
-                ReplyResult.ProviderError(outcome.error.userFacingMessage)
+                ReplyResult.ProviderError(providerErrorMessage(outcome.error))
             LlmTurnRunner.TurnResult.EmptyResponse ->
-                ReplyResult.ProviderError("Grok hat keine Antwort gesendet.")
+                ReplyResult.ProviderError(context.localizedString(R.string.llm_empty_response))
         }
     }
 
@@ -81,7 +84,7 @@ class LlmChannel @Inject constructor(
         val body = when (result) {
             is ReplyResult.FollowUp -> result.body
             is ReplyResult.ProviderError -> errorReply(result.message)
-            ReplyResult.Expired -> "Entschuldige — die Konversation ist abgelaufen."
+            ReplyResult.Expired -> context.localizedString(R.string.llm_conversation_expired)
             // Sealed-Class-Vollständigkeit; alle anderen ReplyResult-Typen sind für LLM nicht relevant.
             ReplyResult.Ignored,
             ReplyResult.PayloadMismatch,
@@ -117,7 +120,23 @@ class LlmChannel @Inject constructor(
     }
 
     private fun errorReply(detail: String): String =
-        "Entschuldige, ich kann das gerade nicht beantworten — $detail"
+        context.localizedString(R.string.llm_error_wrapper, detail)
+
+    /** Lokalisierter, vom Tesla-TTS vorlesbarer Text pro Provider-Fehlerart. */
+    private fun providerErrorMessage(error: LlmProviderError): String = when (error) {
+        is LlmProviderError.NoNetwork -> context.localizedString(R.string.llm_error_no_network)
+        is LlmProviderError.MissingKey -> context.localizedString(R.string.llm_error_missing_key)
+        is LlmProviderError.Auth -> context.localizedString(R.string.llm_error_auth)
+        is LlmProviderError.RateLimit -> context.localizedString(R.string.llm_error_ratelimit)
+        is LlmProviderError.Server -> context.localizedString(R.string.llm_error_server, error.code)
+        is LlmProviderError.Network -> context.localizedString(R.string.llm_error_network)
+        is LlmProviderError.Parse -> context.localizedString(R.string.llm_error_parse)
+    }
+
+    private fun rateLimitMessage(reason: LlmRateLimiter.Reason): String = when (reason) {
+        LlmRateLimiter.Reason.PER_MINUTE -> context.localizedString(R.string.llm_ratelimit_per_min)
+        LlmRateLimiter.Reason.PER_HOUR -> context.localizedString(R.string.llm_ratelimit_per_hour)
+    }
 
     companion object {
         private const val TAG = "LlmChannel"

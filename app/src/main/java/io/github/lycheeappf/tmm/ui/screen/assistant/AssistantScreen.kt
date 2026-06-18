@@ -32,9 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.hilt.navigation.compose.hiltViewModel
+import io.github.lycheeappf.tmm.R
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -67,7 +70,7 @@ fun AssistantScreen(
     }
 
     MfsScaffold(
-        title = "Grok-Assistent",
+        title = stringResource(R.string.assistant_title),
         bottomBar = bottomBar,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { inner ->
@@ -80,18 +83,15 @@ fun AssistantScreen(
             verticalArrangement = Arrangement.spacedBy(MfsSpacing.lg)
         ) {
             Text(
-                "Deine Diktate aus dem Tesla gehen an Grok (xAI). Die Antwort liest dein " +
-                    "Tesla vor. Der Gesprächskontext für Grok bleibt nur kurz im Speicher. " +
-                    "Deine Diktate werden zusätzlich lokal auf dem Gerät protokolliert " +
-                    "(für Diagnose und erneute Zustellung) und verlassen es nur Richtung xAI.",
+                stringResource(R.string.assistant_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             // ---- Privacy-Einwilligung ----
             SettingCard(
-                title = "Einwilligung",
-                description = "Vor dem ersten Start zwingend — bestätigt, dass Diktate an xAI gehen."
+                title = stringResource(R.string.assistant_consent_title),
+                description = stringResource(R.string.assistant_consent_desc)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -102,8 +102,8 @@ fun AssistantScreen(
                         onCheckedChange = { viewModel.setPrivacyConsent(it) }
                     )
                     Text(
-                        if (state.privacyConsent) "Eingewilligt — Start freigegeben."
-                        else "Noch nicht eingewilligt — Start blockiert.",
+                        if (state.privacyConsent) stringResource(R.string.assistant_consent_granted)
+                        else stringResource(R.string.assistant_consent_not_granted),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -111,17 +111,18 @@ fun AssistantScreen(
 
             // ---- API-Key ----
             SettingCard(
-                title = "xAI-API-Key",
-                description = "Wird verschlüsselt auf dem Gerät gespeichert und nicht ins Backup übernommen."
+                title = stringResource(R.string.assistant_apikey_title),
+                description = stringResource(R.string.assistant_apikey_desc)
             ) {
                 StatusPill(
-                    text = if (state.apiKeyIsSet) "Key aktiv" else "Kein Key",
+                    text = if (state.apiKeyIsSet) stringResource(R.string.assistant_apikey_active)
+                    else stringResource(R.string.assistant_apikey_none),
                     status = if (state.apiKeyIsSet) MfsStatus.Success else MfsStatus.Neutral
                 )
                 OutlinedTextField(
                     value = state.apiKeyDraft,
                     onValueChange = viewModel::setApiKeyDraft,
-                    label = { Text("Neuen Key eintragen") },
+                    label = { Text(stringResource(R.string.assistant_apikey_field_label)) },
                     visualTransformation = if (keyVisible) VisualTransformation.None
                     else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -129,7 +130,8 @@ fun AssistantScreen(
                             Icon(
                                 imageVector = if (keyVisible) Icons.Outlined.VisibilityOff
                                 else Icons.Outlined.Visibility,
-                                contentDescription = if (keyVisible) "Key verbergen" else "Key anzeigen"
+                                contentDescription = if (keyVisible) stringResource(R.string.assistant_apikey_hide)
+                                else stringResource(R.string.assistant_apikey_show)
                             )
                         }
                     },
@@ -138,7 +140,7 @@ fun AssistantScreen(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
                     PrimaryActionButton(
-                        text = "Speichern",
+                        text = stringResource(R.string.assistant_apikey_save),
                         onClick = { viewModel.saveApiKey() },
                         enabled = state.apiKeyDraft.isNotBlank(),
                         loading = state.saving
@@ -146,14 +148,14 @@ fun AssistantScreen(
                     TextButton(
                         onClick = { viewModel.clearApiKey() },
                         enabled = state.apiKeyIsSet && !state.saving
-                    ) { Text("Entfernen") }
+                    ) { Text(stringResource(R.string.assistant_apikey_remove)) }
                 }
             }
 
             // ---- Modell + Texte ----
             SettingCard(
-                title = "Modell",
-                description = "Standard: grok-4.3. Nur ändern, wenn xAI ein anderes Modell empfiehlt."
+                title = stringResource(R.string.assistant_model_title),
+                description = stringResource(R.string.assistant_model_desc)
             ) {
                 OutlinedTextField(
                     value = state.model,
@@ -164,9 +166,8 @@ fun AssistantScreen(
             }
 
             SettingCard(
-                title = "Dein Name (optional)",
-                description = "Grok spricht dich damit an. Wird für {driver} in Begrüßung und " +
-                    "Verhalten eingesetzt. Leer lassen für eine neutrale Anrede."
+                title = stringResource(R.string.assistant_drivername_title),
+                description = stringResource(R.string.assistant_drivername_desc)
             ) {
                 OutlinedTextField(
                     value = state.driverName,
@@ -177,11 +178,8 @@ fun AssistantScreen(
             }
 
             SettingCard(
-                title = "Zusätzlicher Name für Sprachsteuerung",
-                description = "Zusätzlicher Kontakt zum Ansprechen per Sprache ('Text an …'). " +
-                    "Leitet auf Grok um — Grok antwortet weiterhin als 'Grok'. Teslas " +
-                    "Sprachsteuerung erkennt einen VOR- + NACHNAMEN am zuverlässigsten. 'Aus' " +
-                    "entfernt den Zusatzkontakt; Auswählen bzw. Anwenden synchronisiert direkt zum Tesla."
+                title = stringResource(R.string.assistant_voicealias_title),
+                description = stringResource(R.string.assistant_voicealias_desc)
             ) {
                 val isCustom = state.voiceAliasEnabled &&
                     state.voiceAliasName !in AssistantViewModel.PRESET_NAMES
@@ -199,7 +197,7 @@ fun AssistantScreen(
                             customMode = false
                             viewModel.applyVoiceAlias(false, state.voiceAliasName)
                         },
-                        label = { Text("Aus") }
+                        label = { Text(stringResource(R.string.assistant_voicealias_off)) }
                     )
                     AssistantViewModel.PRESET_NAMES.forEach { preset ->
                         FilterChip(
@@ -217,7 +215,7 @@ fun AssistantScreen(
                         selected = customMode,
                         enabled = !state.voiceAliasApplying,
                         onClick = { customMode = true },
-                        label = { Text("Eigener Name") }
+                        label = { Text(stringResource(R.string.assistant_voicealias_custom)) }
                     )
                 }
                 if (customMode) {
@@ -225,21 +223,24 @@ fun AssistantScreen(
                         value = customDraft,
                         onValueChange = { customDraft = it },
                         singleLine = true,
-                        label = { Text("z.B. Viktor Grok") },
+                        label = { Text(stringResource(R.string.assistant_voicealias_custom_hint)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Button(
                         onClick = { viewModel.applyVoiceAlias(true, customDraft) },
                         enabled = customDraft.isNotBlank() && !state.voiceAliasApplying
                     ) {
-                        Text(if (state.voiceAliasApplying) "läuft…" else "Anwenden & zum Tesla syncen")
+                        Text(
+                            if (state.voiceAliasApplying) stringResource(R.string.assistant_voicealias_applying)
+                            else stringResource(R.string.assistant_voicealias_apply)
+                        )
                     }
                 }
             }
 
             SettingCard(
-                title = "Begrüßung",
-                description = "Erster Satz, den dein Tesla beim Start vorliest. {driver} wird durch deinen Namen ersetzt."
+                title = stringResource(R.string.assistant_welcome_title),
+                description = stringResource(R.string.assistant_welcome_desc)
             ) {
                 OutlinedTextField(
                     value = state.welcomeMessage,
@@ -251,8 +252,8 @@ fun AssistantScreen(
             }
 
             SettingCard(
-                title = "Verhalten von Grok",
-                description = "Leitet Grok an, wie es antworten soll. {driver} wird durch deinen Namen ersetzt. Kurz halten — geht in jede Anfrage ein."
+                title = stringResource(R.string.assistant_behavior_title),
+                description = stringResource(R.string.assistant_behavior_desc)
             ) {
                 OutlinedTextField(
                     value = state.systemPrompt,
@@ -265,40 +266,48 @@ fun AssistantScreen(
 
             // ---- Parameter ----
             SliderCard(
-                title = "Verlauf verwerfen nach",
-                description = "Nach so vielen Sekunden ohne Eingabe wird der Gesprächsverlauf gelöscht.",
+                title = stringResource(R.string.assistant_ttl_title),
+                description = stringResource(R.string.assistant_ttl_desc),
                 value = state.contextTtlSeconds.toFloat(),
-                valueLabel = "${state.contextTtlSeconds} Sekunden",
+                valueLabel = pluralStringResource(
+                    R.plurals.assistant_ttl_value,
+                    state.contextTtlSeconds,
+                    state.contextTtlSeconds
+                ),
                 range = 30f..600f,
                 onChange = { viewModel.setContextTtl(it.toInt()) }
             )
             SliderCard(
-                title = "Maximale Antwortlänge",
-                description = "Obergrenze pro Antwort. 512 entspricht etwa 3–5 vorlesbaren Sätzen.",
+                title = stringResource(R.string.assistant_maxtokens_title),
+                description = stringResource(R.string.assistant_maxtokens_desc),
                 value = state.maxTokens.toFloat(),
-                valueLabel = "${state.maxTokens} Tokens",
+                valueLabel = pluralStringResource(
+                    R.plurals.assistant_maxtokens_value,
+                    state.maxTokens,
+                    state.maxTokens
+                ),
                 range = 64f..2048f,
                 onChange = { viewModel.setMaxTokens(it.toInt()) }
             )
             SliderCard(
-                title = "Kreativität",
-                description = "0 = streng sachlich, 1.5 = sehr kreativ. Standard 0.7.",
+                title = stringResource(R.string.assistant_temperature_title),
+                description = stringResource(R.string.assistant_temperature_desc),
                 value = state.temperature,
                 valueLabel = "%.2f".format(state.temperature),
                 range = 0f..1.5f,
                 onChange = viewModel::setTemperature
             )
             SliderCard(
-                title = "Anfragen-Limit pro Minute",
-                description = "Maximale Grok-Anfragen je Gespräch innerhalb von 60 Sekunden.",
+                title = stringResource(R.string.assistant_rate_min_title),
+                description = stringResource(R.string.assistant_rate_min_desc),
                 value = state.rateLimitPerMin.toFloat(),
                 valueLabel = "${state.rateLimitPerMin}",
                 range = 1f..60f,
                 onChange = { viewModel.setRateLimitPerMin(it.toInt()) }
             )
             SliderCard(
-                title = "Anfragen-Limit pro Stunde",
-                description = "Maximale Grok-Anfragen je Gespräch innerhalb von 60 Minuten.",
+                title = stringResource(R.string.assistant_rate_hour_title),
+                description = stringResource(R.string.assistant_rate_hour_desc),
                 value = state.rateLimitPerHour.toFloat(),
                 valueLabel = "${state.rateLimitPerHour}",
                 range = 1f..600f,
@@ -307,11 +316,11 @@ fun AssistantScreen(
 
             // ---- Start ----
             SettingCard(
-                title = "Gespräch jetzt starten",
-                description = "Spielt die Begrüßung ins Tesla — praktisch zum Testen vor der Fahrt."
+                title = stringResource(R.string.assistant_start_title),
+                description = stringResource(R.string.assistant_start_desc)
             ) {
                 PrimaryActionButton(
-                    text = "Chat starten",
+                    text = stringResource(R.string.assistant_start_action),
                     onClick = { viewModel.triggerAssistant() },
                     enabled = state.privacyConsent && state.apiKeyIsSet,
                     loading = state.triggerInFlight

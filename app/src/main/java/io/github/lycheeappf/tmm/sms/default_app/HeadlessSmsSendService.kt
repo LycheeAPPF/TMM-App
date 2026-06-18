@@ -15,6 +15,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 
 /**
  * Required für Default-SMS-App-Role: respondiert auf RESPOND_VIA_MESSAGE
@@ -78,17 +80,14 @@ class HeadlessSmsSendService : Service() {
 
         val notif = NotificationCompat.Builder(this, MfsApplication.CHANNEL_FALLBACK)
             .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("Quick-Reply nicht zugestellt")
+            .setContentTitle(localizedString(R.string.quickreply_failed_title))
             .setContentText(
-                recipient?.let { "Wollte an $it senden — tap um in Google Messages zu öffnen" }
-                    ?: "Tap, um SMS in Google Messages zu öffnen"
+                recipient?.let { localizedString(R.string.quickreply_failed_text_to, it) }
+                    ?: localizedString(R.string.quickreply_failed_text_generic)
             )
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Das System hat über diese App eine Quick-Reply-SMS senden wollen " +
-                        "(z.B. aus der Anruf-UI). Diese App sendet keine SMS — bitte " +
-                        "öffne Google Messages und sende den Text manuell.\n\n" +
-                        (text ?: "")
+                    localizedString(R.string.quickreply_failed_big, text ?: "")
                 )
             )
             .setContentIntent(pi)

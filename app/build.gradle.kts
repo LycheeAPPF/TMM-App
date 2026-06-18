@@ -38,11 +38,16 @@ android {
         applicationId = "io.github.lycheeappf.tmm"
         minSdk = 33
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // i18n: unterstützte Sprachen. Default-Resources (values/) sind Englisch,
+        // values-de/ liefert die deutsche Übersetzung. Begrenzt zugleich die
+        // mitgelieferten Library-Locales auf en+de.
+        resourceConfigurations += setOf("en", "de")
     }
 
 
@@ -100,6 +105,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    androidResources {
+        // Erzeugt locales_config.xml automatisch aus den vorhandenen values-*/-Ordnern
+        // und injiziert android:localeConfig ins Manifest → aktiviert den OS-Sprach-Picker
+        // (Einstellungen › Apps › TMM › Sprache). Default-Locale via res/resources.properties.
+        generateLocaleConfig = true
     }
 
     packaging {

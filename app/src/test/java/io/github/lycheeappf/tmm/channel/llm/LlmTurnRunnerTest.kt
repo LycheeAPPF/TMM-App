@@ -81,7 +81,7 @@ class LlmTurnRunnerTest {
 
     @Test fun `rate-limit short-circuits before provider call`() = runTest {
         coEvery { limiter.checkAndAcquire(7L) } returns
-            LlmRateLimiter.Decision.Reject(LlmRateLimiter.Reason.PER_MINUTE, "warte")
+            LlmRateLimiter.Decision.Reject(LlmRateLimiter.Reason.PER_MINUTE)
 
         val result = runner.run(7L, "Frage?")
         assertThat(result).isInstanceOf(LlmTurnRunner.TurnResult.RateLimited::class.java)

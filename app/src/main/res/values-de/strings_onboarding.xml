@@ -1,0 +1,56 @@
+<resources>
+    <string name="onboarding_screen_title">Einrichtung</string>
+    <string name="onboarding_intro">Fünf Schritte, dann ist die Tesla-Bridge bereit.</string>
+
+    <!-- Step 1: default SMS app -->
+    <string name="onboarding_step_role_desc">Damit die App Nachrichten so ablegen kann, dass dein Tesla sie liest.</string>
+    <string name="onboarding_step_role_action">Setzen</string>
+
+    <!-- Step 2: notification access -->
+    <string name="onboarding_step_listener_title">Benachrichtigungs-Zugriff</string>
+    <string name="onboarding_step_listener_desc">Liest Benachrichtigungen aus deinen Messenger-Apps.</string>
+    <string name="onboarding_step_listener_action">Aktivieren</string>
+
+    <!-- Step 3: post notifications -->
+    <string name="onboarding_step_post_title">Hinweise anzeigen</string>
+    <string name="onboarding_step_post_desc">Für Status- und Fehlermeldungen dieser App.</string>
+    <string name="onboarding_step_post_action">Erlauben</string>
+
+    <!-- Step 4: contacts -->
+    <string name="onboarding_step_contacts_title">Kontakte (empfohlen)</string>
+    <string name="onboarding_step_contacts_desc">Damit dein Tesla den Namen statt einer Platzhalter-Nummer anzeigt, legt die App pro Gespräch einen unsichtbaren Eintrag an. Er erscheint nicht in deiner Kontakte-App. Ohne diese Berechtigung zeigt Tesla die Nummer.</string>
+    <string name="onboarding_step_contacts_action">Erlauben</string>
+    <string name="onboarding_step_contacts_skip">Überspringen — Tesla zeigt dann nur die Nummer</string>
+    <string name="onboarding_step_contacts_granted">Berechtigung erteilt. Bestehende Gespräche werden im Hintergrund nachgetragen.</string>
+
+    <!-- Step 5: network test -->
+    <string name="onboarding_step_preflight_title">Netz-Test</string>
+    <string name="onboarding_step_preflight_desc">Prüft, ob die Test-Adresse (%1$s) von deinem Netz kostenlos abgelehnt wird. Sendet eine 1-Zeichen-SMS, Ergebnis nach ~60 s.</string>
+    <string name="onboarding_step_preflight_running">läuft…</string>
+    <string name="onboarding_step_preflight_retry">Erneut testen</string>
+
+    <!-- Pre-flight confirm dialog -->
+    <string name="onboarding_preflight_dialog_title">Echte SMS senden?</string>
+    <string name="onboarding_preflight_dialog_text">Der Test sendet über dein Mobilfunknetz eine 1-Zeichen-SMS an die reservierte Test-Adresse %1$s. Lehnt dein Anbieter sie korrekt ab, entstehen keine Kosten — je nach Anbieter kann eine SMS aber berechnet werden.\n\nFortfahren?</string>
+    <string name="onboarding_preflight_dialog_confirm">Senden</string>
+    <string name="onboarding_preflight_dialog_cancel">Abbrechen</string>
+
+    <!-- Risk banner -->
+    <string name="onboarding_risk_title">Netz hat die Test-SMS durchgelassen</string>
+    <string name="onboarding_risk_body">Tesla-Antworten an %1$s könnten als reguläre SMS gesendet werden und Kosten verursachen. Falls du fortfahren willst, bestätige die Risikoannahme.</string>
+    <string name="onboarding_risk_accept">Risiko annehmen — trotzdem fortfahren</string>
+    <string name="onboarding_risk_accepted">Risiko angenommen.</string>
+
+    <!-- Default-SMS diagnostic -->
+    <string name="onboarding_diag_hide">Details verbergen</string>
+    <string name="onboarding_diag_show">Haken fehlt? Details</string>
+    <string name="onboarding_diag_title">Diagnose (warum der Haken fehlt):</string>
+    <string name="onboarding_diag_telephony_match">Telephony-Default stimmt überein</string>
+    <string name="onboarding_diag_system_sees">System sieht als Default</string>
+    <string name="onboarding_diag_our_package">Unser Package</string>
+    <string name="onboarding_diag_null">(null)</string>
+    <string name="onboarding_diag_other_default">→ Anderes Package als Default gesetzt. Tippe nochmal \'Setzen\' und wähle im Dialog explizit \'Tesla Messages Manager\'.</string>
+
+    <!-- Finish -->
+    <string name="onboarding_finish_action">Setup abschließen</string>
+</resources>

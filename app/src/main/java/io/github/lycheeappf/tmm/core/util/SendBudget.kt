@@ -6,6 +6,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -60,13 +62,11 @@ class SendBudget @Inject constructor(
         val nm = context.getSystemService<NotificationManager>() ?: return
         val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_DIAGNOSTIC)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("Send-Budget erreicht")
-            .setContentText("Tageslimit von $budget Forwards aufgebraucht.")
+            .setContentTitle(context.localizedString(R.string.budget_reached_title))
+            .setContentText(context.localizedString(R.string.budget_reached_text, budget))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Tageslimit von $budget forwarded Notifications aufgebraucht. " +
-                        "Weitere Nachrichten werden bis Mitternacht ignoriert. " +
-                        "In den App-Einstellungen kann das Budget erhöht werden."
+                    context.localizedString(R.string.budget_reached_big, budget)
                 )
             )
             .setOngoing(true)

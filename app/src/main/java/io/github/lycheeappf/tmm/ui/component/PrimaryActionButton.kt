@@ -11,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
 /**
@@ -43,7 +45,8 @@ fun PrimaryActionButton(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             }
-            AnimatedContent(targetState = if (loading) "läuft…" else text, label = "btnLabel") { label ->
+            val loadingLabel = stringResource(R.string.component_button_loading)
+            AnimatedContent(targetState = if (loading) loadingLabel else text, label = "btnLabel") { label ->
                 Text(label)
             }
         }

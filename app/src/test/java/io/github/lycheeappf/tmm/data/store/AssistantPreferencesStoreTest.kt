@@ -8,18 +8,24 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 /**
- * Sichert den Antwort-Namen (fest „Grok") und den konfigurierbaren Sprach-Ansprech-
- * Kontakt: Default aktiv mit neutralem Namen „xAI Grok", Setter persistieren. DataStore
- * braucht einen echten Context → Robolectric.
+ * Sichert den Antwort-Namen (fest „Grok"), den konfigurierbaren Sprach-Ansprech-
+ * Kontakt (Default aktiv mit neutralem Namen „xAI Grok") und die Locale-abhängige
+ * Default-Equality-Migration für System-Prompt + Welcome (DE↔EN-Flip vs. Erhalt
+ * eigener Texte). DataStore braucht einen echten Context → Robolectric.
+ *
+ * Die App-Locale ist eine veränderliche [LocaleProvider]-Lambda (`{ locale }`), damit
+ * ein Sprachwechsel auf demselben DataStore getestet werden kann.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class AssistantPreferencesStoreTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val store = AssistantPreferencesStore(context)
+    private var locale: Locale = Locale.GERMAN
+    private val store = AssistantPreferencesStore(context) { locale }
 
     @Test
     fun `assistant reply name defaults to Grok`() = runTest {
@@ -39,5 +45,49 @@ class AssistantPreferencesStoreTest {
         store.setVoiceAliasEnabled(false)
         assertThat(store.voiceAliasName()).isEqualTo("Elon Musk")
         assertThat(store.voiceAliasEnabled()).isFalse()
+    }
+
+    @Test
+    fun `persisted unmodified system-prompt default flips with the app locale`() = runTest {
+        // Ein nie angepasst gespeicherter DE-Default gilt als Seed → flippt mit der Sprache.
+        store.setSystemPrompt(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+
+        locale = Locale.ENGLISH
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+
+        locale = Locale.GERMAN
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+    }
+
+    @Test
+    fun `persisted unmodified welcome default flips with the app locale`() = runTest {
+        store.setWelcomeMessage(AssistantPreferencesStore.DEFAULT_WELCOME)
+
+        locale = Locale.ENGLISH
+        assertThat(store.welcomeMessageRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_WELCOME_EN)
+    }
+
+    @Test
+    fun `genuinely custom system-prompt is preserved across a locale switch`() = runTest {
+        val custom = "Sei knapp und sprich wie ein Pirat, {driver}."
+        store.setSystemPrompt(custom)
+
+        locale = Locale.ENGLISH
+        assertThat(store.systemPromptRaw()).isEqualTo(custom)
+        locale = Locale.GERMAN
+        assertThat(store.systemPromptRaw()).isEqualTo(custom)
+    }
+
+    @Test
+    fun `deliberately emptied prompt stays empty and does not fall back to a default`() = runTest {
+        store.setSystemPrompt("")
+
+        locale = Locale.ENGLISH
+        assertThat(store.systemPromptRaw()).isEmpty()
+        locale = Locale.GERMAN
+        assertThat(store.systemPromptRaw()).isEmpty()
     }
 }

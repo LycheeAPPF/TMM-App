@@ -1,0 +1,55 @@
+<resources>
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_export_action">Export</string>
+    <string name="diagnostics_last_export">Last export: %1$s</string>
+
+    <string name="diagnostics_tab_mappings">Mappings</string>
+    <string name="diagnostics_tab_reply_history">Reply history</string>
+    <string name="diagnostics_tab_live_log">Live log</string>
+
+    <string name="diagnostics_mappings_empty">No mappings for %1$s. Filled as soon as notifications arrive.</string>
+
+    <string name="diagnostics_mapping_replyable">replyable</string>
+    <string name="diagnostics_mapping_read_only">read-only</string>
+    <string name="diagnostics_mapping_created">created: %1$s</string>
+    <string name="diagnostics_mapping_expires">expires: %1$s</string>
+    <string name="diagnostics_mapping_replies">replies: %1$d</string>
+
+    <string name="diagnostics_reply_history_empty">No reply attempts yet. Dictate a reply in your Tesla to fill this list.</string>
+    <string name="diagnostics_reply_history_unknown_channel">Unknown %1$s</string>
+
+    <string name="diagnostics_log_filter_all">All</string>
+    <string name="diagnostics_log_filter_warnings_errors">Warnings/errors only</string>
+    <string name="diagnostics_log_empty">Log is empty. Once notifications or Tesla replies arrive, the events will appear here.</string>
+
+    <string name="diagnostics_sender_test_title">Sender test</string>
+    <string name="diagnostics_sender_test_action">Run test</string>
+    <string name="diagnostics_sender_test_desc">Checks whether your Tesla gets the name instead of the number for the Grok address. No SMS is sent.</string>
+
+    <string name="diagnostics_sender_test_error">Test failed</string>
+    <string name="diagnostics_sender_test_verdict_name_ok">Tesla shows the name correctly</string>
+    <string name="diagnostics_sender_test_verdict_no_write">Write permission for contacts missing</string>
+    <string name="diagnostics_sender_test_verdict_number_only">Tesla shows only the number</string>
+
+    <string name="diagnostics_sender_test_details_hide">Hide details</string>
+    <string name="diagnostics_sender_test_details_show">Details</string>
+    <string name="diagnostics_sender_test_copy">Copy</string>
+
+    <string name="diagnostics_sender_test_yes">yes</string>
+    <string name="diagnostics_sender_test_no">no</string>
+    <string name="diagnostics_sender_test_contacts_in_account">Contacts in account</string>
+    <string name="diagnostics_sender_test_contact_created">Contact created</string>
+    <string name="diagnostics_sender_test_e164_label">E164 (abbreviation only)</string>
+    <string name="diagnostics_sender_test_e164_null_irrelevant">null — irrelevant (lookup ok)</string>
+    <string name="diagnostics_sender_test_e164_null">null</string>
+    <string name="diagnostics_sender_test_phonelookup_found">→ %1$s</string>
+    <string name="diagnostics_sender_test_phonelookup_not_found">not found</string>
+
+    <string name="diagnostics_verdict_no_write">WRITE_CONTACTS missing — without it no contact can be created.</string>
+    <string name="diagnostics_verdict_phone_ok">Phone side OK. If Tesla still shows the number: \'Re-sync Tesla contacts\' + reconnect Bluetooth.</string>
+    <string name="diagnostics_verdict_contact_id_null">contactId is NULL. AGGREGATION_MODE_DISABLED creates no aggregate contact row, so the PhoneLookup JOIN breaks.</string>
+    <string name="diagnostics_verdict_e164_null">contactId OK, but E164=null (+888 range without a valid country code) → strict match dead, resolution runs via the min_match/PhoneLookup fallback.</string>
+    <string name="diagnostics_verdict_lookup_fails">contactId+E164 OK, lookup still fails — details in the live log (storedNorm / min_match).</string>
+
+    <string name="diagnostics_sender_test_unknown_error">unknown error</string>
+</resources>

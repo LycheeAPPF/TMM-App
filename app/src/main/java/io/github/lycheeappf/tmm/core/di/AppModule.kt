@@ -1,13 +1,18 @@
 package io.github.lycheeappf.tmm.core.di
 
+import android.app.LocaleManager
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.github.lycheeappf.tmm.core.locale.LocaleProvider
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import java.util.Locale
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -26,6 +31,18 @@ object AppModule {
 
     @Provides @Singleton
     fun provideClock(): Clock = SystemClock
+
+    /**
+     * Aktive App-Locale (per-app locale, API 33+). Leer ("Systemsprache folgen")
+     * → [Locale.getDefault]. Wird genutzt, um sprachabhängige Defaults (Grok-Prompt)
+     * zur Lesezeit zu wählen.
+     */
+    @Provides @Singleton
+    fun provideLocaleProvider(@ApplicationContext context: Context): LocaleProvider =
+        LocaleProvider {
+            val locales = context.getSystemService(LocaleManager::class.java)?.applicationLocales
+            if (locales == null || locales.isEmpty) Locale.getDefault() else locales[0]
+        }
 }
 
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class IoDispatcher

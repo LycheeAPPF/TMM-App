@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -26,10 +29,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.BuildConfig
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.ui.component.MfsCardVariant
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -58,7 +65,7 @@ fun SettingsScreen(
         onPauseOrDispose { }
     }
 
-    MfsScaffold(title = "Einstellungen", bottomBar = bottomBar) { inner ->
+    MfsScaffold(title = stringResource(R.string.settings_title), bottomBar = bottomBar) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -67,32 +74,38 @@ fun SettingsScreen(
                 .padding(horizontal = MfsSpacing.xl, vertical = MfsSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(MfsSpacing.lg)
         ) {
-            SectionHeader("Weiterleitung")
+            SectionHeader(stringResource(R.string.settings_section_forwarding))
 
             SettingCard(
-                title = "Gültigkeit der Zuordnung",
-                description = "Wie lange merkt sich die App, welche Tesla-Adresse zu welchem Chat gehört?"
+                title = stringResource(R.string.settings_ttl_title),
+                description = stringResource(R.string.settings_ttl_desc)
             ) {
-                Text("${state.ttlHours} Stunden", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    pluralStringResource(R.plurals.settings_ttl_hours, state.ttlHours, state.ttlHours),
+                    style = MaterialTheme.typography.bodyLarge
+                )
                 Slider(
                     value = state.ttlHours.toFloat(),
                     onValueChange = { viewModel.setTtlHours(it.toInt().coerceIn(1, 168)) },
                     valueRange = 1f..168f
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("1 h", style = MaterialTheme.typography.labelSmall)
-                    Text("7 Tage", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.settings_ttl_slider_min), style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.settings_ttl_slider_max), style = MaterialTheme.typography.labelSmall)
                 }
             }
 
             SettingCard(
-                title = "Tageslimit",
-                description = "Maximale Anzahl weitergeleiteter Nachrichten pro Tag — ein Sicherheitsnetz."
+                title = stringResource(R.string.settings_budget_title),
+                description = stringResource(R.string.settings_budget_desc)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${state.sendBudget} Nachrichten", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "heute: ${state.sendCountToday}",
+                        pluralStringResource(R.plurals.settings_budget_messages, state.sendBudget, state.sendBudget),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        stringResource(R.string.settings_budget_today, state.sendCountToday),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (state.sendCountToday >= state.sendBudget)
                             MaterialTheme.colorScheme.error
@@ -106,18 +119,24 @@ fun SettingsScreen(
                 )
             }
 
-            SectionHeader("Apps")
+            SectionHeader(stringResource(R.string.settings_section_apps))
             SettingCard(
-                title = "Freigegebene Apps",
-                description = "Lege fest, welche Apps an dein Tesla weitergeleitet werden.",
+                title = stringResource(R.string.settings_whitelist_title),
+                description = stringResource(R.string.settings_whitelist_desc),
                 variant = MfsCardVariant.Outlined
             ) {
                 MfsListItem(
-                    title = "Liste öffnen",
+                    title = stringResource(R.string.settings_whitelist_open),
                     trailing = { androidx.compose.material3.Icon(Icons.Outlined.ChevronRight, null) },
                     onClick = onOpenWhitelist
                 )
             }
+
+            SectionHeader(stringResource(R.string.settings_section_language))
+            LanguageSettingCard(
+                currentTag = state.languageTag,
+                onSelect = { viewModel.setLanguage(it) }
+            )
 
             AnimatedVisibility(
                 visible = state.developerMode,
@@ -143,18 +162,57 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun LanguageSettingCard(
+    currentTag: String,
+    onSelect: (String) -> Unit
+) {
+    // "" = Systemsprache folgen, sonst "de"/"en". OS-Picker kann auch Regions-Tags
+    // ("de-DE") liefern — daher per Sprach-Präfix auf die drei Optionen normalisieren.
+    val selected = when {
+        currentTag.isBlank() -> ""
+        currentTag.startsWith("de") -> "de"
+        currentTag.startsWith("en") -> "en"
+        else -> ""
+    }
+    SettingCard(
+        title = stringResource(R.string.settings_language_title),
+        description = stringResource(R.string.settings_language_desc)
+    ) {
+        Column(modifier = Modifier.selectableGroup()) {
+            LanguageOption(stringResource(R.string.settings_language_system), selected == "") { onSelect("") }
+            LanguageOption(stringResource(R.string.settings_language_german), selected == "de") { onSelect("de") }
+            LanguageOption(stringResource(R.string.settings_language_english), selected == "en") { onSelect("en") }
+        }
+    }
+}
+
+@Composable
+private fun LanguageOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = MfsSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
 private fun DeveloperSettings(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     onOpenDiagnostics: () -> Unit,
     onOpenChannels: () -> Unit
 ) {
-    SectionHeader("Entwickler")
+    SectionHeader(stringResource(R.string.settings_section_developer))
 
     SettingCard(
-        title = "Netz-Test (Pre-Flight)",
-        description = "Sendet eine Test-SMS an die +888-Systemadresse und prüft, ob das Netz sie " +
-            "kostenlos ablehnt. 'Sicher abgelehnt' = +888 ist verwendbar."
+        title = stringResource(R.string.settings_preflight_title),
+        description = stringResource(R.string.settings_preflight_desc)
     ) {
         val (statusText, status) = preflightStatusUi(state.preflightStatus)
         StatusPill(text = statusText, status = status)
@@ -163,32 +221,35 @@ private fun DeveloperSettings(
             horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
         ) {
             PrimaryActionButton(
-                text = "Test ausführen",
+                text = stringResource(R.string.settings_preflight_run),
                 onClick = { viewModel.runPreflight() },
                 loading = state.preflightRunning
             )
             TextButton(
                 onClick = { viewModel.resetPreflight() },
                 enabled = !state.preflightRunning
-            ) { Text("Zurücksetzen") }
+            ) { Text(stringResource(R.string.settings_preflight_reset)) }
         }
     }
 
     SettingCard(
-        title = "Tesla-Bridge-Kontakte",
-        description = "Pro Gespräch wird ein unsichtbarer Kontakt angelegt, damit Tesla den Namen " +
-            "statt der Nummer anzeigt. Bei Problemen: Sync neu erzwingen."
+        title = stringResource(R.string.settings_contacts_title),
+        description = stringResource(R.string.settings_contacts_desc)
     ) {
         Text(
             when {
                 state.teslaContactsHasPermission ->
-                    "${state.teslaContactCount} synchronisierte Kontakte"
+                    pluralStringResource(
+                        R.plurals.settings_contacts_count,
+                        state.teslaContactCount,
+                        state.teslaContactCount
+                    )
                 !state.teslaContactsHasRead && !state.teslaContactsHasWrite ->
-                    "Kontakt-Berechtigung fehlt (Lesen + Schreiben) — Tesla zeigt nur Nummern"
+                    stringResource(R.string.settings_contacts_perm_missing)
                 !state.teslaContactsHasWrite ->
-                    "Schreibrecht für Kontakte fehlt — Tesla zeigt nur Nummern"
+                    stringResource(R.string.settings_contacts_write_missing)
                 else ->
-                    "Leserecht für Kontakte fehlt — Tesla zeigt nur Nummern"
+                    stringResource(R.string.settings_contacts_read_missing)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = if (state.teslaContactsHasPermission) MaterialTheme.colorScheme.onSurface
@@ -198,41 +259,43 @@ private fun DeveloperSettings(
             enabled = state.teslaContactsHasPermission && !state.teslaContactsResetting,
             onClick = { viewModel.resetTeslaContacts() }
         ) {
-            Text(if (state.teslaContactsResetting) "läuft…" else "Tesla-Kontakte neu synchronisieren")
+            Text(
+                if (state.teslaContactsResetting) stringResource(R.string.settings_contacts_resyncing)
+                else stringResource(R.string.settings_contacts_resync)
+            )
         }
     }
 
     SettingCard(
-        title = "Diagnose-Werkzeuge",
-        description = "Mappings, Reply-Verlauf, Live-Log und der Channel-Überblick.",
+        title = stringResource(R.string.settings_diagnostics_title),
+        description = stringResource(R.string.settings_diagnostics_desc),
         variant = MfsCardVariant.Outlined
     ) {
         MfsListItem(
-            title = "Diagnose",
-            subtitle = "Mappings, Reply-Verlauf, Live-Log, Sender-Test",
+            title = stringResource(R.string.settings_diagnostics_item_title),
+            subtitle = stringResource(R.string.settings_diagnostics_item_subtitle),
             trailing = { androidx.compose.material3.Icon(Icons.Outlined.ChevronRight, null) },
             onClick = onOpenDiagnostics
         )
         HorizontalDivider()
         MfsListItem(
-            title = "Channels",
-            subtitle = "Notification (V1) + Grok-LLM (V2)",
+            title = stringResource(R.string.settings_channels_item_title),
+            subtitle = stringResource(R.string.settings_channels_item_subtitle),
             trailing = { androidx.compose.material3.Icon(Icons.Outlined.ChevronRight, null) },
             onClick = onOpenChannels
         )
     }
 
     SettingCard(
-        title = "Entwicklermodus",
-        description = "Blendet Diagnose, Channels und die Experten-Einstellungen ein. " +
-            "Ausschalten versteckt sie wieder; das Versions-Label unten bleibt der Wieder-Einstieg."
+        title = stringResource(R.string.settings_devmode_title),
+        description = stringResource(R.string.settings_devmode_desc)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Entwicklermodus aktiv", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.settings_devmode_active), style = MaterialTheme.typography.bodyLarge)
             Switch(
                 checked = state.developerMode,
                 onCheckedChange = { viewModel.setDeveloperMode(it) }
@@ -247,9 +310,10 @@ private fun VersionTapFooter(
     onEnableDeveloperMode: () -> Unit
 ) {
     val context = LocalContext.current
+    val devModeEnabledToast = stringResource(R.string.settings_devmode_enabled_toast)
     var tapCount by remember { mutableIntStateOf(0) }
     Text(
-        text = "Version ${BuildConfig.VERSION_NAME}",
+        text = stringResource(R.string.settings_version_label, BuildConfig.VERSION_NAME),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.outline,
         modifier = Modifier
@@ -261,7 +325,7 @@ private fun VersionTapFooter(
                     tapCount = 0
                     onEnableDeveloperMode()
                     android.widget.Toast
-                        .makeText(context, "Entwicklermodus aktiviert", android.widget.Toast.LENGTH_SHORT)
+                        .makeText(context, devModeEnabledToast, android.widget.Toast.LENGTH_SHORT)
                         .show()
                 }
             }

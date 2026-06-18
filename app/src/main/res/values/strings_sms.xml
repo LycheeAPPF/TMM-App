@@ -1,0 +1,36 @@
+<resources>
+    <!-- SMS conversations list -->
+    <string name="sms_list_title">SMS</string>
+    <string name="sms_compose_action">New SMS</string>
+    <string name="sms_list_default_app_title">Default SMS app required</string>
+    <string name="sms_list_default_app_desc">For your real text messages to be shown, this app must be the default SMS app.</string>
+    <string name="sms_list_default_app_action">Set</string>
+    <string name="sms_list_read_permission_title">SMS access required</string>
+    <string name="sms_list_read_permission_desc">Allow read access to SMS to display your history.</string>
+    <string name="sms_list_read_permission_action">Allow</string>
+    <string name="sms_list_empty">No SMS.</string>
+
+    <!-- SMS thread -->
+    <string name="sms_thread_title_fallback">SMS</string>
+    <string name="sms_thread_empty">No messages.</string>
+    <string name="sms_thread_reply_hint">Message…</string>
+    <string name="sms_thread_send_action">Send</string>
+    <string name="sms_thread_meta_failed">failed</string>
+    <string name="sms_thread_meta_sending">sending…</string>
+
+    <!-- SMS compose -->
+    <string name="sms_compose_title">New SMS</string>
+    <string name="sms_compose_recipient_label">Recipient (number)</string>
+    <string name="sms_compose_body_label">Message</string>
+    <string name="sms_compose_send_action">Send</string>
+
+    <!-- Send feedback (snackbar) -->
+    <string name="sms_feedback_enqueued">Sending…</string>
+    <string name="sms_feedback_not_default">App is not the default SMS app.</string>
+    <string name="sms_feedback_missing_permission">SMS send permission is missing.</string>
+    <string name="sms_feedback_no_telephony">No cellular service available.</string>
+    <string name="sms_feedback_blank_recipient">No recipient.</string>
+    <string name="sms_feedback_blank_body">Message is empty.</string>
+    <string name="sms_feedback_fake_address">This address cannot be messaged.</string>
+    <string name="sms_feedback_error">Sending failed.</string>
+</resources>

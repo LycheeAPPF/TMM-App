@@ -1,0 +1,16 @@
+<resources>
+    <string name="channels_intro">Every Tesla-visible conversation belongs to a channel. The channel ID is encoded in the fake phone number.</string>
+
+    <string name="channels_address_scheme_header">Address scheme</string>
+    <string name="channels_address_scheme_diagram">+888 X YYYYYYY\n       │ └─── Mapping ID (7 digits)\n       └───── Channel ID (1=LLM is V2-reserved)</string>
+
+    <string name="channels_status_reserved">V2 reserved</string>
+    <string name="channels_status_active">Active</string>
+    <string name="channels_status_channel">Channel %1$d</string>
+
+    <string name="channels_address_line">%1$s: %2$s%3$dXXXXXXX</string>
+
+    <string name="channels_desc_notification">Routes Tesla dictation replies via RemoteInput to the original messaging app (WhatsApp, Telegram, Signal, …)</string>
+    <string name="channels_desc_llm">AI assistant (Grok): forwards Tesla dictations to xAI Grok and injects the answer as a fake SMS that the Tesla TTS reads aloud. Start a conversation via the home-screen button.</string>
+    <string name="channels_desc_system">Internal channel reserve for pre-flight tests and diagnostic conversations</string>
+</resources>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="assistant_title">Grok Assistant</string>
+    <string name="assistant_intro">Your dictations from the Tesla go to Grok (xAI). Your Tesla reads the reply aloud. The conversation context for Grok stays in memory only briefly. Your dictations are additionally logged locally on the device (for diagnostics and re-delivery) and only ever leave it toward xAI.</string>
+
+    <string name="assistant_consent_title">Consent</string>
+    <string name="assistant_consent_desc">Mandatory before the first start — confirms that dictations go to xAI.</string>
+    <string name="assistant_consent_granted">Consent given — start enabled.</string>
+    <string name="assistant_consent_not_granted">Not consented yet — start blocked.</string>
+
+    <string name="assistant_apikey_title">xAI API key</string>
+    <string name="assistant_apikey_desc">Stored encrypted on the device and not included in backups.</string>
+    <string name="assistant_apikey_active">Key active</string>
+    <string name="assistant_apikey_none">No key</string>
+    <string name="assistant_apikey_field_label">Enter new key</string>
+    <string name="assistant_apikey_hide">Hide key</string>
+    <string name="assistant_apikey_show">Show key</string>
+    <string name="assistant_apikey_save">Save</string>
+    <string name="assistant_apikey_remove">Remove</string>
+
+    <string name="assistant_model_title">Model</string>
+    <string name="assistant_model_desc">Default: grok-4.3. Only change it if xAI recommends a different model.</string>
+
+    <string name="assistant_drivername_title">Your name (optional)</string>
+    <string name="assistant_drivername_desc">Grok addresses you with it. Used for {driver} in the greeting and behavior. Leave blank for a neutral form of address.</string>
+
+    <string name="assistant_voicealias_title">Additional name for voice control</string>
+    <string name="assistant_voicealias_desc">Additional contact for addressing by voice (\'Text to …\'). Redirects to Grok — Grok still replies as \'Grok\'. Tesla\'s voice control recognizes a FIRST + LAST name most reliably. \'Off\' removes the extra contact; selecting or applying syncs straight to the Tesla.</string>
+    <string name="assistant_voicealias_off">Off</string>
+    <string name="assistant_voicealias_custom">Custom name</string>
+    <string name="assistant_voicealias_custom_hint">e.g. Viktor Grok</string>
+    <string name="assistant_voicealias_apply">Apply &amp; sync to Tesla</string>
+    <string name="assistant_voicealias_applying">running…</string>
+
+    <string name="assistant_welcome_title">Greeting</string>
+    <string name="assistant_welcome_desc">The first sentence your Tesla reads aloud at the start. {driver} is replaced by your name.</string>
+
+    <string name="assistant_behavior_title">Grok behavior</string>
+    <string name="assistant_behavior_desc">Instructs Grok how it should reply. {driver} is replaced by your name. Keep it short — it goes into every request.</string>
+
+    <string name="assistant_ttl_title">Discard history after</string>
+    <string name="assistant_ttl_desc">After this many seconds without input, the conversation history is deleted.</string>
+    <plurals name="assistant_ttl_value">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+
+    <string name="assistant_maxtokens_title">Maximum reply length</string>
+    <string name="assistant_maxtokens_desc">Upper limit per reply. 512 equals roughly 3–5 readable sentences.</string>
+    <plurals name="assistant_maxtokens_value">
+        <item quantity="one">%1$d token</item>
+        <item quantity="other">%1$d tokens</item>
+    </plurals>
+
+    <string name="assistant_temperature_title">Creativity</string>
+    <string name="assistant_temperature_desc">0 = strictly factual, 1.5 = very creative. Default 0.7.</string>
+
+    <string name="assistant_rate_min_title">Request limit per minute</string>
+    <string name="assistant_rate_min_desc">Maximum Grok requests per conversation within 60 seconds.</string>
+    <string name="assistant_rate_hour_title">Request limit per hour</string>
+    <string name="assistant_rate_hour_desc">Maximum Grok requests per conversation within 60 minutes.</string>
+
+    <string name="assistant_start_title">Start conversation now</string>
+    <string name="assistant_start_desc">Plays the greeting into the Tesla — handy for testing before driving.</string>
+    <string name="assistant_start_action">Start chat</string>
+
+    <string name="assistant_feedback_key_saved">API key saved.</string>
+    <string name="assistant_feedback_key_rejected">API key rejected: %1$s.</string>
+    <string name="assistant_feedback_key_rejected_reason_invalid">invalid</string>
+    <string name="assistant_feedback_save_failed">Save failed: %1$s</string>
+    <string name="assistant_feedback_key_removed">API key removed.</string>
+    <string name="assistant_feedback_voicealias_saved">Saved — Tesla sync is running. Reconnect Bluetooth if needed.</string>
+
+    <string name="assistant_feedback_start_success">AI conversation started (%1$s).</string>
+    <string name="assistant_feedback_start_no_key">Please enter an API key first.</string>
+    <string name="assistant_feedback_start_not_default_sms">App is not the default SMS app — check setup on the Home screen.</string>
+    <string name="assistant_feedback_start_budget">Daily send budget reached.</string>
+    <string name="assistant_feedback_start_injection_failed">Welcome injection failed.</string>
+    <string name="assistant_feedback_start_consent_missing">Please confirm the privacy notice first.</string>
+</resources>

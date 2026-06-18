@@ -1,5 +1,8 @@
 package io.github.lycheeappf.tmm.ui.component
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 
 /**
@@ -8,11 +11,18 @@ import io.github.lycheeappf.tmm.data.store.SettingsStore
  * die Status-Texte nicht auseinanderlaufen. Bewusst klares Deutsch (keine
  * "Carrier rejected"-Fachbegriffe).
  */
+@Composable
 fun preflightStatusUi(raw: String?): Pair<String, MfsStatus> = when (raw) {
-    SettingsStore.PREFLIGHT_OK -> "Sicher: Netz hat die Test-SMS abgelehnt" to MfsStatus.Success
-    SettingsStore.PREFLIGHT_RISK -> "Achtung: SMS wurde gesendet — nicht nutzen" to MfsStatus.Error
-    SettingsStore.PREFLIGHT_TIMEOUT -> "Zeitüberschreitung — bitte erneut testen" to MfsStatus.Warning
-    SettingsStore.PREFLIGHT_ERROR -> "Fehler — ist die App als Standard-SMS-App gesetzt?" to MfsStatus.Error
-    SettingsStore.PREFLIGHT_RUNNING -> "läuft…" to MfsStatus.Info
-    else -> "Noch nicht ausgeführt" to MfsStatus.Neutral
+    SettingsStore.PREFLIGHT_OK ->
+        stringResource(R.string.component_preflight_ok) to MfsStatus.Success
+    SettingsStore.PREFLIGHT_RISK ->
+        stringResource(R.string.component_preflight_risk) to MfsStatus.Error
+    SettingsStore.PREFLIGHT_TIMEOUT ->
+        stringResource(R.string.component_preflight_timeout) to MfsStatus.Warning
+    SettingsStore.PREFLIGHT_ERROR ->
+        stringResource(R.string.component_preflight_error) to MfsStatus.Error
+    SettingsStore.PREFLIGHT_RUNNING ->
+        stringResource(R.string.component_preflight_running) to MfsStatus.Info
+    else ->
+        stringResource(R.string.component_preflight_not_run) to MfsStatus.Neutral
 }

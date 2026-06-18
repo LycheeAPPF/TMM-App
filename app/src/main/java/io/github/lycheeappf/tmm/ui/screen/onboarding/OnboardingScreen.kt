@@ -99,7 +99,7 @@ fun OnboardingScreen(
     val isPreflightRisk = state.preflightStatus == SettingsStore.PREFLIGHT_RISK
     val canComplete = state.currentStep == OnboardingStep.Done
 
-    MfsScaffold(title = "Einrichtung") { inner ->
+    MfsScaffold(title = stringResource(R.string.onboarding_screen_title)) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -109,7 +109,7 @@ fun OnboardingScreen(
             verticalArrangement = Arrangement.spacedBy(MfsSpacing.lg)
         ) {
             Text(
-                "Fünf Schritte, dann ist die Tesla-Bridge bereit.",
+                stringResource(R.string.onboarding_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -118,12 +118,12 @@ fun OnboardingScreen(
 
             StepCard(
                 number = 1,
-                title = "Standard-SMS-App",
-                description = "Damit die App Nachrichten so ablegen kann, dass dein Tesla sie liest.",
+                title = stringResource(R.string.onboarding_title_role),
+                description = stringResource(R.string.onboarding_step_role_desc),
                 done = state.isDefaultSmsApp
             ) {
                 Button(onClick = { roleLauncher.launch(viewModel.defaultSmsIntent()) }) {
-                    Text("Setzen")
+                    Text(stringResource(R.string.onboarding_step_role_action))
                 }
                 if (!state.isDefaultSmsApp && state.ourPackage.isNotBlank()) {
                     DefaultSmsDiagnostic(
@@ -137,32 +137,30 @@ fun OnboardingScreen(
 
             StepCard(
                 number = 2,
-                title = "Benachrichtigungs-Zugriff",
-                description = "Liest Benachrichtigungen aus deinen Messenger-Apps.",
+                title = stringResource(R.string.onboarding_step_listener_title),
+                description = stringResource(R.string.onboarding_step_listener_desc),
                 done = state.hasNotificationAccess
             ) {
                 Button(onClick = {
                     nlsLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                }) { Text("Aktivieren") }
+                }) { Text(stringResource(R.string.onboarding_step_listener_action)) }
             }
 
             StepCard(
                 number = 3,
-                title = "Hinweise anzeigen",
-                description = "Für Status- und Fehlermeldungen dieser App.",
+                title = stringResource(R.string.onboarding_step_post_title),
+                description = stringResource(R.string.onboarding_step_post_desc),
                 done = state.hasPostNotifications
             ) {
                 Button(onClick = {
                     postNotifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                }) { Text("Erlauben") }
+                }) { Text(stringResource(R.string.onboarding_step_post_action)) }
             }
 
             StepCard(
                 number = 4,
-                title = "Kontakte (empfohlen)",
-                description = "Damit dein Tesla den Namen statt einer Platzhalter-Nummer anzeigt, " +
-                    "legt die App pro Gespräch einen unsichtbaren Eintrag an. Er erscheint nicht in " +
-                    "deiner Kontakte-App. Ohne diese Berechtigung zeigt Tesla die Nummer.",
+                title = stringResource(R.string.onboarding_step_contacts_title),
+                description = stringResource(R.string.onboarding_step_contacts_desc),
                 done = state.hasContactsAccess || state.contactsSkipped
             ) {
                 if (!state.hasContactsAccess) {
@@ -173,13 +171,13 @@ fun OnboardingScreen(
                                 android.Manifest.permission.WRITE_CONTACTS
                             )
                         )
-                    }) { Text("Erlauben") }
+                    }) { Text(stringResource(R.string.onboarding_step_contacts_action)) }
                     TextButton(onClick = { viewModel.skipContactsStep() }) {
-                        Text("Überspringen — Tesla zeigt dann nur die Nummer")
+                        Text(stringResource(R.string.onboarding_step_contacts_skip))
                     }
                 } else {
                     Text(
-                        "Berechtigung erteilt. Bestehende Gespräche werden im Hintergrund nachgetragen.",
+                        stringResource(R.string.onboarding_step_contacts_granted),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -187,9 +185,11 @@ fun OnboardingScreen(
 
             StepCard(
                 number = 5,
-                title = "Netz-Test",
-                description = "Prüft, ob die Test-Adresse (${state.preflightTargetAddress}) von deinem " +
-                    "Netz kostenlos abgelehnt wird. Sendet eine 1-Zeichen-SMS, Ergebnis nach ~60 s.",
+                title = stringResource(R.string.onboarding_step_preflight_title),
+                description = stringResource(
+                    R.string.onboarding_step_preflight_desc,
+                    state.preflightTargetAddress
+                ),
                 done = state.preflightStatus == SettingsStore.PREFLIGHT_OK ||
                     (state.preflightStatus == SettingsStore.PREFLIGHT_RISK && state.riskAcknowledged)
             ) {
@@ -199,16 +199,16 @@ fun OnboardingScreen(
                         horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Text("läuft…")
+                        Text(stringResource(R.string.onboarding_step_preflight_running))
                     }
                     state.preflightStatus == null -> Button(onClick = { showPreFlightDialog = true }) {
-                        Text("Test starten")
+                        Text(stringResource(R.string.onboarding_action_run_preflight))
                     }
                     else -> Column(verticalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
                         val (label, status) = preflightStatusUi(state.preflightStatus)
                         StatusPill(text = label, status = status)
                         OutlinedButton(onClick = { showPreFlightDialog = true }) {
-                            Text("Erneut testen")
+                            Text(stringResource(R.string.onboarding_step_preflight_retry))
                         }
                     }
                 }
@@ -239,7 +239,7 @@ fun OnboardingScreen(
                 onClick = { viewModel.markOnboarded(onFinished) },
                 modifier = Modifier.fillMaxWidth().padding(top = MfsSpacing.sm)
             ) {
-                Text("Setup abschließen")
+                Text(stringResource(R.string.onboarding_finish_action))
             }
         }
     }
@@ -254,16 +254,20 @@ private fun PreFlightConfirmDialog(
     AlertDialog(
         onDismissRequest = onCancel,
         icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null) },
-        title = { Text("Echte SMS senden?") },
+        title = { Text(stringResource(R.string.onboarding_preflight_dialog_title)) },
         text = {
-            Text(
-                "Der Test sendet über dein Mobilfunknetz eine 1-Zeichen-SMS an die reservierte " +
-                    "Test-Adresse $targetAddress. Lehnt dein Anbieter sie korrekt ab, entstehen keine " +
-                    "Kosten — je nach Anbieter kann eine SMS aber berechnet werden.\n\nFortfahren?"
-            )
+            Text(stringResource(R.string.onboarding_preflight_dialog_text, targetAddress))
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Senden") } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Abbrechen") } }
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.onboarding_preflight_dialog_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.onboarding_preflight_dialog_cancel))
+            }
+        }
     )
 }
 
@@ -291,14 +295,13 @@ private fun RiskBanner(
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Text(
-                    "Netz hat die Test-SMS durchgelassen",
+                    stringResource(R.string.onboarding_risk_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
             Text(
-                "Tesla-Antworten an $targetAddress könnten als reguläre SMS gesendet werden und " +
-                    "Kosten verursachen. Falls du fortfahren willst, bestätige die Risikoannahme.",
+                stringResource(R.string.onboarding_risk_body, targetAddress),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
@@ -306,10 +309,10 @@ private fun RiskBanner(
                 Button(
                     onClick = onAcknowledge,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Risiko annehmen — trotzdem fortfahren") }
+                ) { Text(stringResource(R.string.onboarding_risk_accept)) }
             } else {
                 Text(
-                    "Risiko angenommen.",
+                    stringResource(R.string.onboarding_risk_accepted),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
@@ -327,7 +330,10 @@ private fun DefaultSmsDiagnostic(
 ) {
     var expanded by remember { mutableStateOf(false) }
     TextButton(onClick = { expanded = !expanded }) {
-        Text(if (expanded) "Details verbergen" else "Haken fehlt? Details")
+        Text(
+            if (expanded) stringResource(R.string.onboarding_diag_hide)
+            else stringResource(R.string.onboarding_diag_show)
+        )
     }
     AnimatedVisibility(visible = expanded, enter = mfsExpandEnter(), exit = mfsExpandExit()) {
         Surface(
@@ -339,15 +345,23 @@ private fun DefaultSmsDiagnostic(
                 modifier = Modifier.padding(MfsSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(MfsSpacing.xs)
             ) {
-                Text("Diagnose (warum der Haken fehlt):", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    stringResource(R.string.onboarding_diag_title),
+                    style = MaterialTheme.typography.labelMedium
+                )
                 DiagnosticRow("RoleManager.isRoleHeld(SMS)", roleManagerHeld.toString())
-                DiagnosticRow("Telephony default match", telephonyMatches.toString())
-                DiagnosticRow("System sieht als Default", systemDefault ?: "(null)")
-                DiagnosticRow("Unser Package", ourPackage)
+                DiagnosticRow(
+                    stringResource(R.string.onboarding_diag_telephony_match),
+                    telephonyMatches.toString()
+                )
+                DiagnosticRow(
+                    stringResource(R.string.onboarding_diag_system_sees),
+                    systemDefault ?: stringResource(R.string.onboarding_diag_null)
+                )
+                DiagnosticRow(stringResource(R.string.onboarding_diag_our_package), ourPackage)
                 if (systemDefault != null && systemDefault != ourPackage) {
                     Text(
-                        "→ Anderes Package als Default gesetzt. Tippe nochmal 'Setzen' und wähle " +
-                            "im Dialog explizit 'Tesla Messages Manager'.",
+                        stringResource(R.string.onboarding_diag_other_default),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )

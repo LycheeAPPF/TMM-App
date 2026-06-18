@@ -16,6 +16,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 
 /**
  * Empfängt echte eingehende SMS, wenn unsere App Default-SMS-App ist.
@@ -129,7 +131,7 @@ class DeliverSmsReceiver : BroadcastReceiver() {
 
         val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_DIAGNOSTIC)
             .setSmallIcon(android.R.drawable.sym_action_email)
-            .setContentTitle("SMS von $address")
+            .setContentTitle(context.localizedString(R.string.sms_incoming_title, address))
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pi)

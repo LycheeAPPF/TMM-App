@@ -1,0 +1,10 @@
+<resources>
+    <string name="component_scaffold_back_desc">Zurück</string>
+    <string name="component_button_loading">läuft…</string>
+    <string name="component_preflight_ok">Sicher: Netz hat die Test-SMS abgelehnt</string>
+    <string name="component_preflight_risk">Achtung: SMS wurde gesendet — nicht nutzen</string>
+    <string name="component_preflight_timeout">Zeitüberschreitung — bitte erneut testen</string>
+    <string name="component_preflight_error">Fehler — ist die App als Standard-SMS-App gesetzt?</string>
+    <string name="component_preflight_running">läuft…</string>
+    <string name="component_preflight_not_run">Noch nicht ausgeführt</string>
+</resources>

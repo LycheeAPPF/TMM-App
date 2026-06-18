@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.Toast
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 
 /**
  * Tap-Handler für die Fallback-Notification: kopiert den nicht-zustellbaren
@@ -20,7 +22,7 @@ class ClipboardCopyReceiver : BroadcastReceiver() {
             return
         }
         FallbackNotifier.copyToClipboard(context, text)
-        Toast.makeText(context, "Antwort kopiert", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.localizedString(R.string.clipboard_copied_toast), Toast.LENGTH_SHORT).show()
     }
 
     companion object {

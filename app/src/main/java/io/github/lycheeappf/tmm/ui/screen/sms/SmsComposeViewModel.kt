@@ -1,8 +1,10 @@
 package io.github.lycheeappf.tmm.ui.screen.sms
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.domain.sms.SmsSendResult
 import io.github.lycheeappf.tmm.domain.sms.SmsSender
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +25,7 @@ data class SmsComposeUiState(
 
 @HiltViewModel
 class SmsComposeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val sender: SmsSender
 ) : ViewModel() {
 
@@ -42,7 +45,7 @@ class SmsComposeViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     sending = false,
-                    feedback = smsSendFeedback(result),
+                    feedback = smsSendFeedback(context, result),
                     sent = result is SmsSendResult.Enqueued
                 )
             }

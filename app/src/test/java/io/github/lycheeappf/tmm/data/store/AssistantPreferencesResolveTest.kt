@@ -2,11 +2,12 @@ package io.github.lycheeappf.tmm.data.store
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import java.util.Locale
 
 /**
  * Unit-Tests für die {driver}-Token-Auflösung. Pure Funktion ohne DataStore,
  * deckt den gefüllten Namen, den leeren (neutralen) Fall und die Default-
- * Konstanten ab — verhindert ein unaufgelöstes Token im Tesla-TTS.
+ * Konstanten in DE und EN ab — verhindert ein unaufgelöstes Token im Tesla-TTS.
  */
 class AssistantPreferencesResolveTest {
 
@@ -54,6 +55,50 @@ class AssistantPreferencesResolveTest {
             AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT, ""
         )
         assertThat(noName).contains("im Tesla des Fahrers.")
+        assertThat(noName).doesNotContain("{driver}")
+    }
+
+    // ---- English ------------------------------------------------------------
+
+    @Test fun `english blank name uses neutral english forms`() {
+        val out = AssistantPreferencesStore.resolveDriverTemplate(
+            "Hey {driver}, in {driver}'s Tesla {driver} watches the road.", "", Locale.ENGLISH
+        )
+        assertThat(out).isEqualTo("Hey, in the driver's Tesla the driver watches the road.")
+    }
+
+    @Test fun `english filled name replaces all driver tokens`() {
+        val out = AssistantPreferencesStore.resolveDriverTemplate(
+            "Hey {driver}, in {driver}'s Tesla {driver} drives.", "Alex", Locale.ENGLISH
+        )
+        assertThat(out).isEqualTo("Hey Alex, in Alex's Tesla Alex drives.")
+    }
+
+    @Test fun `default english welcome renders cleanly with and without name`() {
+        val withName = AssistantPreferencesStore.resolveDriverTemplate(
+            AssistantPreferencesStore.DEFAULT_WELCOME_EN, "Alex", Locale.ENGLISH
+        )
+        assertThat(withName).startsWith("Hey Alex, this is Grok.")
+        assertThat(withName).doesNotContain("{driver}")
+
+        val noName = AssistantPreferencesStore.resolveDriverTemplate(
+            AssistantPreferencesStore.DEFAULT_WELCOME_EN, "", Locale.ENGLISH
+        )
+        assertThat(noName).startsWith("Hey, this is Grok.")
+        assertThat(noName).doesNotContain("{driver}")
+    }
+
+    @Test fun `default english system prompt has no leftover token in either case`() {
+        val withName = AssistantPreferencesStore.resolveDriverTemplate(
+            AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN, "Alex", Locale.ENGLISH
+        )
+        assertThat(withName).contains("in Alex's Tesla.")
+        assertThat(withName).doesNotContain("{driver}")
+
+        val noName = AssistantPreferencesStore.resolveDriverTemplate(
+            AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN, "", Locale.ENGLISH
+        )
+        assertThat(noName).contains("in the driver's Tesla.")
         assertThat(noName).doesNotContain("{driver}")
     }
 }

@@ -7,7 +7,7 @@ to hands-free while driving.
 > **Disclaimer:** Not affiliated with, endorsed by, or sponsored by Tesla, Inc. or xAI. "Tesla"
 > and "Grok" are trademarks of their respective owners. Use at your own risk.
 
-The app's UI is currently German.
+The app's UI is available in **English** and **German**. Pick a language under **Settings → Language** (System default / Deutsch / English); the Android per-app language picker (**Settings → Apps → TMM → Language**) works too and stays in sync.
 
 ## What it does
 

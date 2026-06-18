@@ -1,5 +1,7 @@
 package io.github.lycheeappf.tmm.ui.screen.assistant
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
@@ -18,16 +20,24 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Sichert den Apply-Pfad des zusätzlichen Sprach-Ansprech-Kontakts
  * ([AssistantViewModel.applyVoiceAlias]): aktivieren setzt Enabled+Name und erzwingt
  * DANN den Tesla-Resync; „Aus" setzt nur Enabled=false (kein Name) + Resync; leerer
  * Name bei aktiviert ist ein No-op.
+ *
+ * Robolectric: die VM löst Feedback-Texte über einen echten Context auf (localizedString).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class AssistantViewModelTest {
 
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val dispatcher = StandardTestDispatcher()
     private val prefs = mockk<AssistantPreferencesStore>(relaxed = true)
     private val apiKeyStore = mockk<ApiKeyStore>(relaxed = true)
@@ -36,7 +46,7 @@ class AssistantViewModelTest {
     private val teslaContactResync = mockk<TeslaContactResync>(relaxed = true)
 
     private fun viewModel() = AssistantViewModel(
-        prefs, apiKeyStore, coordinator, contactProvisioner, teslaContactResync, dispatcher
+        context, prefs, apiKeyStore, coordinator, contactProvisioner, teslaContactResync, dispatcher
     )
 
     @Before

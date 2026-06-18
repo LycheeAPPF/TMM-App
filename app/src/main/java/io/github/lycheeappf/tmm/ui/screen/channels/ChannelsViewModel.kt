@@ -2,6 +2,9 @@ package io.github.lycheeappf.tmm.ui.screen.channels
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.domain.channel.ChannelRegistry
 import javax.inject.Inject
@@ -16,6 +19,7 @@ data class ChannelRow(
 
 @HiltViewModel
 class ChannelsViewModel @Inject constructor(
+    @ApplicationContext private val context: android.content.Context,
     private val registry: ChannelRegistry
 ) : ViewModel() {
 
@@ -23,14 +27,18 @@ class ChannelsViewModel @Inject constructor(
         val registered = registry.isRegistered(id)
         ChannelRow(
             id = id,
-            displayName = id.label,
+            displayName = when (id) {
+                ChannelId.NOTIFICATION -> context.localizedString(R.string.channel_notification_label)
+                ChannelId.LLM -> context.localizedString(R.string.channel_llm_label)
+                ChannelId.SYSTEM -> context.localizedString(R.string.channel_system_label)
+            },
             isRegistered = registered,
             // V2: LLM-Channel ist live. V3-reserve gibt es derzeit nicht.
             isReserved = !registered,
             description = when (id) {
-                ChannelId.NOTIFICATION -> "Routet Tesla-Diktatantworten via RemoteInput an die Original-Messaging-App (WhatsApp, Telegram, Signal, …)"
-                ChannelId.LLM -> "AI-Assistent (Grok): leitet Tesla-Diktate an xAI Grok und injiziert die Antwort als fake SMS, die der Tesla TTS vorliest. Konversation startet via Home-Screen-Button."
-                ChannelId.SYSTEM -> "Interne Channel-Reserve für Pre-Flight-Tests und Diagnose-Konversationen"
+                ChannelId.NOTIFICATION -> context.localizedString(R.string.channels_desc_notification)
+                ChannelId.LLM -> context.localizedString(R.string.channels_desc_llm)
+                ChannelId.SYSTEM -> context.localizedString(R.string.channels_desc_system)
             }
         )
     }

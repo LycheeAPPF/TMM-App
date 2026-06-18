@@ -37,7 +37,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.lycheeappf.tmm.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -115,26 +118,26 @@ fun HomeScreen(
             AnimatedVisibility(visible = !allGranted, enter = mfsExpandEnter(), exit = mfsExpandExit()) {
                 Column(verticalArrangement = Arrangement.spacedBy(MfsSpacing.lg)) {
                     StatusCard(
-                        title = "Standard-SMS-App",
-                        description = "Damit dein Tesla die weitergeleiteten Nachrichten anzeigen kann.",
+                        title = stringResource(R.string.home_perm_sms_title),
+                        description = stringResource(R.string.home_perm_sms_desc),
                         isGranted = state.isDefaultSmsApp,
-                        actionLabel = "Setzen",
+                        actionLabel = stringResource(R.string.home_perm_sms_action),
                         onAction = { roleLauncher.launch(viewModel.defaultSmsIntent()) }
                     )
                     StatusCard(
-                        title = "Benachrichtigungs-Zugriff",
-                        description = "Erlaubt das Lesen von Benachrichtigungen deiner Messenger.",
+                        title = stringResource(R.string.home_perm_listener_title),
+                        description = stringResource(R.string.home_perm_listener_desc),
                         isGranted = state.hasNotificationAccess,
-                        actionLabel = "Aktivieren",
+                        actionLabel = stringResource(R.string.home_perm_listener_action),
                         onAction = {
                             listenerLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         }
                     )
                     StatusCard(
-                        title = "Hinweise dieser App",
-                        description = "Für Status- und Fehlermeldungen.",
+                        title = stringResource(R.string.home_perm_post_title),
+                        description = stringResource(R.string.home_perm_post_desc),
                         isGranted = state.hasPostNotifications,
-                        actionLabel = "Erlauben",
+                        actionLabel = stringResource(R.string.home_perm_post_action),
                         onAction = {
                             postNotifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                         }
@@ -142,16 +145,33 @@ fun HomeScreen(
                 }
             }
             AnimatedVisibility(visible = allGranted, enter = mfsExpandEnter(), exit = mfsExpandExit()) {
-                StatusPill(text = "Alle Berechtigungen erteilt", status = MfsStatus.Success)
+                StatusPill(text = stringResource(R.string.home_perm_all_granted), status = MfsStatus.Success)
             }
 
             // Live-Status
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(MfsSpacing.lg)) {
-                    SectionHeader("Status")
-                    StatusRow("Zuordnung gültig", "${state.mappingTtlHours} Stunden")
-                    StatusRow("Heute weitergeleitet", "${state.sendCountToday} / ${state.sendBudget}")
-                    StatusRow("Netz-Test", state.preflightResult ?: "noch nicht ausgeführt")
+                    SectionHeader(stringResource(R.string.home_status_title))
+                    StatusRow(
+                        stringResource(R.string.home_status_mapping_label),
+                        pluralStringResource(
+                            R.plurals.home_status_mapping_hours,
+                            state.mappingTtlHours,
+                            state.mappingTtlHours
+                        )
+                    )
+                    StatusRow(
+                        stringResource(R.string.home_status_forwarded_label),
+                        stringResource(
+                            R.string.home_status_forwarded_value,
+                            state.sendCountToday,
+                            state.sendBudget
+                        )
+                    )
+                    StatusRow(
+                        stringResource(R.string.home_status_preflight_label),
+                        state.preflightResult ?: stringResource(R.string.home_status_preflight_pending)
+                    )
                 }
             }
 
@@ -165,8 +185,8 @@ fun HomeScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 MfsListItem(
-                    title = "Freigegebene Apps",
-                    subtitle = "Welche Apps an dein Tesla weitergeleitet werden",
+                    title = stringResource(R.string.home_whitelist_title),
+                    subtitle = stringResource(R.string.home_whitelist_subtitle),
                     trailing = { Icon(Icons.Outlined.ChevronRight, contentDescription = null) },
                     onClick = onOpenWhitelist
                 )
@@ -206,14 +226,15 @@ private fun HeroStatus(isReady: Boolean) {
             }
             Column(verticalArrangement = Arrangement.spacedBy(MfsSpacing.xs)) {
                 Text(
-                    if (isReady) "Bereit" else "Einrichtung nötig",
+                    if (isReady) stringResource(R.string.home_hero_ready_title)
+                    else stringResource(R.string.home_hero_setup_title),
                     style = MaterialTheme.typography.titleLarge
                 )
                 Text(
                     if (isReady)
-                        "Nachrichten werden an dein Tesla weitergeleitet."
+                        stringResource(R.string.home_hero_ready_body)
                     else
-                        "Erteile die folgenden Berechtigungen, um zu starten.",
+                        stringResource(R.string.home_hero_setup_body),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -246,23 +267,23 @@ private fun AssistantTriggerCard(
                 horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
             ) {
                 Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
-                Text("Grok-Assistent", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.home_assistant_title), style = MaterialTheme.typography.titleMedium)
             }
             Text(
                 if (apiKeyIsSet)
-                    "Starte das Gespräch im Tesla: diktiere wie gewohnt, Grok antwortet und dein Tesla liest die Antwort vor."
+                    stringResource(R.string.home_assistant_body_ready)
                 else
-                    "Hinterlege zuerst einen xAI-API-Key in den Assistent-Einstellungen.",
+                    stringResource(R.string.home_assistant_body_no_key),
                 style = MaterialTheme.typography.bodyMedium
             )
             Row(horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
                 PrimaryActionButton(
-                    text = "Chat starten",
+                    text = stringResource(R.string.home_assistant_action_start),
                     onClick = onStart,
                     enabled = canTrigger,
                     loading = triggerInFlight
                 )
-                TextButton(onClick = onConfigure) { Text("Einstellungen") }
+                TextButton(onClick = onConfigure) { Text(stringResource(R.string.home_assistant_action_settings)) }
             }
         }
     }
@@ -275,18 +296,11 @@ private fun AssistantConsentDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { Button(onClick = onConfirm) { Text("Verstanden, starten") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
-        title = { Text("Diktate werden an Grok übertragen") },
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.home_consent_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.home_consent_dismiss)) } },
+        title = { Text(stringResource(R.string.home_consent_title)) },
         text = {
-            Text(
-                "Wenn du diese Konversation startest, sendet die App jedes Tesla-Diktat " +
-                    "an die xAI Grok API. xAI bekommt damit den Inhalt deiner Diktate.\n\n" +
-                    "Wir setzen \"store: false\" — xAI speichert die Konversation nicht " +
-                    "langfristig — kurzfristige Logging-Praktiken können wir aber nicht " +
-                    "kontrollieren.\n\nDer Gesprächsverlauf lebt nur im Speicher dieser App " +
-                    "und wird nach kurzer Inaktivität verworfen."
-            )
+            Text(stringResource(R.string.home_consent_body))
         }
     )
 }

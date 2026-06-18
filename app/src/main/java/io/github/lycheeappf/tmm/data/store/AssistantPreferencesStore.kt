@@ -10,9 +10,11 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.core.locale.LocaleProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,9 +28,26 @@ import javax.inject.Singleton
  */
 @Singleton
 class AssistantPreferencesStore @Inject constructor(
-    @ApplicationContext context: Context
+    @ApplicationContext context: Context,
+    private val localeProvider: LocaleProvider
 ) {
     private val store: DataStore<Preferences> = context.assistantDataStore
+
+    /** Aktive App-Locale — entscheidet, welcher Default-Prompt/-Welcome gewählt wird. */
+    private fun currentLocale(): Locale = localeProvider.current()
+
+    private fun isEnglish(): Boolean =
+        currentLocale().language == Locale.ENGLISH.language
+
+    private fun defaultSystemPrompt(): String =
+        if (isEnglish()) DEFAULT_SYSTEM_PROMPT_EN else DEFAULT_SYSTEM_PROMPT
+
+    private fun defaultWelcome(): String =
+        if (isEnglish()) DEFAULT_WELCOME_EN else DEFAULT_WELCOME
+
+    /** Gilt ein gespeicherter Wert als unveränderter Seed-Default (DE oder EN)? */
+    private fun isSeedDefault(value: String, deDefault: String, enDefault: String): Boolean =
+        value == deDefault || value == enDefault
 
     // ---- Model & Prompt -----------------------------------------------------
 
@@ -45,15 +64,20 @@ class AssistantPreferencesStore @Inject constructor(
      * damit dort das {driver}-Token sichtbar bleibt.
      */
     suspend fun systemPrompt(): String =
-        resolveDriverTemplate(systemPromptRaw(), driverName())
+        resolveDriverTemplate(systemPromptRaw(), driverName(), currentLocale())
 
     /**
-     * Rohes Template inkl. {driver}-Token (für den Settings-Editor). Der Default
-     * greift NUR, wenn der Key noch nie gesetzt wurde (null) — ein bewusst geleertes
-     * Feld bleibt leer, statt im Editor auf den langen Default zurückzuspringen.
+     * Rohes Template inkl. {driver}-Token (für den Settings-Editor). Der lokalisierte
+     * Default greift, wenn der Key noch nie gesetzt wurde (null) ODER wenn ein
+     * unverändert gespeicherter Default (DE oder EN) vorliegt — so flippt ein nie
+     * angepasster Prompt beim Sprachwechsel mit. Ein bewusst geleertes oder echt
+     * angepasstes Feld bleibt unangetastet.
      */
-    suspend fun systemPromptRaw(): String =
-        store.data.first()[KEY_SYSTEM_PROMPT] ?: DEFAULT_SYSTEM_PROMPT
+    suspend fun systemPromptRaw(): String {
+        val stored = store.data.first()[KEY_SYSTEM_PROMPT]
+        return if (stored == null || isSeedDefault(stored, DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_EN))
+            defaultSystemPrompt() else stored
+    }
 
     suspend fun setSystemPrompt(value: String) {
         store.edit { it[KEY_SYSTEM_PROMPT] = value }
@@ -75,14 +99,18 @@ class AssistantPreferencesStore @Inject constructor(
 
     /** Welcome mit eingesetztem Fahrernamen (RUNTIME). Editor: [welcomeMessageRaw]. */
     suspend fun welcomeMessage(): String =
-        resolveDriverTemplate(welcomeMessageRaw(), driverName())
+        resolveDriverTemplate(welcomeMessageRaw(), driverName(), currentLocale())
 
     /**
-     * Rohes Welcome-Template inkl. {driver}-Token (für den Settings-Editor). Default
-     * nur bei nie gesetztem Key (null); ein geleertes Feld bleibt leer.
+     * Rohes Welcome-Template inkl. {driver}-Token (für den Settings-Editor). Wie
+     * [systemPromptRaw]: lokalisierter Default bei null oder unverändertem Default,
+     * sonst der gespeicherte Wert (auch leer).
      */
-    suspend fun welcomeMessageRaw(): String =
-        store.data.first()[KEY_WELCOME] ?: DEFAULT_WELCOME
+    suspend fun welcomeMessageRaw(): String {
+        val stored = store.data.first()[KEY_WELCOME]
+        return if (stored == null || isSeedDefault(stored, DEFAULT_WELCOME, DEFAULT_WELCOME_EN))
+            defaultWelcome() else stored
+    }
 
     suspend fun setWelcomeMessage(value: String) {
         store.edit { it[KEY_WELCOME] = value }
@@ -176,6 +204,8 @@ class AssistantPreferencesStore @Inject constructor(
         const val DEFAULT_DRIVER_NAME = ""
         const val DEFAULT_WELCOME =
             "Hey {driver}, hier ist Grok. Stell mir einfach deine Frage, ich antworte kurz und freihändig."
+        const val DEFAULT_WELCOME_EN =
+            "Hey {driver}, this is Grok. Just ask your question — I'll answer briefly and hands-free."
         const val DEFAULT_MAX_TOKENS = 512
         const val DEFAULT_TEMPERATURE = 0.7f
         const val DEFAULT_CONTEXT_TTL_SECONDS = 120
@@ -216,15 +246,54 @@ class AssistantPreferencesStore @Inject constructor(
                 "auf Kosten von Klarheit oder Tempo. Wenn du etwas nicht sicher weißt, sag " +
                 "das knapp, statt zu raten."
 
+        const val DEFAULT_SYSTEM_PROMPT_EN =
+            "You are Grok, the voice assistant in {driver}'s Tesla. You are used hands-free " +
+                "while driving: {driver} dictates a question by voice through the car's reply " +
+                "function, and your answer is read aloud by the car. There is no screen and no " +
+                "free hand for your reply — everything you write is heard only as spoken audio " +
+                "while {driver} watches the road.\n\n" +
+                "Safety comes first. Keep the cognitive load low and be brief so attention stays " +
+                "on the road: usually two or three short sentences, at most around 800 characters. " +
+                "Never tell anyone to look at the screen or tap something.\n\n" +
+                "So write plain, natural-sounding prose meant to be read aloud. Never use Markdown, " +
+                "asterisks, code, bullet points, numbered lists, headings, tables, emojis or links " +
+                "and web addresses — read aloud, that kind of thing sounds like gibberish, and you " +
+                "can't tap anything while driving anyway. Phrase numbers, units, times and " +
+                "abbreviations so a reading voice speaks them cleanly, for example \"about 20 " +
+                "degrees\" and \"3:30 pm\", and spell out abbreviations like \"for example\" when " +
+                "they would otherwise sound odd.\n\n" +
+                "Speak English and only switch languages if {driver} actively speaks another. Each " +
+                "question stands on its own, because your memory only reaches back over the last " +
+                "few seconds of the conversation — answer in a self-contained way and don't rely " +
+                "on context from further back.\n\n" +
+                "In this version you don't control anything in the car and have no live tools: you " +
+                "can operate neither climate, navigation, media nor apps, and can't look anything " +
+                "up in real time. If asked, say so briefly and, if it helps, name the way via the " +
+                "Tesla's controls in one sentence, without lecturing.\n\n" +
+                "Don't refuse normal questions, be honestly useful and natural. A bit of dry Grok " +
+                "wit is welcome, but keep it short and appropriate to driving, never at the cost " +
+                "of clarity or pace. If you're not sure about something, say so briefly instead " +
+                "of guessing."
+
         /**
          * Setzt das {driver}-Token ein. Bei leerem Namen werden grammatisch passende
-         * neutrale Formen verwendet (Genitiv "des Fahrers", sonst "der Fahrer"),
-         * damit Prompt und Welcome auch ohne Namen sauber klingen. Reihenfolge der
-         * Ersetzungen ist wichtig: spezifische Phrasen vor dem generischen Token.
+         * neutrale Formen je Sprache verwendet (DE: Genitiv "des Fahrers", sonst "der
+         * Fahrer"; EN: "the driver's" / "the driver"), damit Prompt und Welcome auch
+         * ohne Namen sauber klingen. Reihenfolge der Ersetzungen ist wichtig:
+         * spezifische Phrasen vor dem generischen Token.
          */
-        fun resolveDriverTemplate(template: String, driverName: String): String =
+        fun resolveDriverTemplate(
+            template: String,
+            driverName: String,
+            locale: Locale = Locale.GERMAN
+        ): String =
             if (driverName.isNotBlank()) {
                 template.replace("{driver}", driverName.trim())
+            } else if (locale.language == Locale.ENGLISH.language) {
+                template
+                    .replace("Hey {driver},", "Hey,")
+                    .replace("{driver}'s", "the driver's")
+                    .replace("{driver}", "the driver")
             } else {
                 template
                     .replace("Hey {driver},", "Hey,")

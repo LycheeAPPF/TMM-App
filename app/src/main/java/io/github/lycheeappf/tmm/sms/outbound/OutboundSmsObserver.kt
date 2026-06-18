@@ -12,8 +12,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.MfsApplication
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.InjectedMessageLedger
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.model.FakeAddress
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.repository.ReplyHistoryRecorder
@@ -284,15 +286,11 @@ class OutboundSmsObserver @Inject constructor(
         val nm = context.getSystemService<NotificationManager>() ?: return
         val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_FALLBACK)
             .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("Carrier hat Test-Nummer geroutet!")
-            .setContentText("$address wurde nicht abgewiesen — mögliche SMS-Kosten")
+            .setContentTitle(context.localizedString(R.string.carrier_warning_title))
+            .setContentText(context.localizedString(R.string.carrier_warning_text, address))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Dein Mobilfunkanbieter hat eine SMS an $address tatsächlich " +
-                        "gesendet, statt sie als ungültige Test-Nummer abzulehnen. " +
-                        "Das kann Kosten verursachen. " +
-                        "Wechsle in den App-Einstellungen das Number-Schema oder " +
-                        "deaktiviere die Tesla-Bridge bis das geklärt ist."
+                    context.localizedString(R.string.carrier_warning_big, address)
                 )
             )
             .setPriority(NotificationCompat.PRIORITY_MAX)

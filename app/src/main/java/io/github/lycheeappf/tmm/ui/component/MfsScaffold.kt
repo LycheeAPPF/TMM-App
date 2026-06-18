@@ -12,7 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import io.github.lycheeappf.tmm.R
 
 /**
  * Einheitliches App-Gerüst: TopAppBar (Titel + optionaler Zurück-Pfeil + Actions),
@@ -43,7 +45,10 @@ fun MfsScaffold(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.component_scaffold_back_desc)
+                            )
                         }
                     }
                 },

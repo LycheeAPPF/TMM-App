@@ -21,13 +21,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-enum class OnboardingStep(val title: String) {
-    DefaultSmsApp("Default SMS App"),
-    NotificationAccess("Notification Access"),
-    PostNotifications("Benachrichtigungen"),
-    ContactsAccess("Tesla-Kontakte"),
-    PreFlightTest("Carrier-Test"),
-    Done("Fertig")
+// Kein Anzeige-Label hier: der Onboarding-Screen rendert seine Schritt-Titel selbst
+// aus lokalisierten String-Ressourcen. Dieses Enum dient nur der Schritt-Logik.
+enum class OnboardingStep {
+    DefaultSmsApp,
+    NotificationAccess,
+    PostNotifications,
+    ContactsAccess,
+    PreFlightTest,
+    Done
 }
 
 data class OnboardingUiState(

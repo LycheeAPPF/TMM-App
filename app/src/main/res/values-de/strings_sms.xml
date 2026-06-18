@@ -1,0 +1,36 @@
+<resources>
+    <!-- SMS conversations list -->
+    <string name="sms_list_title">SMS</string>
+    <string name="sms_compose_action">Neue SMS</string>
+    <string name="sms_list_default_app_title">Standard-SMS-App nötig</string>
+    <string name="sms_list_default_app_desc">Damit deine echten SMS angezeigt werden können, muss diese App die Standard-SMS-App sein.</string>
+    <string name="sms_list_default_app_action">Setzen</string>
+    <string name="sms_list_read_permission_title">SMS-Zugriff nötig</string>
+    <string name="sms_list_read_permission_desc">Erlaube den Lesezugriff auf SMS, um deinen Verlauf anzuzeigen.</string>
+    <string name="sms_list_read_permission_action">Erlauben</string>
+    <string name="sms_list_empty">Keine SMS.</string>
+
+    <!-- SMS thread -->
+    <string name="sms_thread_title_fallback">SMS</string>
+    <string name="sms_thread_empty">Keine Nachrichten.</string>
+    <string name="sms_thread_reply_hint">Nachricht…</string>
+    <string name="sms_thread_send_action">Senden</string>
+    <string name="sms_thread_meta_failed">fehlgeschlagen</string>
+    <string name="sms_thread_meta_sending">wird gesendet…</string>
+
+    <!-- SMS compose -->
+    <string name="sms_compose_title">Neue SMS</string>
+    <string name="sms_compose_recipient_label">Empfänger (Nummer)</string>
+    <string name="sms_compose_body_label">Nachricht</string>
+    <string name="sms_compose_send_action">Senden</string>
+
+    <!-- Send feedback (snackbar) -->
+    <string name="sms_feedback_enqueued">Wird gesendet…</string>
+    <string name="sms_feedback_not_default">App ist nicht Standard-SMS-App.</string>
+    <string name="sms_feedback_missing_permission">SMS-Sendeberechtigung fehlt.</string>
+    <string name="sms_feedback_no_telephony">Kein Mobilfunk verfügbar.</string>
+    <string name="sms_feedback_blank_recipient">Kein Empfänger.</string>
+    <string name="sms_feedback_blank_body">Nachricht ist leer.</string>
+    <string name="sms_feedback_fake_address">Diese Adresse kann nicht angeschrieben werden.</string>
+    <string name="sms_feedback_error">Senden fehlgeschlagen.</string>
+</resources>

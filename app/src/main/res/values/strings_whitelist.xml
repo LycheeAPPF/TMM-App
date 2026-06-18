@@ -1,0 +1,11 @@
+<resources>
+    <string name="whitelist_title">Allowed apps</string>
+    <string name="whitelist_intro">These apps are captured and forwarded to your Tesla.</string>
+    <string name="whitelist_search_hint">Search…</string>
+    <string name="whitelist_show_system_apps_label">Show system apps</string>
+    <plurals name="whitelist_visible_count">
+        <item quantity="one">%1$d visible</item>
+        <item quantity="other">%1$d visible</item>
+    </plurals>
+    <string name="whitelist_empty">No app found.</string>
+</resources>
