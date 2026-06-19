@@ -17,6 +17,15 @@
     <string name="assistant_apikey_show">Key anzeigen</string>
     <string name="assistant_apikey_save">Speichern</string>
     <string name="assistant_apikey_remove">Entfernen</string>
+    <string name="assistant_apikey_test">Key testen</string>
+    <string name="assistant_keytest_valid">Key gültig</string>
+    <string name="assistant_keytest_auth">Key abgelehnt (Auth-Fehler)</string>
+    <string name="assistant_keytest_no_network">Kein Netz</string>
+    <string name="assistant_keytest_timeout">Zeitüberschreitung</string>
+    <string name="assistant_keytest_ratelimit">Rate-Limit — später erneut</string>
+    <string name="assistant_keytest_server">Server-/Konfigurationsfehler</string>
+    <string name="assistant_keytest_missing_key">Kein Key gespeichert</string>
+    <string name="assistant_keytest_error">Test fehlgeschlagen</string>
 
     <string name="assistant_model_title">Modell</string>
     <string name="assistant_model_desc">Standard: grok-4.3. Nur ändern, wenn xAI ein anderes Modell empfiehlt.</string>

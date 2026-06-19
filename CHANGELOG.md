@@ -4,6 +4,18 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-06-19
+
+### Added
+- **Local xAI API-key test.** A new **“Test key”** button in the **Grok assistant**
+  settings (next to Save / Remove) checks whether the stored xAI key actually works —
+  entirely on the phone, with **no Bluetooth or Tesla connection**. It sends a single
+  minimal request to the xAI API and shows a colour-coded result: **green** = key valid;
+  **red** = key rejected (auth error), no network, or server error; **yellow** = timeout
+  or rate-limited. The ping goes against the default model (so a custom model name can’t
+  be mistaken for an invalid key) and sends no personal data — just a fixed `"ping"` — so
+  it can be used to validate the key during setup, before privacy consent is granted.
+
 ## [0.4.0] — 2026-06-18
 
 ### Added
@@ -90,6 +102,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Signal, …) to a Tesla over Bluetooth MAP and routes dictated replies back to the
   originating app.
 
+[0.5.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.5.0
 [0.4.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.4.0
 [0.3.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.3.0
 [0.2.0]: https://github.com/LycheeAPPF/TMM-App/releases/tag/v0.2.0
