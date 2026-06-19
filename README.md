@@ -54,7 +54,9 @@ allow installing from unknown sources). On first launch, complete the setup card
 
 The app never ships an API key. Create one at <https://console.x.ai> and paste it into
 **Settings → AI Assistant → xAI API key**. It is stored **encrypted in the Android Keystore**
-(AES-256-GCM) and excluded from device backups.
+(AES-256-GCM) and excluded from device backups. Tap **“Test key”** to verify it works right on
+the phone — no car or Bluetooth needed; a colour-coded result shows whether the key is valid,
+rejected, or the request hit a network/timeout issue.
 
 ## Build from source
 

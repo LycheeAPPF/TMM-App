@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.channel.llm.KeyTestOutcome
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -142,13 +143,30 @@ fun AssistantScreen(
                     PrimaryActionButton(
                         text = stringResource(R.string.assistant_apikey_save),
                         onClick = { viewModel.saveApiKey() },
-                        enabled = state.apiKeyDraft.isNotBlank(),
+                        enabled = state.apiKeyDraft.isNotBlank() && !state.keyTestRunning,
                         loading = state.saving
                     )
                     TextButton(
                         onClick = { viewModel.clearApiKey() },
-                        enabled = state.apiKeyIsSet && !state.saving
+                        enabled = state.apiKeyIsSet && !state.saving && !state.keyTestRunning
                     ) { Text(stringResource(R.string.assistant_apikey_remove)) }
+                }
+                // Lokaler Key-Test (ohne Tesla/Bluetooth): nur Key nötig, kein Consent.
+                // FlowRow, damit lange Ergebnis-Labels auf schmalen Screens umbrechen.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
+                    PrimaryActionButton(
+                        text = stringResource(R.string.assistant_apikey_test),
+                        onClick = { viewModel.testApiKey() },
+                        enabled = state.apiKeyIsSet && !state.saving,
+                        loading = state.keyTestRunning
+                    )
+                    state.keyTestResult?.let {
+                        val (label, status) = keyTestResultUi(it)
+                        StatusPill(text = label, status = status)
+                    }
                 }
             }
 
@@ -352,4 +370,21 @@ private fun SliderCard(
             valueRange = range
         )
     }
+}
+
+/**
+ * Bildet ein [KeyTestOutcome] auf (lokalisiertes Label, [MfsStatus]) ab. Die Farbe
+ * trägt die Bedeutung: grün = gültig, rot = Auth/Netz/Server/unbekannt,
+ * gelb = Timeout/Rate-Limit/kein Key.
+ */
+@Composable
+private fun keyTestResultUi(outcome: KeyTestOutcome): Pair<String, MfsStatus> = when (outcome) {
+    KeyTestOutcome.VALID -> stringResource(R.string.assistant_keytest_valid) to MfsStatus.Success
+    KeyTestOutcome.AUTH_ERROR -> stringResource(R.string.assistant_keytest_auth) to MfsStatus.Error
+    KeyTestOutcome.NO_NETWORK -> stringResource(R.string.assistant_keytest_no_network) to MfsStatus.Error
+    KeyTestOutcome.TIMEOUT -> stringResource(R.string.assistant_keytest_timeout) to MfsStatus.Warning
+    KeyTestOutcome.RATE_LIMITED -> stringResource(R.string.assistant_keytest_ratelimit) to MfsStatus.Warning
+    KeyTestOutcome.SERVER_ERROR -> stringResource(R.string.assistant_keytest_server) to MfsStatus.Error
+    KeyTestOutcome.MISSING_KEY -> stringResource(R.string.assistant_keytest_missing_key) to MfsStatus.Warning
+    KeyTestOutcome.UNKNOWN -> stringResource(R.string.assistant_keytest_error) to MfsStatus.Error
 }

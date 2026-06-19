@@ -9,6 +9,8 @@ import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
+import io.github.lycheeappf.tmm.channel.llm.GrokKeyTester
+import io.github.lycheeappf.tmm.channel.llm.KeyTestOutcome
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
@@ -45,6 +47,8 @@ data class AssistantUiState(
     val voiceAliasName: String = AssistantPreferencesStore.DEFAULT_VOICE_ALIAS_NAME,
     val voiceAliasApplying: Boolean = false,
     val triggerInFlight: Boolean = false,
+    val keyTestRunning: Boolean = false,
+    val keyTestResult: KeyTestOutcome? = null,
     val lastFeedback: String? = null
 )
 
@@ -53,6 +57,7 @@ class AssistantViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
+    private val keyTester: GrokKeyTester,
     private val coordinator: AssistantTriggerCoordinator,
     private val contactProvisioner: AssistantContactProvisioner,
     private val teslaContactResync: TeslaContactResync,
@@ -144,6 +149,8 @@ class AssistantViewModel @Inject constructor(
                     saving = false,
                     apiKeyDraft = "",
                     apiKeyIsSet = it.apiKeyIsSet || apiKeyIsSet,
+                    // Key geändert → altes Test-Ergebnis ist stale.
+                    keyTestResult = null,
                     lastFeedback = feedback
                 )
             }
@@ -159,9 +166,27 @@ class AssistantViewModel @Inject constructor(
                 it.copy(
                     apiKeyIsSet = false,
                     apiKeyDraft = "",
+                    keyTestResult = null,
                     lastFeedback = context.localizedString(R.string.assistant_feedback_key_removed)
                 )
             }
+        }
+    }
+
+    /**
+     * Prüft den gespeicherten xAI-Key rein lokal (kein Tesla/Bluetooth) via
+     * [GrokKeyTester]: minimaler „ping" gegen die xAI-API, Ergebnis als
+     * [KeyTestOutcome] in den State. `coRunCatching` re-throwt `CancellationException`;
+     * jeder andere unerwartete Fehler wird zu [KeyTestOutcome.UNKNOWN]. Save/Remove
+     * sind in der UI gesperrt, solange dieser Test läuft (Race-Guard) — der Key kann
+     * sich also während eines laufenden Tests nicht ändern.
+     */
+    fun testApiKey() {
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update { it.copy(keyTestRunning = true, keyTestResult = null) }
+            val outcome = coRunCatching { keyTester.run() }
+                .getOrDefault(KeyTestOutcome.UNKNOWN)
+            _uiState.update { it.copy(keyTestRunning = false, keyTestResult = outcome) }
         }
     }
 

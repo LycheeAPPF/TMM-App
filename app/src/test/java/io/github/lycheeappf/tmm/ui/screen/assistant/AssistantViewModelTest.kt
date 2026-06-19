@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
+import io.github.lycheeappf.tmm.channel.llm.GrokKeyTester
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
@@ -41,12 +42,13 @@ class AssistantViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val prefs = mockk<AssistantPreferencesStore>(relaxed = true)
     private val apiKeyStore = mockk<ApiKeyStore>(relaxed = true)
+    private val keyTester = mockk<GrokKeyTester>(relaxed = true)
     private val coordinator = mockk<AssistantTriggerCoordinator>(relaxed = true)
     private val contactProvisioner = mockk<AssistantContactProvisioner>(relaxed = true)
     private val teslaContactResync = mockk<TeslaContactResync>(relaxed = true)
 
     private fun viewModel() = AssistantViewModel(
-        context, prefs, apiKeyStore, coordinator, contactProvisioner, teslaContactResync, dispatcher
+        context, prefs, apiKeyStore, keyTester, coordinator, contactProvisioner, teslaContactResync, dispatcher
     )
 
     @Before
