@@ -44,7 +44,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.BuildConfig
 import io.github.lycheeappf.tmm.R
-import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
 import io.github.lycheeappf.tmm.ui.component.MfsCardVariant
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -53,6 +52,8 @@ import io.github.lycheeappf.tmm.ui.component.PrimaryActionButton
 import io.github.lycheeappf.tmm.ui.component.SectionHeader
 import io.github.lycheeappf.tmm.ui.component.SettingCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
+import io.github.lycheeappf.tmm.ui.component.TeslaConnectionCard
+import io.github.lycheeappf.tmm.ui.component.TeslaDevicePickerDialog
 import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
 import io.github.lycheeappf.tmm.ui.component.mfsExpandExit
 import io.github.lycheeappf.tmm.ui.component.preflightStatusUi
@@ -66,6 +67,7 @@ fun SettingsScreen(
     onOpenWhitelist: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenChannels: () -> Unit,
+    onRestartSetup: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -252,7 +254,8 @@ fun SettingsScreen(
                         state = state,
                         viewModel = viewModel,
                         onOpenDiagnostics = onOpenDiagnostics,
-                        onOpenChannels = onOpenChannels
+                        onOpenChannels = onOpenChannels,
+                        onRestartSetup = onRestartSetup
                     )
                 }
             }
@@ -329,112 +332,13 @@ private fun BudgetDisableDialog(
     )
 }
 
-/**
- * Karte „Tesla-Verbindung": zeigt das gewählte Gerät und steuert die Auswahl.
- * Ohne BLUETOOTH_CONNECT-Permission gibt es nur den Erteilen-Button.
- */
-@Composable
-private fun TeslaConnectionCard(
-    deviceName: String?,
-    hasPermission: Boolean,
-    onGrantPermission: () -> Unit,
-    onSelectDevice: () -> Unit,
-    onClearDevice: () -> Unit
-) {
-    SettingCard(
-        title = stringResource(R.string.settings_tesla_conn_title),
-        description = stringResource(R.string.settings_tesla_conn_desc)
-    ) {
-        Text(
-            if (deviceName != null) stringResource(R.string.settings_tesla_conn_selected, deviceName)
-            else stringResource(R.string.settings_tesla_conn_none),
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (deviceName != null) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (!hasPermission) {
-            Text(
-                stringResource(R.string.settings_tesla_conn_perm_missing),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-            PrimaryActionButton(
-                text = stringResource(R.string.settings_tesla_conn_grant),
-                onClick = onGrantPermission
-            )
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onSelectDevice) {
-                    Text(
-                        if (deviceName != null) stringResource(R.string.settings_tesla_conn_change)
-                        else stringResource(R.string.settings_tesla_conn_select)
-                    )
-                }
-                if (deviceName != null) {
-                    TextButton(onClick = onClearDevice) {
-                        Text(stringResource(R.string.settings_tesla_conn_clear))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Auswahl-Dialog der gekoppelten Geräte; Tippen auf ein Gerät bestätigt sofort. */
-@Composable
-private fun TeslaDevicePickerDialog(
-    devices: List<PairedBtDevice>,
-    selectedAddress: String?,
-    onSelect: (PairedBtDevice) -> Unit,
-    onCancel: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(stringResource(R.string.settings_tesla_conn_dialog_title)) },
-        text = {
-            if (devices.isEmpty()) {
-                Text(stringResource(R.string.settings_tesla_conn_dialog_empty))
-            } else {
-                Column(modifier = Modifier.selectableGroup()) {
-                    devices.forEach { device ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = device.address == selectedAddress,
-                                    role = Role.RadioButton,
-                                    onClick = { onSelect(device) }
-                                )
-                                .padding(vertical = MfsSpacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
-                        ) {
-                            RadioButton(selected = device.address == selectedAddress, onClick = null)
-                            Text(device.name, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.settings_tesla_conn_dialog_cancel))
-            }
-        }
-    )
-}
-
 @Composable
 private fun DeveloperSettings(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     onOpenDiagnostics: () -> Unit,
-    onOpenChannels: () -> Unit
+    onOpenChannels: () -> Unit,
+    onRestartSetup: () -> Unit
 ) {
     SectionHeader(stringResource(R.string.settings_section_developer))
 
@@ -512,6 +416,15 @@ private fun DeveloperSettings(
             trailing = { androidx.compose.material3.Icon(Icons.Outlined.ChevronRight, null) },
             onClick = onOpenChannels
         )
+    }
+
+    SettingCard(
+        title = stringResource(R.string.settings_restart_setup_title),
+        description = stringResource(R.string.settings_restart_setup_desc)
+    ) {
+        TextButton(onClick = onRestartSetup) {
+            Text(stringResource(R.string.settings_restart_setup_button))
+        }
     }
 
     SettingCard(

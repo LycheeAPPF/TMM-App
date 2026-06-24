@@ -84,6 +84,10 @@
     <string name="settings_channels_item_title">Channels</string>
     <string name="settings_channels_item_subtitle">Notification (V1) + Grok-LLM (V2)</string>
 
+    <string name="settings_restart_setup_title">Setup erneut starten</string>
+    <string name="settings_restart_setup_desc">Öffnet die Einrichtung erneut, um die Schritte anzusehen. Deine bestehende Einrichtung bleibt erhalten — nichts wird zurückgesetzt.</string>
+    <string name="settings_restart_setup_button">Setup öffnen</string>
+
     <string name="settings_devmode_title">Entwicklermodus</string>
     <string name="settings_devmode_desc">Blendet Diagnose, Channels und die Experten-Einstellungen ein. Ausschalten versteckt sie wieder; das Versions-Label unten bleibt der Wieder-Einstieg.</string>
     <string name="settings_devmode_active">Entwicklermodus aktiv</string>

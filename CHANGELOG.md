@@ -15,7 +15,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   check runs before the daily-limit reserve, so a disconnected phone never burns budget.
   Requires the **BLUETOOTH_CONNECT** permission (requested from the same card). Until a
   device is selected — or if the permission isn't granted — forwarding behaves as before
-  (24/7), so nothing silently stops working before you've set it up.
+  (24/7), so nothing silently stops working before you've set it up. The same picker also
+  appears as an optional step in the **setup guide**.
+- **Developer settings → "Restart setup".** A button in the developer section reopens the
+  setup guide so you can review the steps after first-run; your existing setup is kept
+  (the onboarding flag is not reset).
 - **Daily limit can be switched off.** The **Settings → Forwarding → "Daily limit"** card
   now has an on/off switch (**on by default**). Turning it off shows a warning explaining
   the risks — without a cap, a misbehaving messenger could write unlimited fake SMS into

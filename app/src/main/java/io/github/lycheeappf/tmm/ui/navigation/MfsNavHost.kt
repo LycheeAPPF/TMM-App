@@ -56,7 +56,11 @@ fun MfsNavHost(
                 bottomBar = bottomBar,
                 onOpenWhitelist = { navController.navigate(MfsDestination.Whitelist.route) },
                 onOpenDiagnostics = { navController.navigate(MfsDestination.Diagnostics.route) },
-                onOpenChannels = { navController.navigate(MfsDestination.Channels.route) }
+                onOpenChannels = { navController.navigate(MfsDestination.Channels.route) },
+                // Setup erneut ansehen (Dev): Onboarding-Screen öffnen. Setzt das
+                // Onboarded-Flag NICHT zurück — die Schritte zeigen ihren Ist-Zustand;
+                // „Fertig" landet wieder auf Home.
+                onRestartSetup = { navController.navigate(MfsDestination.Onboarding.route) }
             )
         }
         composable(MfsDestination.Assistant.route) {
