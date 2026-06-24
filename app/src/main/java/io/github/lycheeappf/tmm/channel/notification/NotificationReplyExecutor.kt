@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.reply.ReplyResult
 import javax.inject.Inject
@@ -26,7 +27,8 @@ class NotificationReplyExecutor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val actionCache: ActionCache,
     private val rebuilder: PendingIntentRebuilder,
-    private val fallbackNotifier: FallbackNotifier
+    private val fallbackNotifier: FallbackNotifier,
+    private val logBuffer: LogBuffer
 ) {
 
     suspend fun reply(
@@ -34,15 +36,19 @@ class NotificationReplyExecutor @Inject constructor(
         mappingId: Long,
         text: String
     ): ReplyResult {
-        val resolved = actionCache.get(payload.notificationKey)
+        val cached = actionCache.get(payload.notificationKey)
+        val resolved = cached
             ?: rebuilder.rebuild(payload)
             ?: run {
                 Log.w(TAG, "No action available for ${payload.notificationKey}")
+                logBuffer.warn(TAG, "reply NO_ACTION notif=${payload.notificationKey} (cache-miss + rebuild-miss)")
                 fallbackNotifier.post(payload, text)
                 return ReplyResult.NoActionAvailable
             }
+        val via = if (cached != null) "cache" else "rebuild"
 
         if (resolved.remoteInputs.isEmpty()) {
+            logBuffer.warn(TAG, "reply NO_REMOTE_INPUT notif=${payload.notificationKey}")
             fallbackNotifier.post(payload, text)
             return ReplyResult.NoRemoteInput
         }
@@ -51,6 +57,7 @@ class NotificationReplyExecutor @Inject constructor(
         // PendingIntent. Bei IMMUTABLE würde Android den Text silent dropen.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && resolved.actionIntent.isImmutable) {
             Log.w(TAG, "PendingIntent is IMMUTABLE — RemoteInput would silently drop. Fallback.")
+            logBuffer.warn(TAG, "reply PI_CANCELED notif=${payload.notificationKey} reason=immutable")
             actionCache.remove(payload.notificationKey)
             fallbackNotifier.post(payload, text)
             return ReplyResult.PendingIntentCanceled
@@ -66,9 +73,11 @@ class NotificationReplyExecutor @Inject constructor(
         return try {
             resolved.actionIntent.send(context, 0, intent)
             Log.i(TAG, "Reply sent via RemoteInput (notif=${payload.notificationKey}, mapping=$mappingId)")
+            logBuffer.info(TAG, "reply SUCCESS notif=${payload.notificationKey} mapping=$mappingId via $via")
             ReplyResult.Success
         } catch (e: PendingIntent.CanceledException) {
             Log.w(TAG, "PendingIntent canceled for ${payload.notificationKey}", e)
+            logBuffer.warn(TAG, "reply PI_CANCELED notif=${payload.notificationKey} reason=canceled-on-send")
             // Canceled = PI ist tot. Cache aufräumen damit folgende Replies
             // nicht in derselben Sackgasse landen.
             actionCache.remove(payload.notificationKey)
@@ -76,6 +85,7 @@ class NotificationReplyExecutor @Inject constructor(
             ReplyResult.PendingIntentCanceled
         } catch (e: Exception) {
             Log.e(TAG, "Reply trigger failed", e)
+            logBuffer.error(TAG, "reply PROVIDER_ERROR notif=${payload.notificationKey} msg=${e.message}")
             fallbackNotifier.post(payload, text)
             ReplyResult.ProviderError(e.message ?: "Unknown")
         }

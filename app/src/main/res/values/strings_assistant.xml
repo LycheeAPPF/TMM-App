@@ -27,6 +27,16 @@
     <string name="assistant_keytest_missing_key">No key configured</string>
     <string name="assistant_keytest_error">Test failed</string>
 
+    <string name="assistant_websearch_title">Allow internet access (web search)</string>
+    <string name="assistant_websearch_desc">Lets Grok look things up live on the web via xAI for current questions (weather, news, prices). Your dictated question then goes to xAI\'s search subsystem — the same xAI trust boundary as a normal reply. Costs can add up: xAI bills tokens plus each successful search, and one question can trigger several searches. Off by default.</string>
+    <string name="assistant_websearch_on">Web search on.</string>
+    <string name="assistant_websearch_off">Web search off.</string>
+
+    <string name="assistant_xsearch_title">Allow X/Twitter search</string>
+    <string name="assistant_xsearch_desc">Lets Grok pull live posts from X/Twitter — a social-media signal, good for current discussion or sentiment. For factual answers, prefer web search. Same xAI trust boundary; billed per successful search like web search. Off by default.</string>
+    <string name="assistant_xsearch_on">X search on.</string>
+    <string name="assistant_xsearch_off">X search off.</string>
+
     <string name="assistant_model_title">Model</string>
     <string name="assistant_model_desc">Default: grok-4.3. Only change it if xAI recommends a different model.</string>
 

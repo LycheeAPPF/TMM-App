@@ -14,6 +14,7 @@ import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.core.util.DiagnosticsExporter
 import io.github.lycheeappf.tmm.core.util.LogBuffer
+import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.db.MappingDao
 import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryDao
@@ -23,12 +24,15 @@ import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -99,17 +103,28 @@ class DiagnosticsViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** One-Shot-Events (Share-Sheet öffnen / Fehler-Toast) an die UI-Schicht. */
+    private val shareEvents = Channel<DiagnosticsEvent>(Channel.BUFFERED)
+    val events: Flow<DiagnosticsEvent> = shareEvents.receiveAsFlow()
+
     fun selectChannel(channel: ChannelId) {
         selectedChannel.value = channel
     }
 
-    fun exportDiagnostics() {
+    /**
+     * Schreibt den redigierten Export (IO) und emittiert ein [DiagnosticsEvent],
+     * das die UI in ein Android-Share-Sheet übersetzt. Ein Tap → eine Datei.
+     */
+    fun shareDiagnostics() {
         viewModelScope.launch {
             transient.value = transient.value.copy(exporting = true)
-            val path = withContext(ioDispatcher) {
-                runCatching { exporter.exportToCache().absolutePath }.getOrNull()
+            val file = withContext(ioDispatcher) {
+                coRunCatching { exporter.exportToCache() }.getOrNull()
             }
-            transient.value = transient.value.copy(exporting = false, lastPath = path)
+            transient.value = transient.value.copy(exporting = false, lastPath = file?.absolutePath)
+            shareEvents.send(
+                if (file != null) DiagnosticsEvent.Share(file) else DiagnosticsEvent.ExportFailed
+            )
         }
     }
 

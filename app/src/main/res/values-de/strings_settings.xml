@@ -33,6 +33,12 @@
     <string name="settings_language_german">Deutsch</string>
     <string name="settings_language_english">English</string>
 
+    <string name="settings_section_support">Support</string>
+    <string name="settings_send_diagnostics_title">Problem melden</string>
+    <string name="settings_send_diagnostics_desc">Sendet eine Diagnose-Datei an den Entwickler, damit ein Problem behoben werden kann.</string>
+    <string name="settings_send_diagnostics_button">Diagnose senden</string>
+    <string name="settings_send_diagnostics_hint">Die Datei enthält keine Nachrichteninhalte.</string>
+
     <string name="settings_section_developer">Entwickler</string>
 
     <string name="settings_preflight_title">Netz-Test (Pre-Flight)</string>

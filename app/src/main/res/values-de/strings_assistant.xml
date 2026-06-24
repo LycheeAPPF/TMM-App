@@ -27,6 +27,16 @@
     <string name="assistant_keytest_missing_key">Kein Key gespeichert</string>
     <string name="assistant_keytest_error">Test fehlgeschlagen</string>
 
+    <string name="assistant_websearch_title">Internetzugriff erlauben (Web-Suche)</string>
+    <string name="assistant_websearch_desc">Lässt Grok für aktuelle Fragen (Wetter, News, Preise) live im Web nachschlagen — über xAI. Deine diktierte Frage geht dann an xAIs Such-Subsystem — gleiche xAI-Vertrauensgrenze wie eine normale Antwort. Kosten können sich summieren: xAI berechnet Tokens plus jede erfolgreiche Suche, und eine Frage kann mehrere Suchen auslösen. Standardmäßig aus.</string>
+    <string name="assistant_websearch_on">Web-Suche an.</string>
+    <string name="assistant_websearch_off">Web-Suche aus.</string>
+
+    <string name="assistant_xsearch_title">X-/Twitter-Suche erlauben</string>
+    <string name="assistant_xsearch_desc">Lässt Grok live Beiträge von X/Twitter einbeziehen — ein Social-Media-Signal, gut für aktuelle Diskussion oder Stimmung. Für Fakten besser die Web-Suche. Gleiche xAI-Vertrauensgrenze; wie die Web-Suche pro erfolgreicher Suche abgerechnet. Standardmäßig aus.</string>
+    <string name="assistant_xsearch_on">X-Suche an.</string>
+    <string name="assistant_xsearch_off">X-Suche aus.</string>
+
     <string name="assistant_model_title">Modell</string>
     <string name="assistant_model_desc">Standard: grok-4.3. Nur ändern, wenn xAI ein anderes Modell empfiehlt.</string>
 

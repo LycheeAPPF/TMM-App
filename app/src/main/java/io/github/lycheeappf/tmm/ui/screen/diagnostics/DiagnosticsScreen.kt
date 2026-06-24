@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -26,6 +26,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -63,6 +65,20 @@ fun DiagnosticsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(0) }
 
+    val context = LocalContext.current
+    val chooserTitle = stringResource(R.string.diagnostics_share_chooser_title)
+    val exportFailed = stringResource(R.string.diagnostics_share_failed)
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is DiagnosticsEvent.Share ->
+                    context.startActivity(DiagnosticsShare.chooser(context, event.file, chooserTitle))
+                DiagnosticsEvent.ExportFailed ->
+                    android.widget.Toast.makeText(context, exportFailed, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     io.github.lycheeappf.tmm.ui.component.MfsScaffold(
         title = stringResource(R.string.diagnostics_title),
         onBack = onBack,
@@ -71,10 +87,10 @@ fun DiagnosticsScreen(
                 CircularProgressIndicator(modifier = Modifier.size(18.dp))
             }
             IconButton(
-                onClick = { viewModel.exportDiagnostics() },
+                onClick = { viewModel.shareDiagnostics() },
                 enabled = !state.exportInFlight
             ) {
-                Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.diagnostics_export_action))
+                Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.diagnostics_share_action))
             }
         }
     ) { inner ->

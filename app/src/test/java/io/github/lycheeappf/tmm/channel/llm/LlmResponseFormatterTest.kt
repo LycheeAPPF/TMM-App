@@ -75,4 +75,46 @@ class LlmResponseFormatterTest {
         assertThat(formatter.format("Eins\n\nZwei\n\nDrei"))
             .isEqualTo("Eins. Zwei. Drei")
     }
+
+    @Test fun `removes inline citation markers including adjacent ones`() {
+        assertThat(formatter.format("Das Wetter ist sonnig[[1]](https://a.com)[[2]](https://b.com) heute"))
+            .isEqualTo("Das Wetter ist sonnig heute")
+    }
+
+    @Test fun `markdown links keep only the label`() {
+        assertThat(formatter.format("Siehe [die Quelle](https://example.com) dazu"))
+            .isEqualTo("Siehe die Quelle dazu")
+    }
+
+    @Test fun `bare urls are removed`() {
+        assertThat(formatter.format("Mehr unter https://example.com/foo?bar=1 hier"))
+            .isEqualTo("Mehr unter hier")
+    }
+
+    @Test fun `citations then links then bare urls combined in order`() {
+        val input = "Fakt[[1]](https://a.com), siehe [Doku](https://b.com), roh https://c.com Ende"
+        assertThat(formatter.format(input)).isEqualTo("Fakt, siehe Doku, roh Ende")
+    }
+
+    @Test fun `prose with bracket-paren shape is not corrupted`() {
+        // Keine echte Markdown-URL → bleibt unverändert (kein Wort-Verschmelzen zu "Punkt1").
+        assertThat(formatter.format("Nimm Punkt[1](wichtig) ernst"))
+            .isEqualTo("Nimm Punkt[1](wichtig) ernst")
+    }
+
+    @Test fun `bare footnote and ordinary parentheses survive`() {
+        assertThat(formatter.format("Siehe Quelle [1] dazu")).isEqualTo("Siehe Quelle [1] dazu")
+        assertThat(formatter.format("Das (zum Beispiel) ist gut"))
+            .isEqualTo("Das (zum Beispiel) ist gut")
+    }
+
+    @Test fun `removing a url keeps the sentence-ending period`() {
+        assertThat(formatter.format("Quelle https://a.com. Nächster Satz."))
+            .isEqualTo("Quelle. Nächster Satz.")
+    }
+
+    @Test fun `parenthesised url is removed without leaving an orphan paren`() {
+        assertThat(formatter.format("Siehe (https://example.com) dazu"))
+            .isEqualTo("Siehe dazu")
+    }
 }

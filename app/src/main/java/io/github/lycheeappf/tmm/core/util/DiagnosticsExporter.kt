@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.BuildConfig
 import io.github.lycheeappf.tmm.core.model.ChannelId
 import io.github.lycheeappf.tmm.data.db.MappingDao
 import io.github.lycheeappf.tmm.data.db.MappingEntity
@@ -22,16 +23,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Dumpt einen Snapshot aller wichtigen Diagnose-Daten (Mappings, Reply-History,
- * Logs, Settings, OS/Device) als JSON in den App-Cache. Nutzbar zum Anhängen
- * an Bug-Reports.
+ * Dumpt einen **redigierten, selbst-genügsamen** Snapshot aller Diagnose-Daten
+ * (Build/Device, Settings, Mappings, Reply-History, voller persistenter Log) als
+ * eine JSON-Datei in den App-Cache. Gedacht zum Teilen via Android-Share-Sheet —
+ * ein Tester schickt diese eine Datei, der Maintainer fixt daraus.
+ *
+ * Redaktion ist **immer** an (siehe [Redaction]): Kontaktnamen maskiert,
+ * conversationKey gehasht, Antworttext → Länge. Der Log-Abschnitt ist bereits
+ * per Konstruktion PII-frei (Pipeline loggt nur Metadaten), daher 1:1 übernommen.
  */
 @Singleton
 class DiagnosticsExporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val mappingDao: MappingDao,
     private val replyHistoryDao: ReplyHistoryDao,
-    private val logBuffer: LogBuffer,
+    private val logFileStore: LogFileStore,
     private val settingsStore: SettingsStore
 ) {
 
@@ -42,6 +48,12 @@ class DiagnosticsExporter @Inject constructor(
         val history = collectRecentHistory()
         val payload = DiagnosticsSnapshot(
             generatedAt = System.currentTimeMillis(),
+            build = BuildInfo(
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                applicationId = BuildConfig.APPLICATION_ID,
+                debug = BuildConfig.DEBUG
+            ),
             android = AndroidInfo(
                 sdkInt = Build.VERSION.SDK_INT,
                 manufacturer = Build.MANUFACTURER,
@@ -56,13 +68,8 @@ class DiagnosticsExporter @Inject constructor(
             ),
             mappings = mappings.map { it.toSerializable() },
             replyHistory = history.map { it.toSerializable() },
-            logs = logBuffer.snapshot().map {
-                LogSerializable(
-                    ts = it.timestamp,
-                    level = it.level.name,
-                    tag = it.tag,
-                    message = it.message
-                )
+            logs = logFileStore.readTail(MAX_LOG_LINES).map {
+                LogSerializable(ts = it.timestamp, level = it.level.name, tag = it.tag, message = it.message)
             }
         )
         val text = json.encodeToString(payload)
@@ -84,17 +91,34 @@ class DiagnosticsExporter @Inject constructor(
     private suspend fun collectRecentHistory(): List<ReplyHistoryEntity> =
         replyHistoryDao.observeRecent(limit = 500).first()
 
+    /** Mapping redigiert: conversationKey gehasht, Drittkontakt-Namen im Payload maskiert. */
     private fun MappingEntity.toSerializable() = MappingSerializable(
-        mappingId, channel, fakeAddress, conversationKey, payloadJson,
-        createdAt, expiresAt, lastUsedAt, replyCount, replyable
+        mappingId,
+        channel,
+        fakeAddress,
+        Redaction.redactConversationKey(conversationKey),
+        Redaction.redactPayloadJson(payloadJson),
+        createdAt,
+        expiresAt,
+        lastUsedAt,
+        replyCount,
+        replyable
     )
 
+    /** Reply-History redigiert: Inhalt raus, Länge bleibt; Ergebnis/Fehler behalten. */
     private fun ReplyHistoryEntity.toSerializable() = ReplyHistorySerializable(
-        id, mappingId, channel, text, attemptedAt, result, errorDetail
+        id,
+        mappingId,
+        channel,
+        "<len=${text.length}>",
+        attemptedAt,
+        result,
+        errorDetail
     )
 
     companion object {
         private const val TAG = "DiagnosticsExporter"
+        private const val MAX_LOG_LINES = 5000
         private val exportFileName =
             SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.GERMANY)
     }
@@ -103,11 +127,20 @@ class DiagnosticsExporter @Inject constructor(
 @Serializable
 private data class DiagnosticsSnapshot(
     val generatedAt: Long,
+    val build: BuildInfo,
     val android: AndroidInfo,
     val settings: SettingsSnapshot,
     val mappings: List<MappingSerializable>,
     val replyHistory: List<ReplyHistorySerializable>,
     val logs: List<LogSerializable>
+)
+
+@Serializable
+private data class BuildInfo(
+    val versionName: String,
+    val versionCode: Int,
+    val applicationId: String,
+    val debug: Boolean
 )
 
 @Serializable

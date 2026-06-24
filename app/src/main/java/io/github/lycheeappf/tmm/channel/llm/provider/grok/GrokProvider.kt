@@ -66,13 +66,23 @@ class GrokProvider @Inject constructor(
             }
             add(ResponsesInputItem(role = "user", content = req.userMessage))
         }
+        // Client-Function-Tools (V2 leer) + server-seitige Agent-Tools (web/x search).
+        val tools = buildList {
+            req.tools.forEach { add(it.toDto()) }
+            if (req.webSearch) add(ResponsesTool(type = "web_search"))
+            if (req.xSearch) add(ResponsesTool(type = "x_search"))
+        }.takeIf { it.isNotEmpty() }
+        // Bei aktiver Suche Inline-Zitate serverseitig abschalten — sonst landen
+        // `[[1]](url)`-Marker im vorgelesenen Text. Der Formatter strippt zusätzlich (Fallback).
+        val include = if (req.webSearch || req.xSearch) listOf("no_inline_citations") else null
         return ResponsesRequest(
             model = req.model,
             input = items,
             maxOutputTokens = req.maxTokens.takeIf { it > 0 },
             temperature = req.temperature.toDouble().takeIf { it >= 0.0 },
             store = false,
-            tools = req.tools.takeIf { it.isNotEmpty() }?.map { it.toDto() }
+            tools = tools,
+            include = include
         )
     }
 

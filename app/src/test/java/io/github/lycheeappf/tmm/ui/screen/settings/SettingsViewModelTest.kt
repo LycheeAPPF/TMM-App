@@ -37,10 +37,11 @@ class SettingsViewModelTest {
     private val preFlightTester = mockk<PreFlightTester>(relaxed = true)
     private val appLocaleManager = mockk<AppLocaleManager>(relaxed = true)
     private val notificationChannels = mockk<AppNotificationChannels>(relaxed = true)
+    private val diagnosticsExporter = mockk<io.github.lycheeappf.tmm.core.util.DiagnosticsExporter>(relaxed = true)
 
     private fun viewModel() = SettingsViewModel(
         store, contactSyncWriter, teslaContactResync, preFlightTester,
-        appLocaleManager, notificationChannels, dispatcher
+        appLocaleManager, notificationChannels, diagnosticsExporter, dispatcher
     )
 
     @Before

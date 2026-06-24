@@ -90,4 +90,77 @@ class AssistantPreferencesStoreTest {
         locale = Locale.GERMAN
         assertThat(store.systemPromptRaw()).isEmpty()
     }
+
+    @Test
+    fun `emptied prompt stays empty at runtime even with search on`() = runTest {
+        store.setSystemPrompt("")
+        assertThat(store.systemPrompt(webSearch = true, xSearch = true)).isEmpty()
+    }
+
+    @Test
+    fun `web and x search default off and persist`() = runTest {
+        assertThat(store.webSearchEnabled()).isFalse()
+        assertThat(store.xSearchEnabled()).isFalse()
+
+        store.setWebSearchEnabled(true)
+        store.setXSearchEnabled(true)
+        assertThat(store.webSearchEnabled()).isTrue()
+        assertThat(store.xSearchEnabled()).isTrue()
+    }
+
+    // Eigener Basis-Prompt je Klausel-Test → unabhängig von der (im selben
+    // DataStore geteilten) Reihenfolge anderer Tests, die den Prompt verändern.
+    @Test
+    fun `system prompt without search keeps the no-realtime clause`() = runTest {
+        store.setSystemPrompt("Basis.")
+        val prompt = store.systemPrompt(webSearch = false, xSearch = false)
+        assertThat(prompt).contains("Echtzeit")          // DE NO_SEARCH_CLAUSE
+        assertThat(prompt).doesNotContain("live im Web")
+    }
+
+    @Test
+    fun `system prompt with web search announces live web lookup`() = runTest {
+        store.setSystemPrompt("Basis.")
+        val prompt = store.systemPrompt(webSearch = true, xSearch = false)
+        assertThat(prompt).contains("live im Web nachschlagen")
+        assertThat(prompt).doesNotContain("und auf X")
+    }
+
+    @Test
+    fun `system prompt with both searches announces web and X`() = runTest {
+        store.setSystemPrompt("Basis.")
+        val prompt = store.systemPrompt(webSearch = true, xSearch = true)
+        assertThat(prompt).contains("live im Web und auf X")
+    }
+
+    @Test
+    fun `system prompt search clause is localized to english`() = runTest {
+        store.setSystemPrompt("Basis.")
+        locale = Locale.ENGLISH
+        assertThat(store.systemPrompt(webSearch = true, xSearch = false))
+            .contains("live on the web")
+        assertThat(store.systemPrompt(webSearch = false, xSearch = false))
+            .contains("real time")
+    }
+
+    @Test
+    fun `stored legacy default system-prompt migrates to the new default`() = runTest {
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT)
+        // Wird als Seed erkannt → liefert den NEUEN (umformulierten) Default, nicht den Legacy-Text.
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.systemPromptRaw())
+            .isNotEqualTo(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT)
+    }
+
+    @Test
+    fun `stored legacy EN default system-prompt migrates to the new EN default`() = runTest {
+        // Schützt die handgepflegte 27-zeilige EN-Legacy-Konstante vor stillem Drift.
+        locale = Locale.ENGLISH
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.systemPromptRaw())
+            .isNotEqualTo(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT_EN)
+    }
 }

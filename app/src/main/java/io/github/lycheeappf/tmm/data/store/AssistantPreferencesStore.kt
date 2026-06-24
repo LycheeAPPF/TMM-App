@@ -49,6 +49,37 @@ class AssistantPreferencesStore @Inject constructor(
     private fun isSeedDefault(value: String, deDefault: String, enDefault: String): Boolean =
         value == deDefault || value == enDefault
 
+    /**
+     * Lokalisierte Live-Suche-Klausel, die [systemPrompt] an den Prompt hängt. Kein
+     * UI-String (geht an xAI), daher Konstanten in diesem File. Ohne Suche bleibt der
+     * bisherige „kann nichts in Echtzeit nachschlagen"-Hinweis; mit Suche die Erlaubnis,
+     * live nachzuschlagen — stets mit der Auflage, keine URLs/Marker/Markdown vorzulesen.
+     */
+    private fun searchCapabilityClause(webSearch: Boolean, xSearch: Boolean): String {
+        if (!webSearch && !xSearch) {
+            return if (isEnglish()) NO_SEARCH_CLAUSE_EN else NO_SEARCH_CLAUSE
+        }
+        return if (isEnglish()) {
+            val source = when {
+                webSearch && xSearch -> "the web and on X"
+                webSearch -> "the web"
+                else -> "X"
+            }
+            "You can look up current information live on $source — use it when fresh facts help, " +
+                "and weave the facts into plain spoken prose, without ever reading out URLs, " +
+                "source markers or markdown."
+        } else {
+            val source = when {
+                webSearch && xSearch -> "im Web und auf X"
+                webSearch -> "im Web"
+                else -> "auf X"
+            }
+            "Du kannst aktuelle Informationen live $source nachschlagen — nutze das, wenn frische " +
+                "Fakten helfen, und webe die Fakten in normalen gesprochenen Fließtext ein, ohne " +
+                "je URLs, Quellenmarker oder Markdown vorzulesen."
+        }
+    }
+
     // ---- Model & Prompt -----------------------------------------------------
 
     suspend fun model(): String =
@@ -62,9 +93,19 @@ class AssistantPreferencesStore @Inject constructor(
      * System-Prompt mit eingesetztem Fahrernamen ({driver} aufgelöst) — der
      * RUNTIME-Pfad ([LlmTurnRunner]). Der Settings-Editor nutzt [systemPromptRaw],
      * damit dort das {driver}-Token sichtbar bleibt.
+     *
+     * [webSearch]/[xSearch] entscheiden, welche Live-Suche-Klausel angehängt wird:
+     * ohne Suche der „kann nichts in Echtzeit nachschlagen"-Hinweis, mit Suche die
+     * Erlaubnis, live im Web/auf X nachzuschlagen (ohne URLs/Marker vorzulesen). Der
+     * Aufrufer liest die Flags EINMAL und reicht sie hier UND in den Request, damit
+     * Prompt und gesendete Tools nicht auseinanderlaufen.
      */
-    suspend fun systemPrompt(): String =
-        resolveDriverTemplate(systemPromptRaw(), driverName(), currentLocale())
+    suspend fun systemPrompt(webSearch: Boolean, xSearch: Boolean): String {
+        val base = resolveDriverTemplate(systemPromptRaw(), driverName(), currentLocale())
+        // Ein bewusst geleerter Prompt bleibt leer (kein „\n\n"-Vorspann, keine Klausel).
+        if (base.isBlank()) return base
+        return base + "\n\n" + searchCapabilityClause(webSearch, xSearch)
+    }
 
     /**
      * Rohes Template inkl. {driver}-Token (für den Settings-Editor). Der lokalisierte
@@ -75,8 +116,10 @@ class AssistantPreferencesStore @Inject constructor(
      */
     suspend fun systemPromptRaw(): String {
         val stored = store.data.first()[KEY_SYSTEM_PROMPT]
-        return if (stored == null || isSeedDefault(stored, DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_EN))
-            defaultSystemPrompt() else stored
+        return if (stored == null ||
+            isSeedDefault(stored, DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_EN) ||
+            isSeedDefault(stored, LEGACY_DEFAULT_SYSTEM_PROMPT, LEGACY_DEFAULT_SYSTEM_PROMPT_EN)
+        ) defaultSystemPrompt() else stored
     }
 
     suspend fun setSystemPrompt(value: String) {
@@ -175,6 +218,34 @@ class AssistantPreferencesStore @Inject constructor(
     fun privacyConsentFlow(): Flow<Boolean> =
         store.data.map { it[KEY_PRIVACY_CONSENT] ?: false }
 
+    // ---- Internetzugriff (server-seitige Suche) ----------------------------
+
+    /**
+     * Darf Grok live im Web suchen (xAIs server-seitiges `web_search`-Tool)? Opt-in,
+     * Default `false`. Eine Suche schickt die diktierte Frage an xAIs Such-Subsystem
+     * (gleiche xAI-Vertrauensgrenze wie der normale Turn) und kostet zusätzlich.
+     */
+    suspend fun webSearchEnabled(): Boolean =
+        store.data.first()[KEY_WEB_SEARCH_ENABLED] ?: false
+
+    suspend fun setWebSearchEnabled(value: Boolean) {
+        store.edit { it[KEY_WEB_SEARCH_ENABLED] = value }
+    }
+
+    fun webSearchEnabledFlow(): Flow<Boolean> =
+        store.data.map { it[KEY_WEB_SEARCH_ENABLED] ?: false }
+
+    /** Darf Grok live auf X/Twitter suchen (`x_search`-Tool)? Opt-in, Default `false`. */
+    suspend fun xSearchEnabled(): Boolean =
+        store.data.first()[KEY_X_SEARCH_ENABLED] ?: false
+
+    suspend fun setXSearchEnabled(value: Boolean) {
+        store.edit { it[KEY_X_SEARCH_ENABLED] = value }
+    }
+
+    fun xSearchEnabledFlow(): Flow<Boolean> =
+        store.data.map { it[KEY_X_SEARCH_ENABLED] ?: false }
+
     // ---- Sprach-Ansprech-Kontakt (zusätzlicher Alias) ----------------------
 
     /**
@@ -236,6 +307,83 @@ class AssistantPreferencesStore @Inject constructor(
                 "anderen spricht. Jede Frage steht für sich, denn dein Gedächtnis reicht nur " +
                 "über die letzten Sekunden des Gesprächs — antworte in sich verständlich und " +
                 "verlass dich nicht auf weiter zurückliegenden Kontext.\n\n" +
+                "In dieser Version steuerst du nichts im Auto: du kannst weder Klima, " +
+                "Navigation, Medien noch Apps bedienen. Wirst du danach gefragt, sag das kurz " +
+                "und nenne, wenn es hilft, in einem Satz den Weg über die Bedienelemente des " +
+                "Teslas, ohne zu belehren.\n\n" +
+                "Weise normale Fragen nicht ab, sei ehrlich nützlich und natürlich. Etwas " +
+                "trockener Grok-Witz ist willkommen, aber kurz und der Fahrt angemessen, nie " +
+                "auf Kosten von Klarheit oder Tempo. Wenn du etwas nicht sicher weißt, sag " +
+                "das knapp, statt zu raten."
+
+        const val DEFAULT_SYSTEM_PROMPT_EN =
+            "You are Grok, the voice assistant in {driver}'s Tesla. You are used hands-free " +
+                "while driving: {driver} dictates a question by voice through the car's reply " +
+                "function, and your answer is read aloud by the car. There is no screen and no " +
+                "free hand for your reply — everything you write is heard only as spoken audio " +
+                "while {driver} watches the road.\n\n" +
+                "Safety comes first. Keep the cognitive load low and be brief so attention stays " +
+                "on the road: usually two or three short sentences, at most around 800 characters. " +
+                "Never tell anyone to look at the screen or tap something.\n\n" +
+                "So write plain, natural-sounding prose meant to be read aloud. Never use Markdown, " +
+                "asterisks, code, bullet points, numbered lists, headings, tables, emojis or links " +
+                "and web addresses — read aloud, that kind of thing sounds like gibberish, and you " +
+                "can't tap anything while driving anyway. Phrase numbers, units, times and " +
+                "abbreviations so a reading voice speaks them cleanly, for example \"about 20 " +
+                "degrees\" and \"3:30 pm\", and spell out abbreviations like \"for example\" when " +
+                "they would otherwise sound odd.\n\n" +
+                "Speak English and only switch languages if {driver} actively speaks another. Each " +
+                "question stands on its own, because your memory only reaches back over the last " +
+                "few seconds of the conversation — answer in a self-contained way and don't rely " +
+                "on context from further back.\n\n" +
+                "In this version you don't control anything in the car: you can operate neither " +
+                "climate, navigation, media nor apps. If asked, say so briefly and, if it helps, " +
+                "name the way via the Tesla's controls in one sentence, without lecturing.\n\n" +
+                "Don't refuse normal questions, be honestly useful and natural. A bit of dry Grok " +
+                "wit is welcome, but keep it short and appropriate to driving, never at the cost " +
+                "of clarity or pace. If you're not sure about something, say so briefly instead " +
+                "of guessing."
+
+        /**
+         * Live-Suche-Klausel ohne aktive Suche — angehängt von [searchCapabilityClause].
+         * Bewahrt das bisherige Verhalten („sag knapp, dass du nichts nachschlagen kannst").
+         */
+        const val NO_SEARCH_CLAUSE =
+            "Du kannst nichts in Echtzeit nachschlagen; wirst du danach gefragt, sag das knapp."
+        const val NO_SEARCH_CLAUSE_EN =
+            "You can't look anything up in real time; if asked, say so briefly."
+
+        /**
+         * Wortgleiche VORGÄNGER-Defaults (vor dem web_search-Umbau, mit der alten
+         * „keine Live-Werkzeuge … nichts in Echtzeit nachschlagen"-Formulierung). In
+         * [systemPromptRaw] via [isSeedDefault] mitgeprüft, damit ein Nutzer, der den
+         * alten Default unverändert gespeichert hat, beim Update auf den neuen Default
+         * mitflippt, statt als „custom" einzufrieren (und so widersprüchliche Prompts
+         * mit der angehängten Such-Klausel zu erzeugen).
+         */
+        const val LEGACY_DEFAULT_SYSTEM_PROMPT =
+            "Du bist Grok, der Sprachassistent im Tesla von {driver}. Du wirst freihändig " +
+                "während der Fahrt benutzt: {driver} diktiert eine Frage per Stimme über die " +
+                "Antwort-Funktion des Autos, und deine Antwort wird vom Auto laut vorgelesen. " +
+                "Es gibt keinen Bildschirm und keine Hand für deine Antwort — alles, was du " +
+                "schreibst, wird nur als gesprochenes Audio gehört, während {driver} auf die " +
+                "Straße schaut.\n\n" +
+                "Oberste Regel ist Sicherheit. Halte die kognitive Last gering und fass dich " +
+                "kurz, damit die Aufmerksamkeit auf der Straße bleibt: in der Regel zwei bis " +
+                "drei knappe Sätze, höchstens rund 800 Zeichen. Sag nie, jemand solle auf den " +
+                "Bildschirm schauen oder etwas antippen.\n\n" +
+                "Schreib darum reinen, natürlich klingenden Fließtext zum Vorlesen. Niemals " +
+                "Markdown, Sternchen, Code, Aufzählungen, nummerierte Listen, Überschriften, " +
+                "Tabellen, Emojis oder Links und Webadressen — vorgelesen klingt so etwas wie " +
+                "Kauderwelsch, und antippen kann man im Fahren ohnehin nichts. Formuliere " +
+                "Zahlen, Einheiten, Uhrzeiten und Abkürzungen so, dass eine Vorlesestimme sie " +
+                "sauber spricht, also \"circa 20 Grad\" statt einer Tilde mit Gradzeichen und " +
+                "\"15 Uhr 30\" statt einer Doppelpunkt-Schreibweise, und löse Abkürzungen wie " +
+                "\"zum Beispiel\" auf, wenn sie sonst seltsam klingen.\n\n" +
+                "Sprich Deutsch und wechsle die Sprache nur, wenn {driver} aktiv in einer " +
+                "anderen spricht. Jede Frage steht für sich, denn dein Gedächtnis reicht nur " +
+                "über die letzten Sekunden des Gesprächs — antworte in sich verständlich und " +
+                "verlass dich nicht auf weiter zurückliegenden Kontext.\n\n" +
                 "In dieser Version steuerst du nichts im Auto und hast keine Live-Werkzeuge: " +
                 "du kannst weder Klima, Navigation, Medien noch Apps bedienen und nichts in " +
                 "Echtzeit nachschlagen. Wirst du danach gefragt, sag das kurz und nenne, wenn " +
@@ -246,7 +394,7 @@ class AssistantPreferencesStore @Inject constructor(
                 "auf Kosten von Klarheit oder Tempo. Wenn du etwas nicht sicher weißt, sag " +
                 "das knapp, statt zu raten."
 
-        const val DEFAULT_SYSTEM_PROMPT_EN =
+        const val LEGACY_DEFAULT_SYSTEM_PROMPT_EN =
             "You are Grok, the voice assistant in {driver}'s Tesla. You are used hands-free " +
                 "while driving: {driver} dictates a question by voice through the car's reply " +
                 "function, and your answer is read aloud by the car. There is no screen and no " +
@@ -315,6 +463,8 @@ class AssistantPreferencesStore @Inject constructor(
         private val KEY_PRIVACY_CONSENT = booleanPreferencesKey("privacy_consent")
         private val KEY_VOICE_ALIAS_ENABLED = booleanPreferencesKey("voice_alias_enabled")
         private val KEY_VOICE_ALIAS_NAME = stringPreferencesKey("voice_alias_name")
+        private val KEY_WEB_SEARCH_ENABLED = booleanPreferencesKey("web_search_enabled")
+        private val KEY_X_SEARCH_ENABLED = booleanPreferencesKey("x_search_enabled")
     }
 }
 

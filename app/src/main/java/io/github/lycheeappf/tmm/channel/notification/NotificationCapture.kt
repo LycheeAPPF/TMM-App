@@ -137,11 +137,11 @@ class NotificationCapture @Inject constructor(
 
             budgetCommitted = true
             Log.i(TAG, "Captured ${sbn.key} → ${mapping.fakeAddress} (replyable=$replyable)")
-            // Nur Metadaten loggen — body landet sonst über DiagnosticsExporter
-            // im exportierten Log und ist damit ein Privacy-Leak.
+            // Nur Metadaten loggen — Body UND Kontaktname landen sonst über
+            // DiagnosticsExporter im exportierten Log und wären ein Privacy-Leak.
             logBuffer.info(
                 TAG,
-                "Inject ${mapping.fakeAddress}: ${msg.senderName} (${msg.body.length} chars)"
+                "Inject ${mapping.fakeAddress} (${msg.body.length} chars, group=${msg.isGroup}, replyable=$replyable)"
             )
         } finally {
             if (!budgetCommitted) {

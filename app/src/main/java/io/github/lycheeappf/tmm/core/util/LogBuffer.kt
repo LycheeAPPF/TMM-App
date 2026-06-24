@@ -1,11 +1,16 @@
 package io.github.lycheeappf.tmm.core.util
 
+import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
 import java.util.Date
@@ -14,27 +19,40 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * In-Memory Ring-Buffer für die letzten N Log-Events. Wird vom Diagnostics-Screen
- * als Live-Log-Tail beobachtet.
+ * In-Memory Ring-Buffer (Capacity 500) für die letzten Log-Events + persistenter
+ * On-Disk-Sink ([LogFileStore]). Der Diagnostics-Screen beobachtet [events] als
+ * Live-Tail; der Export liest den vollen Verlauf aus der Datei.
  *
- * Capacity 500 — bei Overflow werden älteste Einträge verworfen.
- *
- * Hot-Path-Kosten: [log] läuft im Capture-/Inject-Pfad oft pro Notification. Statt
- * bei jedem Aufruf die komplette 500er-Liste zu kopieren, bumpen wir nur einen
- * O(1)-Versionszähler; die Liste wird ausschliesslich materialisiert, *während*
- * der Diagnose-Screen [events] sammelt (durch `conflate` ≤1 Kopie pro Frame).
+ * Hot-Path: [log] kopiert nicht pro Aufruf die 500er-Liste, sondern bumpt nur einen
+ * O(1)-Versionszähler und reicht den Eintrag non-blocking an [LogFileStore.append].
+ * Beim Start wird der persistierte Tail einmalig in den Ring geladen, damit Live-Tab
+ * und Export Historie über Neustarts hinweg zeigen.
  */
 @Singleton
-class LogBuffer @Inject constructor() {
+class LogBuffer @Inject constructor(
+    private val fileStore: LogFileStore,
+    @IoDispatcher ioDispatcher: CoroutineDispatcher
+) {
 
+    private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
     private val buffer = ArrayDeque<LogEntry>(CAPACITY)
     private val version = MutableStateFlow(0)
+
+    init {
+        // Tail ist neueste-zuerst und gehört hinter etwaige Live-Einträge (älter).
+        scope.launch {
+            val tail = fileStore.readTail(CAPACITY)
+            synchronized(buffer) {
+                tail.forEach { if (buffer.size < CAPACITY) buffer.addLast(it) }
+            }
+            version.update { it + 1 }
+        }
+    }
 
     /**
      * Live-Tail. Emittiert einen frischen Snapshot, wann immer sich der Buffer
      * ändert — aber `conflate`d, sodass ein Burst zu einer Kopie im Tempo des
-     * Collectors zusammenfällt. Typ ist [Flow] (nicht StateFlow): es gibt keinen
-     * "aktuellen Wert" ohne Kopie; Consumer nutzen `combine`/`collect`.
+     * Collectors zusammenfällt.
      */
     val events: Flow<List<LogEntry>> = version
         .map { snapshot() }
@@ -51,11 +69,13 @@ class LogBuffer @Inject constructor() {
             buffer.addFirst(entry)
             while (buffer.size > CAPACITY) buffer.removeLast()
         }
+        fileStore.append(entry)
         version.update { it + 1 }
     }
 
     fun clear() {
         synchronized(buffer) { buffer.clear() }
+        fileStore.clear()
         version.update { it + 1 }
     }
 

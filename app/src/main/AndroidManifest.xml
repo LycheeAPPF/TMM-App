@@ -131,6 +131,17 @@
             android:exported="false"
             android:grantUriPermissions="true" />
 
+        <!-- FileProvider für den Diagnose-Export (content://-Uri fürs Share-Sheet) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- ==== Notification Listener Service ==== -->
         <service
             android:name=".listener.NotificationForwardingService"

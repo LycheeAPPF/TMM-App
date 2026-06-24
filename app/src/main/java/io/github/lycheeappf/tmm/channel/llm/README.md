@@ -74,7 +74,8 @@ OutboundSmsObserver.processRow
 | Mutex | Per-Mapping in `LlmTurnRunner` — kompletter Turn (Provider-Call + History-Append) atomar |
 | Rate-Limit | 6/min, 30/h pro Mapping (`LlmRateLimiter`) |
 | API-Key | Android Keystore AES-256-GCM (`KeystoreApiKeyStore`). Backup ausgeschlossen via `data_extraction_rules.xml`. |
-| Tools | Architektur vorhanden (`AssistantTool`, `ToolRegistry`), V2 leer. V3 kann Notes/Calendar/… einklinken. |
+| Tools (server-seitig) | **Shipped:** `web_search` + `x_search` (xAI Agent-Tools) hinter zwei opt-in Toggles. Der xAI-Server fährt die Such-Schleife selbst und liefert eine fertige Antwort in **einem** Response — **kein** Tool-Execution-Loop nötig, `store=false` bleibt. Aktiviert per Flag in `LlmRequest.webSearch`/`xSearch` → `GrokProvider.buildRequest` hängt `{"type":"web_search"}`/`{"type":"x_search"}` ans `tools`-Array und setzt `include:["no_inline_citations"]`. |
+| Tools (client-seitig) | Function-Calling-Architektur vorhanden (`AssistantTool`, `ToolRegistry`), V2 leer. V3 kann Notes/Calendar/… einklinken (braucht den noch fehlenden Tool-Execution-Loop). |
 | Trigger | `AssistantTriggerCoordinator` als Single-Entry. V2: MANUAL_BUTTON. V3: BLE/QuickSettings/Intent. |
 | TTS-Safe | `LlmResponseFormatter` strippt Markdown, Code-Blöcke, Listen → flowing Text, max 800 Zeichen. |
 | Echo-Protection | `InjectedMessageLedger`: Outbox-Echos eigener Inserts (sollten praktisch nicht vorkommen) werden 10 s geblockt; Normalisierung strippt Display-Prefix vor Vergleich. |
@@ -105,7 +106,7 @@ Refactor des Channel-Codes.
   ausschließen. Der User wird via Consent-Dialog beim Erst-Trigger gewarnt.
 - **HTTPS-only** über `network_security_config.xml`. Cert-Pinning wurde
   bewusst weggelassen (Cert-Rotation würde die App brechen).
-- **Logs** redacten weder API-Key noch Body — der `RedactingAuthInterceptor`
+- **Logs** enthalten weder API-Key noch Body — der `RedactingAuthInterceptor`
   loggt nur HTTP-Methode + Path + Status.
 
 ## V3 Roadmap

@@ -4,6 +4,45 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-24
+
+### Added
+- **Internet access for Grok (web search + X/Twitter search).** Two new opt-in toggles in
+  the **Grok assistant** settings let Grok look things up live while you drive — *Allow
+  internet access (web search)* and *Allow X/Twitter search*. Both are **off by default**.
+  When on, your dictated question is answered with current information (weather, news,
+  prices, live discussion) via xAI's native server-side search; the whole search runs on
+  xAI's side and comes back as one spoken reply. The dictation goes to the **same xAI** as a
+  normal reply (no second service, no second key), still with `store: false`. Note that
+  searches cost extra — xAI bills tokens **plus** each successful search, and one question
+  can trigger several — which is why it stays opt-in.
+- **One-tap diagnostics export.** A new **Settings → Support → "Send diagnostics"**
+  button (no developer mode required) writes a single redacted log file and opens the
+  Android share sheet — so a tester can send **one file** to the maintainer and nothing
+  else. The export bundles build/version info, settings, mappings, reply history and
+  the **persistent** event log in one JSON. All personal data is removed: contact names
+  are masked (`•••(len=N)`), conversation keys are hashed (schema prefix kept), and reply
+  text is reduced to its length. **The file contains no message contents.** The detailed
+  Diagnostics screen's toolbar action is now a **Share** button (was a local-only export).
+
+### Changed
+- With a search toggle on, Grok's behaviour prompt now tells it that it **can** look things
+  up live (instead of the old "no live tools" wording), while still never reading out URLs,
+  citation markers or markdown. Inline citations are disabled at the source and the spoken
+  text is additionally cleaned of any links/URLs so nothing gibberish gets read aloud.
+- **The diagnostics log is now persistent** — a rolling on-disk file (~4 MB, in
+  `filesDir`) instead of in-memory only, so the export survives app restarts and long
+  drives. The in-memory live-log tail is reloaded from disk on start.
+- **More of the reply pipeline is logged** (and exportable): `NotificationReplyExecutor`
+  now records each outcome branch (success via cache/rebuild, no action, no remote input,
+  pending-intent canceled with reason, provider error) and `PendingIntentRebuilder`
+  records the notification-listener / active-notification state. This makes "Reply not
+  delivered" cases diagnosable from the exported file alone.
+
+### Fixed
+- **Privacy:** a contact name that was previously written to the in-memory log on capture
+  is no longer logged (the log is exportable). Only metadata/lengths are logged.
+
 ## [0.5.0] — 2026-06-19
 
 ### Added

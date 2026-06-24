@@ -1,6 +1,9 @@
 <resources>
     <string name="diagnostics_title">Diagnose</string>
     <string name="diagnostics_export_action">Export</string>
+    <string name="diagnostics_share_action">Teilen</string>
+    <string name="diagnostics_share_chooser_title">Diagnose-Datei teilen</string>
+    <string name="diagnostics_share_failed">Export fehlgeschlagen</string>
     <string name="diagnostics_last_export">Letzter Export: %1$s</string>
 
     <string name="diagnostics_tab_mappings">Mappings</string>

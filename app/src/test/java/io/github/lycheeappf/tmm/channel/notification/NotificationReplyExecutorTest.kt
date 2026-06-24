@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Context
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.reply.ReplyResult
 import io.mockk.Runs
@@ -26,7 +27,8 @@ class NotificationReplyExecutorTest {
     private val cache = mockk<ActionCache>(relaxed = true)
     private val rebuilder = mockk<PendingIntentRebuilder>(relaxed = true)
     private val fallback = mockk<FallbackNotifier>(relaxed = true)
-    private val executor = NotificationReplyExecutor(context, cache, rebuilder, fallback)
+    private val logBuffer = mockk<LogBuffer>(relaxed = true)
+    private val executor = NotificationReplyExecutor(context, cache, rebuilder, fallback, logBuffer)
 
     private val payload = ChannelPayload.Notification(
         sourcePackage = "com.whatsapp",
@@ -49,6 +51,7 @@ class NotificationReplyExecutorTest {
         assertThat(result).isEqualTo(ReplyResult.Success)
         verify { pi.send(any<Context>(), any<Int>(), any()) }
         verify(exactly = 0) { fallback.post(any(), any()) }
+        verify { logBuffer.info("ReplyExecutor", "reply SUCCESS notif=${payload.notificationKey} mapping=42 via cache") }
     }
 
     @Test
@@ -65,6 +68,7 @@ class NotificationReplyExecutorTest {
         assertThat(result).isEqualTo(ReplyResult.Success)
         verify { rebuilder.rebuild(payload) }
         verify { pi.send(any<Context>(), any<Int>(), any()) }
+        verify { logBuffer.info("ReplyExecutor", "reply SUCCESS notif=${payload.notificationKey} mapping=42 via rebuild") }
     }
 
     @Test
@@ -76,6 +80,7 @@ class NotificationReplyExecutorTest {
 
         assertThat(result).isEqualTo(ReplyResult.NoActionAvailable)
         verify { fallback.post(payload, "hello") }
+        verify { logBuffer.warn("ReplyExecutor", "reply NO_ACTION notif=${payload.notificationKey} (cache-miss + rebuild-miss)") }
     }
 
     @Test
@@ -90,6 +95,7 @@ class NotificationReplyExecutorTest {
 
         assertThat(result).isEqualTo(ReplyResult.PendingIntentCanceled)
         verify { fallback.post(payload, "hello") }
+        verify { logBuffer.warn("ReplyExecutor", "reply PI_CANCELED notif=${payload.notificationKey} reason=canceled-on-send") }
     }
 
     @Test
@@ -103,5 +109,6 @@ class NotificationReplyExecutorTest {
         assertThat(result).isEqualTo(ReplyResult.NoRemoteInput)
         verify { fallback.post(payload, "hello") }
         coVerify(exactly = 0) { pi.send(any<Context>(), any<Int>(), any()) }
+        verify { logBuffer.warn("ReplyExecutor", "reply NO_REMOTE_INPUT notif=${payload.notificationKey}") }
     }
 }
