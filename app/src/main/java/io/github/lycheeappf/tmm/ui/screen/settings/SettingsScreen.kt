@@ -22,6 +22,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,8 @@ import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
 import io.github.lycheeappf.tmm.ui.component.mfsExpandExit
 import io.github.lycheeappf.tmm.ui.component.preflightStatusUi
+import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsEvent
+import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsShare
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
 @Composable
@@ -63,6 +66,20 @@ fun SettingsScreen(
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose { }
+    }
+
+    val context = LocalContext.current
+    val chooserTitle = stringResource(R.string.diagnostics_share_chooser_title)
+    val exportFailed = stringResource(R.string.diagnostics_share_failed)
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is DiagnosticsEvent.Share ->
+                    context.startActivity(DiagnosticsShare.chooser(context, event.file, chooserTitle))
+                DiagnosticsEvent.ExportFailed ->
+                    android.widget.Toast.makeText(context, exportFailed, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     MfsScaffold(title = stringResource(R.string.settings_title), bottomBar = bottomBar) { inner ->
@@ -137,6 +154,23 @@ fun SettingsScreen(
                 currentTag = state.languageTag,
                 onSelect = { viewModel.setLanguage(it) }
             )
+
+            SectionHeader(stringResource(R.string.settings_section_support))
+            SettingCard(
+                title = stringResource(R.string.settings_send_diagnostics_title),
+                description = stringResource(R.string.settings_send_diagnostics_desc)
+            ) {
+                PrimaryActionButton(
+                    text = stringResource(R.string.settings_send_diagnostics_button),
+                    onClick = { viewModel.shareDiagnostics() },
+                    loading = state.sendingDiagnostics
+                )
+                Text(
+                    stringResource(R.string.settings_send_diagnostics_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             AnimatedVisibility(
                 visible = state.developerMode,

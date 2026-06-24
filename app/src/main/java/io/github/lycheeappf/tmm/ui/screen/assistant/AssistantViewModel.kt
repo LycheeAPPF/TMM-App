@@ -42,6 +42,8 @@ data class AssistantUiState(
     val rateLimitPerMin: Int = AssistantPreferencesStore.DEFAULT_RATE_PER_MIN,
     val rateLimitPerHour: Int = AssistantPreferencesStore.DEFAULT_RATE_PER_HOUR,
     val privacyConsent: Boolean = false,
+    val webSearchEnabled: Boolean = false,
+    val xSearchEnabled: Boolean = false,
     val saving: Boolean = false,
     val voiceAliasEnabled: Boolean = true,
     val voiceAliasName: String = AssistantPreferencesStore.DEFAULT_VOICE_ALIAS_NAME,
@@ -90,6 +92,8 @@ class AssistantViewModel @Inject constructor(
                     rateLimitPerMin = prefs.maxRequestsPerMin(),
                     rateLimitPerHour = prefs.maxRequestsPerHour(),
                     privacyConsent = prefs.isPrivacyConsentGiven(),
+                    webSearchEnabled = prefs.webSearchEnabled(),
+                    xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
                     voiceAliasName = prefs.voiceAliasName()
                 )
@@ -260,6 +264,20 @@ class AssistantViewModel @Inject constructor(
             // Consent-Wechsel → Grok-Auto-Kontakt anlegen (an) bzw. entfernen (aus).
             coRunCatching { contactProvisioner.reconcile() }
             _uiState.update { it.copy(privacyConsent = granted) }
+        }
+    }
+
+    fun setWebSearchEnabled(enabled: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.setWebSearchEnabled(enabled)
+            _uiState.update { it.copy(webSearchEnabled = enabled) }
+        }
+    }
+
+    fun setXSearchEnabled(enabled: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.setXSearchEnabled(enabled)
+            _uiState.update { it.copy(xSearchEnabled = enabled) }
         }
     }
 

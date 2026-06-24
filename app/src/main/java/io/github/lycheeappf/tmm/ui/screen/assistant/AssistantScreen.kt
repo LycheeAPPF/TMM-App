@@ -170,6 +170,48 @@ fun AssistantScreen(
                 }
             }
 
+            // ---- Internetzugriff: Web-Suche ----
+            SettingCard(
+                title = stringResource(R.string.assistant_websearch_title),
+                description = stringResource(R.string.assistant_websearch_desc)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
+                ) {
+                    Switch(
+                        checked = state.webSearchEnabled,
+                        onCheckedChange = { viewModel.setWebSearchEnabled(it) }
+                    )
+                    Text(
+                        if (state.webSearchEnabled) stringResource(R.string.assistant_websearch_on)
+                        else stringResource(R.string.assistant_websearch_off),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            // ---- Internetzugriff: X-/Twitter-Suche ----
+            SettingCard(
+                title = stringResource(R.string.assistant_xsearch_title),
+                description = stringResource(R.string.assistant_xsearch_desc)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
+                ) {
+                    Switch(
+                        checked = state.xSearchEnabled,
+                        onCheckedChange = { viewModel.setXSearchEnabled(it) }
+                    )
+                    Text(
+                        if (state.xSearchEnabled) stringResource(R.string.assistant_xsearch_on)
+                        else stringResource(R.string.assistant_xsearch_off),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
             // ---- Modell + Texte ----
             SettingCard(
                 title = stringResource(R.string.assistant_model_title),

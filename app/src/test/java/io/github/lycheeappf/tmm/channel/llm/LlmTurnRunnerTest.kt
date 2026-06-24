@@ -32,9 +32,11 @@ class LlmTurnRunnerTest {
 
     @Before fun setup() {
         coEvery { prefs.model() } returns "grok-4.3"
-        coEvery { prefs.systemPrompt() } returns "Sys"
+        coEvery { prefs.systemPrompt(any(), any()) } returns "Sys"
         coEvery { prefs.maxTokens() } returns 256
         coEvery { prefs.temperature() } returns 0.7f
+        coEvery { prefs.webSearchEnabled() } returns false
+        coEvery { prefs.xSearchEnabled() } returns false
         coEvery { toolRegistry.activeSchemas() } returns emptyList()
         coEvery { limiter.checkAndAcquire(any()) } returns LlmRateLimiter.Decision.Allow
         // refund() wird bei Provider-Failure / EmptyResponse aufgerufen — mockk
@@ -58,6 +60,21 @@ class LlmTurnRunnerTest {
         assertThat(store.snapshot(store.sessionFor(7L))[1].role).isEqualTo("assistant")
         assertThat(captured.captured.userMessage).isEqualTo("Frage?")
         assertThat(captured.captured.history).isEmpty()
+    }
+
+    @Test fun `search flags snapshot propagates into the request`() = runTest {
+        coEvery { prefs.webSearchEnabled() } returns true
+        coEvery { prefs.xSearchEnabled() } returns true
+        val captured = slot<LlmRequest>()
+        coEvery { provider.complete(capture(captured)) } returns LlmResponse(
+            content = "Antwort!", toolCalls = emptyList(), finishReason = "stop",
+            usage = null, responseId = "r1"
+        )
+
+        runner.run(7L, "Frage?")
+        assertThat(captured.captured.webSearch).isTrue()
+        assertThat(captured.captured.xSearch).isTrue()
+        coVerify { prefs.systemPrompt(true, true) }
     }
 
     @Test fun `provider failure keeps history clean`() = runTest {

@@ -68,14 +68,21 @@ class LlmTurnRunner @Inject constructor(
 
             val model = prefs.model()
             val historyBefore = store.snapshot(session)
+            // Such-Flags EINMAL lesen, damit System-Prompt-Klausel und Request-Tools
+            // garantiert konsistent sind (ein Toggle-Flip zwischen zwei Reads könnte
+            // sonst "du kannst suchen" sagen, ohne die Tools mitzuschicken — oder umgekehrt).
+            val webSearch = prefs.webSearchEnabled()
+            val xSearch = prefs.xSearchEnabled()
             val req = LlmRequest(
                 model = model,
-                systemPrompt = prefs.systemPrompt(),
+                systemPrompt = prefs.systemPrompt(webSearch, xSearch),
                 history = historyBefore,
                 userMessage = userText,
                 tools = toolRegistry.activeSchemas(),
                 maxTokens = prefs.maxTokens(),
-                temperature = prefs.temperature()
+                temperature = prefs.temperature(),
+                webSearch = webSearch,
+                xSearch = xSearch
             )
             val response = try {
                 provider.complete(req)

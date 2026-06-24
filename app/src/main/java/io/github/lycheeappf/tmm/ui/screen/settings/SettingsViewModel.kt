@@ -8,12 +8,18 @@ import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.locale.AppLocaleManager
 import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
+import io.github.lycheeappf.tmm.core.util.DiagnosticsExporter
+import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsEvent
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,7 +38,9 @@ data class SettingsUiState(
     val preflightRunning: Boolean = false,
     val developerMode: Boolean = false,
     /** Aktive App-Sprache: "" = Systemsprache folgen, sonst BCP-47-Tag ("de"/"en"). */
-    val languageTag: String = ""
+    val languageTag: String = "",
+    /** Läuft, während der „Diagnose senden"-Export geschrieben wird. */
+    val sendingDiagnostics: Boolean = false
 )
 
 @HiltViewModel
@@ -43,13 +51,36 @@ class SettingsViewModel @Inject constructor(
     private val preFlightTester: PreFlightTester,
     private val appLocaleManager: AppLocaleManager,
     private val notificationChannels: AppNotificationChannels,
+    private val diagnosticsExporter: DiagnosticsExporter,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    /** One-Shot-Events (Share-Sheet öffnen / Fehler-Toast) an die UI-Schicht. */
+    private val shareEvents = Channel<DiagnosticsEvent>(Channel.BUFFERED)
+    val events: Flow<DiagnosticsEvent> = shareEvents.receiveAsFlow()
+
     init { refresh() }
+
+    /**
+     * „Diagnose senden": schreibt den redigierten Export (IO) und emittiert ein
+     * [DiagnosticsEvent], das die UI in ein Android-Share-Sheet übersetzt. Bewusst
+     * ohne Developer-Mode erreichbar — der einfachste Weg für Tester (ein Tap, eine Datei).
+     */
+    fun shareDiagnostics() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(sendingDiagnostics = true) }
+            val file = withContext(ioDispatcher) {
+                coRunCatching { diagnosticsExporter.exportToCache() }.getOrNull()
+            }
+            _uiState.update { it.copy(sendingDiagnostics = false) }
+            shareEvents.send(
+                if (file != null) DiagnosticsEvent.Share(file) else DiagnosticsEvent.ExportFailed
+            )
+        }
+    }
 
     /**
      * Voller Refresh (Settings + Contact-State). Nur für init/Resume und nach dem

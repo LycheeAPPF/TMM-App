@@ -2,6 +2,7 @@ package io.github.lycheeappf.tmm.ui.screen.assistant
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.google.common.truth.Truth.assertThat
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.GrokKeyTester
@@ -100,5 +101,29 @@ class AssistantViewModelTest {
         coVerify(exactly = 0) { prefs.setVoiceAliasEnabled(any()) }
         coVerify(exactly = 0) { prefs.setVoiceAliasName(any()) }
         coVerify(exactly = 0) { teslaContactResync.force() }
+    }
+
+    @Test
+    fun `setWebSearchEnabled persists and mirrors to ui state`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle() // init refresh() abwarten
+
+        vm.setWebSearchEnabled(true)
+        advanceUntilIdle()
+
+        coVerify { prefs.setWebSearchEnabled(true) }
+        assertThat(vm.uiState.value.webSearchEnabled).isTrue()
+    }
+
+    @Test
+    fun `setXSearchEnabled persists and mirrors to ui state`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.setXSearchEnabled(true)
+        advanceUntilIdle()
+
+        coVerify { prefs.setXSearchEnabled(true) }
+        assertThat(vm.uiState.value.xSearchEnabled).isTrue()
     }
 }

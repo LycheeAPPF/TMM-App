@@ -155,4 +155,45 @@ class GrokProviderTest {
         assertThat(body).contains("Hi")
         assertThat(body).contains("Hallo")
     }
+
+    @Test fun `web and x search add server tools and disable inline citations`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        provider.complete(sampleRequest().copy(webSearch = true, xSearch = true))
+        val body = server.takeRequest().body.readUtf8()
+        assertThat(body).contains("\"type\":\"web_search\"")
+        assertThat(body).contains("\"type\":\"x_search\"")
+        // exakte Key+Array-Form, nicht nur Substring
+        assertThat(body).contains("\"include\":[\"no_inline_citations\"]")
+        // store bleibt false, auch mit aktiver Suche
+        assertThat(body).contains("\"store\":false")
+    }
+
+    @Test fun `web search only adds web_search tool`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        provider.complete(sampleRequest().copy(webSearch = true))
+        val body = server.takeRequest().body.readUtf8()
+        assertThat(body).contains("\"type\":\"web_search\"")
+        assertThat(body).doesNotContain("x_search")
+        assertThat(body).contains("\"include\":[\"no_inline_citations\"]")
+    }
+
+    @Test fun `x search only adds x_search tool`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        provider.complete(sampleRequest().copy(xSearch = true))
+        val body = server.takeRequest().body.readUtf8()
+        assertThat(body).contains("\"type\":\"x_search\"")
+        assertThat(body).doesNotContain("web_search")
+        assertThat(body).contains("\"include\":[\"no_inline_citations\"]")
+    }
+
+    @Test fun `without search flags no tools and no include are sent`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        provider.complete(sampleRequest())
+        val body = server.takeRequest().body.readUtf8()
+        assertThat(body).doesNotContain("web_search")
+        assertThat(body).doesNotContain("x_search")
+        assertThat(body).doesNotContain("no_inline_citations")
+        assertThat(body).doesNotContain("\"tools\"")
+        assertThat(body).doesNotContain("\"include\"")
+    }
 }

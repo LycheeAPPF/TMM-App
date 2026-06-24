@@ -2,6 +2,8 @@ package io.github.lycheeappf.tmm.channel.llm.provider.grok
 
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Test
 
 class GrokDtosTest {
@@ -106,6 +108,39 @@ class GrokDtosTest {
         """.trimIndent()
         val r = json.decodeFromString(ResponsesResponse.serializer(), raw)
         assertThat(r.usage?.cachedTokens).isEqualTo(80)
+    }
+
+    @Test fun `server-side tool serializes to type only`() {
+        val text = json.encodeToString(ResponsesTool.serializer(), ResponsesTool(type = "web_search"))
+        // Kein name/description/parameters — server-seitiges Agent-Tool ist nur {type}.
+        assertThat(text).isEqualTo("""{"type":"web_search"}""")
+    }
+
+    @Test fun `function tool still serializes all four fields`() {
+        val tool = ResponsesTool(
+            type = "function",
+            name = "get_weather",
+            description = "Get weather",
+            parameters = buildJsonObject { put("type", JsonPrimitive("object")) }
+        )
+        val text = json.encodeToString(ResponsesTool.serializer(), tool)
+        assertThat(text).contains("\"type\":\"function\"")
+        assertThat(text).contains("\"name\":\"get_weather\"")
+        assertThat(text).contains("\"description\":\"Get weather\"")
+        assertThat(text).contains("\"parameters\"")
+    }
+
+    @Test fun `request with web search emits tools and include`() {
+        val req = ResponsesRequest(
+            model = "grok-4.3",
+            input = listOf(ResponsesInputItem(role = "user", content = "Hi")),
+            tools = listOf(ResponsesTool(type = "web_search")),
+            include = listOf("no_inline_citations")
+        )
+        val text = json.encodeToString(ResponsesRequest.serializer(), req)
+        assertThat(text).contains("\"type\":\"web_search\"")
+        // Key + Array-Form festnageln, nicht nur den Substring.
+        assertThat(text).contains("\"include\":[\"no_inline_citations\"]")
     }
 
     @Test fun `request without temperature has temperature stripped`() {

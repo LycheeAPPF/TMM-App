@@ -28,7 +28,11 @@ data class ResponsesRequest(
     @SerialName("previous_response_id") val previousResponseId: String? = null,
     val store: Boolean = false,
     val stream: Boolean = false,
-    val tools: List<ResponsesTool>? = null
+    val tools: List<ResponsesTool>? = null,
+    // Steuert optionale Response-Bestandteile. Bei aktivem server-seitigem
+    // web_search/x_search setzen wir `["no_inline_citations"]`, damit Grok keine
+    // `[[1]](url)`-Zitatmarker in den Text webt (die das Tesla-TTS vorlesen würde).
+    val include: List<String>? = null
 )
 
 @Serializable
@@ -40,12 +44,20 @@ data class ResponsesInputItem(
     val output: String? = null
 )
 
+/**
+ * Trägt zwei Tool-Formen:
+ *  - **client-seitige Function-Tools** (`type="function"`) — name/description/parameters
+ *    gesetzt (V3-Seam, in V2 leer).
+ *  - **server-seitige Agent-Tools** (`type="web_search"` / `"x_search"`) — nur `type`;
+ *    die übrigen Felder bleiben `null`. Dank `Json {explicitNulls = false}` serialisiert
+ *    ein `ResponsesTool(type = "web_search")` exakt zu `{"type":"web_search"}`.
+ */
 @Serializable
 data class ResponsesTool(
     val type: String = "function",
-    val name: String,
-    val description: String,
-    val parameters: JsonElement
+    val name: String? = null,
+    val description: String? = null,
+    val parameters: JsonElement? = null
 )
 
 @Serializable
