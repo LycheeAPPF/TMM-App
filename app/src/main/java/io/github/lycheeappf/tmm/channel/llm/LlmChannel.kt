@@ -14,6 +14,7 @@ import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.channel.MessagingChannel
 import io.github.lycheeappf.tmm.domain.reply.ReplyResult
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.sms.provider.SmsContentProviderWriter
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,6 +40,7 @@ class LlmChannel @Inject constructor(
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
     private val logBuffer: LogBuffer,
+    private val bluetoothConnectionChecker: BluetoothConnectionChecker,
     @ApplicationContext private val context: Context
 ) : MessagingChannel {
 
@@ -62,6 +64,15 @@ class LlmChannel @Inject constructor(
         if (!prefs.isPrivacyConsentGiven() || apiKeyStore.read().isNullOrBlank()) {
             logBuffer.warn(TAG, "Tesla-reply für LLM, aber Assistent inaktiv (Consent/Key) — Turn abgelehnt")
             return ReplyResult.ProviderError(context.localizedString(R.string.llm_inactive))
+        }
+        // Verbindungs-Gate wie im Notification-Pfad: nur antworten, während das Handy
+        // mit dem gewählten Tesla verbunden ist. VOR dem turnRunner.run, damit wir bei
+        // „nicht (mehr) im Auto" auch den xAI-Call (und dessen Kosten) sparen. Ignored
+        // → der ReplyDispatcher überspringt das Follow-up-Inject. Fail-open, solange
+        // kein Gerät gewählt ist / die Permission fehlt (siehe BluetoothConnectionChecker).
+        if (!bluetoothConnectionChecker.isTeslaConnected()) {
+            logBuffer.info(TAG, "Tesla not connected — LLM-Turn übersprungen")
+            return ReplyResult.Ignored
         }
         return when (val outcome = turnRunner.run(mapping.mappingId, replyText)) {
             is LlmTurnRunner.TurnResult.Success ->

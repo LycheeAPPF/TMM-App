@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -35,7 +36,12 @@ fun MfsNavHost(
             OnboardingScreen(
                 onFinished = {
                     navController.navigate(MfsDestination.Home.route) {
-                        popUpTo(MfsDestination.Onboarding.route) { inclusive = true }
+                        // Kompletten Back-Stack leeren — korrekt für BEIDE Einstiege:
+                        // Erststart (Start=Onboarding) und „Setup erneut" aus den Settings
+                        // (Start=Home). Danach liegt nur Home auf dem Stack, Zurück verlässt
+                        // die App (kein doppeltes Home, kein verwaister Settings-Eintrag).
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onOpenWhitelist = { navController.navigate(MfsDestination.Whitelist.route) }

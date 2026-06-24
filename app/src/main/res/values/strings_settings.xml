@@ -31,13 +31,16 @@
     <string name="settings_tesla_conn_desc">Messages are only forwarded while your Tesla is connected via Bluetooth.</string>
     <string name="settings_tesla_conn_selected">Selected: %1$s</string>
     <string name="settings_tesla_conn_none">No device selected — messages are forwarded at all times.</string>
+    <string name="settings_tesla_conn_missing">Selected device is no longer paired — re-select or remove it, otherwise nothing is forwarded.</string>
     <string name="settings_tesla_conn_select">Select device</string>
     <string name="settings_tesla_conn_change">Change device</string>
     <string name="settings_tesla_conn_clear">Remove</string>
     <string name="settings_tesla_conn_perm_missing">Bluetooth permission required to detect the connection.</string>
     <string name="settings_tesla_conn_grant">Grant Bluetooth permission</string>
+    <string name="settings_tesla_conn_open_settings">Open app settings</string>
     <string name="settings_tesla_conn_dialog_title">Select your Tesla</string>
     <string name="settings_tesla_conn_dialog_empty">No paired Bluetooth devices found. Pair your Tesla in the system Bluetooth settings first.</string>
+    <string name="settings_tesla_conn_dialog_loading">Loading paired devices…</string>
     <string name="settings_tesla_conn_dialog_cancel">Cancel</string>
 
     <string name="settings_section_apps">Apps</string>

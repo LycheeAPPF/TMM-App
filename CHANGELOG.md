@@ -4,6 +4,34 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] — 2026-06-24
+
+Robustness pass on the v0.7.0 Bluetooth/budget features, from a multi-agent review.
+
+### Added
+- **The Grok assistant now respects the Tesla-connection gate too.** A dictated question is
+  only answered while the phone is connected to your selected Tesla — the check runs *before*
+  the xAI call, so leaving the car between dictation and answer no longer spends tokens or
+  injects a stray reply. (The "start AI chat" button stays car-independent for desk testing.)
+- **Stale-device warning.** If your selected Tesla is no longer paired (unpaired, reset), the
+  Tesla-connection card now shows a warning instead of silently dropping every message.
+- **"Open app settings" fallback** when the Bluetooth permission is permanently denied, so the
+  Grant button is never a dead end (both Settings and the setup guide).
+- **First unit tests for the connection checker** (`BluetoothConnectionCheckerTest`) covering the
+  fail-open contract, plus a Grok "not connected → skip" test.
+
+### Changed
+- **More reliable connection detection.** In addition to the HFP/A2DP audio profiles, the app now
+  tracks Bluetooth ACL connect/disconnect events — so a Tesla that's connected for messages but
+  not currently the audio sink is still recognised as "connected" (fewer false drops).
+- The device picker now **pre-selects your current device** and shows a brief loading state instead
+  of flashing "no paired devices".
+- Your selected device can always be **removed**, even if the Bluetooth permission was later revoked.
+- The Home screen shows **"N (unlimited)"** for forwarded-today when the daily limit is switched off,
+  instead of a misleading "N / limit".
+- "Restart setup" now leaves a **clean back stack** (no duplicate Home, back exits properly).
+- The disconnected-drop diagnostic log is written **once per disconnect**, not per message.
+
 ## [0.7.0] — 2026-06-24
 
 ### Added

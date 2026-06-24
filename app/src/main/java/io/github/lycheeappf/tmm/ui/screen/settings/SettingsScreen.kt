@@ -77,11 +77,30 @@ fun SettingsScreen(
         onPauseOrDispose { }
     }
 
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
     var showBudgetWarn by remember { mutableStateOf(false) }
     var showDevicePicker by remember { mutableStateOf(false) }
+    var btPermanentlyDenied by remember { mutableStateOf(false) }
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { viewModel.refresh() }
+    ) { granted ->
+        // Nach einer Ablehnung: dauerhaft verweigert, wenn keine Rationale mehr
+        // gezeigt werden darf → CTA auf „App-Einstellungen öffnen" umschalten.
+        if (!granted && activity != null) {
+            btPermanentlyDenied = !androidx.core.app.ActivityCompat
+                .shouldShowRequestPermissionRationale(activity, android.Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        viewModel.refresh()
+    }
+    val openAppSettings: () -> Unit = {
+        activity?.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.fromParts("package", context.packageName, null)
+            )
+        )
+    }
 
     if (showBudgetWarn) {
         BudgetDisableDialog(
@@ -95,7 +114,8 @@ fun SettingsScreen(
     if (showDevicePicker) {
         TeslaDevicePickerDialog(
             devices = state.pairedDevices,
-            selectedAddress = null,
+            selectedAddress = state.teslaBtAddress,
+            loading = state.pairedDevicesLoading,
             onSelect = { device ->
                 showDevicePicker = false
                 viewModel.selectTeslaDevice(device.address, device.name)
@@ -104,7 +124,6 @@ fun SettingsScreen(
         )
     }
 
-    val context = LocalContext.current
     val chooserTitle = stringResource(R.string.diagnostics_share_chooser_title)
     val exportFailed = stringResource(R.string.diagnostics_share_failed)
     LaunchedEffect(Unit) {
@@ -199,8 +218,11 @@ fun SettingsScreen(
 
             TeslaConnectionCard(
                 deviceName = state.teslaBtDeviceName,
+                deviceMissing = state.teslaDeviceMissing,
                 hasPermission = state.hasBluetoothPermission,
+                permanentlyDenied = btPermanentlyDenied,
                 onGrantPermission = { btPermLauncher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
+                onOpenAppSettings = openAppSettings,
                 onSelectDevice = {
                     viewModel.loadPairedDevices()
                     showDevicePicker = true

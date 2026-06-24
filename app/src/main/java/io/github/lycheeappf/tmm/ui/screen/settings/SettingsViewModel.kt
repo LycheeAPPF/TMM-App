@@ -35,9 +35,14 @@ data class SettingsUiState(
     val sendCountToday: Int = 0,
     /** Anzeigename des gewählten Tesla-Bluetooth-Geräts; null = keins gewählt. */
     val teslaBtDeviceName: String? = null,
+    /** MAC des gewählten Geräts (zum Vorauswählen im Picker). */
+    val teslaBtAddress: String? = null,
     val hasBluetoothPermission: Boolean = false,
+    /** Gewähltes Gerät ist nicht mehr gekoppelt → Weiterleitung stillschweigend tot. */
+    val teslaDeviceMissing: Boolean = false,
     /** Gekoppelte Geräte für den Auswahl-Dialog (on-demand geladen). */
     val pairedDevices: List<PairedBtDevice> = emptyList(),
+    val pairedDevicesLoading: Boolean = false,
     val teslaContactCount: Int = 0,
     val teslaContactsHasPermission: Boolean = false,
     val teslaContactsHasRead: Boolean = false,
@@ -107,6 +112,12 @@ class SettingsViewModel @Inject constructor(
     /** Billige DataStore-Reads — wird nach jedem Setter aufgerufen. */
     private fun refreshSettings() {
         viewModelScope.launch(ioDispatcher) {
+            val btAddress = store.teslaBtAddress()
+            val hasBt = permissionGate.hasBluetoothConnect()
+            // Gespeichertes Gerät nicht mehr gekoppelt? Dann gated der Check stillschweigend
+            // alles weg — als Warnung surfacen. Nur prüfbar mit Permission.
+            val deviceMissing = btAddress != null && hasBt &&
+                bluetoothConnectionChecker.pairedDevices().none { it.address.equals(btAddress, ignoreCase = true) }
             _uiState.update {
                 it.copy(
                     ttlHours = store.mappingTtlHours(),
@@ -114,7 +125,9 @@ class SettingsViewModel @Inject constructor(
                     sendBudgetEnabled = store.isSendBudgetEnabled(),
                     sendCountToday = store.dailySendCount(),
                     teslaBtDeviceName = store.teslaBtName(),
-                    hasBluetoothPermission = permissionGate.hasBluetoothConnect(),
+                    teslaBtAddress = btAddress,
+                    hasBluetoothPermission = hasBt,
+                    teslaDeviceMissing = deviceMissing,
                     preflightStatus = store.preflightResult(),
                     developerMode = store.isDeveloperMode(),
                     languageTag = appLocaleManager.currentTag()
@@ -209,9 +222,12 @@ class SettingsViewModel @Inject constructor(
      * BLUETOOTH_CONNECT — ohne Permission bleibt die Liste leer.
      */
     fun loadPairedDevices() {
+        // Sofort (synchron, Main) auf „lädt" setzen, damit der Picker beim Öffnen nicht
+        // kurz fälschlich „keine Geräte" zeigt, bevor der IO-Load zurückkommt.
+        _uiState.update { it.copy(pairedDevicesLoading = true, pairedDevices = emptyList()) }
         viewModelScope.launch(ioDispatcher) {
             val devices = bluetoothConnectionChecker.pairedDevices()
-            _uiState.update { it.copy(pairedDevices = devices) }
+            _uiState.update { it.copy(pairedDevices = devices, pairedDevicesLoading = false) }
         }
     }
 

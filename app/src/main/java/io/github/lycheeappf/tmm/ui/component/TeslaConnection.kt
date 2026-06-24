@@ -23,14 +23,22 @@ import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
 /**
  * Karte „Tesla-Verbindung": zeigt das gewählte Gerät und steuert die Auswahl.
- * Ohne BLUETOOTH_CONNECT-Permission gibt es nur den Erteilen-Button. Geteilt
- * zwischen Einstellungen und Onboarding, damit beide Stellen synchron bleiben.
+ * Geteilt zwischen Einstellungen und Onboarding, damit beide Stellen synchron bleiben.
+ *
+ * - [deviceMissing]: das gespeicherte Gerät ist nicht mehr unter den gekoppelten
+ *   Geräten (entkoppelt) → Warnhinweis, sonst würde stillschweigend alles gedroppt.
+ * - Ohne Permission: Erteilen-Button, oder (bei dauerhaft verweigert) ein
+ *   „App-Einstellungen öffnen"-Button, statt eines toten Erteilen-Buttons.
+ * - Das gewählte Gerät bleibt IMMER entfernbar (auch ohne Permission).
  */
 @Composable
 fun TeslaConnectionCard(
     deviceName: String?,
+    deviceMissing: Boolean,
     hasPermission: Boolean,
+    permanentlyDenied: Boolean,
     onGrantPermission: () -> Unit,
+    onOpenAppSettings: () -> Unit,
     onSelectDevice: () -> Unit,
     onClearDevice: () -> Unit
 ) {
@@ -45,43 +53,59 @@ fun TeslaConnectionCard(
             color = if (deviceName != null) MaterialTheme.colorScheme.onSurface
             else MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (deviceMissing) {
+            Text(
+                stringResource(R.string.settings_tesla_conn_missing),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         if (!hasPermission) {
             Text(
                 stringResource(R.string.settings_tesla_conn_perm_missing),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
-            PrimaryActionButton(
-                text = stringResource(R.string.settings_tesla_conn_grant),
-                onClick = onGrantPermission
-            )
+            if (permanentlyDenied) {
+                PrimaryActionButton(
+                    text = stringResource(R.string.settings_tesla_conn_open_settings),
+                    onClick = onOpenAppSettings
+                )
+            } else {
+                PrimaryActionButton(
+                    text = stringResource(R.string.settings_tesla_conn_grant),
+                    onClick = onGrantPermission
+                )
+            }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onSelectDevice) {
-                    Text(
-                        if (deviceName != null) stringResource(R.string.settings_tesla_conn_change)
-                        else stringResource(R.string.settings_tesla_conn_select)
-                    )
-                }
-                if (deviceName != null) {
-                    TextButton(onClick = onClearDevice) {
-                        Text(stringResource(R.string.settings_tesla_conn_clear))
-                    }
-                }
+            TextButton(onClick = onSelectDevice) {
+                Text(
+                    if (deviceName != null) stringResource(R.string.settings_tesla_conn_change)
+                    else stringResource(R.string.settings_tesla_conn_select)
+                )
+            }
+        }
+        // Gewähltes Gerät bleibt immer entfernbar — auch wenn die Permission später
+        // entzogen wurde (sonst säße man auf einer toten Auswahl fest).
+        if (deviceName != null) {
+            TextButton(onClick = onClearDevice) {
+                Text(stringResource(R.string.settings_tesla_conn_clear))
             }
         }
     }
 }
 
-/** Auswahl-Dialog der gekoppelten Geräte; Tippen auf ein Gerät bestätigt sofort. */
+/**
+ * Auswahl-Dialog der gekoppelten Geräte; Tippen auf ein Gerät bestätigt sofort.
+ * [selectedAddress] hebt das aktuell gewählte Gerät hervor. [loading] zeigt einen
+ * Lade-Hinweis, solange die (asynchrone) Geräteliste noch nicht da ist — sonst
+ * blitzte beim Öffnen kurz fälschlich „keine Geräte" auf.
+ */
 @Composable
 fun TeslaDevicePickerDialog(
     devices: List<PairedBtDevice>,
     selectedAddress: String?,
+    loading: Boolean,
     onSelect: (PairedBtDevice) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -89,16 +113,16 @@ fun TeslaDevicePickerDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(R.string.settings_tesla_conn_dialog_title)) },
         text = {
-            if (devices.isEmpty()) {
-                Text(stringResource(R.string.settings_tesla_conn_dialog_empty))
-            } else {
-                Column(modifier = Modifier.selectableGroup()) {
+            when {
+                loading -> Text(stringResource(R.string.settings_tesla_conn_dialog_loading))
+                devices.isEmpty() -> Text(stringResource(R.string.settings_tesla_conn_dialog_empty))
+                else -> Column(modifier = Modifier.selectableGroup()) {
                     devices.forEach { device ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .selectable(
-                                    selected = device.address == selectedAddress,
+                                    selected = device.address.equals(selectedAddress, ignoreCase = true),
                                     role = Role.RadioButton,
                                     onClick = { onSelect(device) }
                                 )
@@ -106,7 +130,10 @@ fun TeslaDevicePickerDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
                         ) {
-                            RadioButton(selected = device.address == selectedAddress, onClick = null)
+                            RadioButton(
+                                selected = device.address.equals(selectedAddress, ignoreCase = true),
+                                onClick = null
+                            )
                             Text(device.name, style = MaterialTheme.typography.bodyLarge)
                         }
                     }

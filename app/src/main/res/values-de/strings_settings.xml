@@ -31,13 +31,16 @@
     <string name="settings_tesla_conn_desc">Nachrichten werden nur weitergeleitet, während dein Tesla per Bluetooth verbunden ist.</string>
     <string name="settings_tesla_conn_selected">Ausgewählt: %1$s</string>
     <string name="settings_tesla_conn_none">Kein Gerät ausgewählt — Nachrichten werden rund um die Uhr weitergeleitet.</string>
+    <string name="settings_tesla_conn_missing">Gewähltes Gerät ist nicht mehr gekoppelt — neu auswählen oder entfernen, sonst wird nichts weitergeleitet.</string>
     <string name="settings_tesla_conn_select">Gerät auswählen</string>
     <string name="settings_tesla_conn_change">Gerät ändern</string>
     <string name="settings_tesla_conn_clear">Entfernen</string>
     <string name="settings_tesla_conn_perm_missing">Bluetooth-Berechtigung nötig, um die Verbindung zu erkennen.</string>
     <string name="settings_tesla_conn_grant">Bluetooth-Berechtigung erteilen</string>
+    <string name="settings_tesla_conn_open_settings">App-Einstellungen öffnen</string>
     <string name="settings_tesla_conn_dialog_title">Wähle deinen Tesla</string>
     <string name="settings_tesla_conn_dialog_empty">Keine gekoppelten Bluetooth-Geräte gefunden. Koppele deinen Tesla zuerst in den System-Bluetooth-Einstellungen.</string>
+    <string name="settings_tesla_conn_dialog_loading">Gekoppelte Geräte werden geladen…</string>
     <string name="settings_tesla_conn_dialog_cancel">Abbrechen</string>
 
     <string name="settings_section_apps">Apps</string>

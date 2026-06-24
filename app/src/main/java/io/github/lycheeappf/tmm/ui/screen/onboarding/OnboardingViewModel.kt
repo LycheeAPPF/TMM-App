@@ -51,8 +51,11 @@ data class OnboardingUiState(
     val riskAcknowledged: Boolean = false,
     /** Optionaler Schritt: gewähltes Tesla-Bluetooth-Gerät; null = keins. */
     val teslaBtDeviceName: String? = null,
+    val teslaBtAddress: String? = null,
     val hasBluetoothPermission: Boolean = false,
-    val pairedDevices: List<PairedBtDevice> = emptyList()
+    val teslaDeviceMissing: Boolean = false,
+    val pairedDevices: List<PairedBtDevice> = emptyList(),
+    val pairedDevicesLoading: Boolean = false
 )
 
 @HiltViewModel
@@ -83,7 +86,9 @@ class OnboardingViewModel @Inject constructor(
         val preflightAddress: String,
         val riskAcked: Boolean,
         val teslaBtName: String?,
-        val hasBluetooth: Boolean
+        val teslaBtAddress: String?,
+        val hasBluetooth: Boolean,
+        val teslaDeviceMissing: Boolean
     )
 
     fun refresh() {
@@ -99,7 +104,12 @@ class OnboardingViewModel @Inject constructor(
                     preflightAddress = preFlightTester.targetAddress(),
                     riskAcked = settingsStore.isRiskAcknowledged(),
                     teslaBtName = settingsStore.teslaBtName(),
-                    hasBluetooth = permissionGate.hasBluetoothConnect()
+                    teslaBtAddress = settingsStore.teslaBtAddress(),
+                    hasBluetooth = permissionGate.hasBluetoothConnect(),
+                    teslaDeviceMissing = settingsStore.teslaBtAddress()?.let { addr ->
+                        permissionGate.hasBluetoothConnect() &&
+                            bluetoothConnectionChecker.pairedDevices().none { it.address.equals(addr, ignoreCase = true) }
+                    } ?: false
                 )
             }
             val currentStep = determineStep(
@@ -127,7 +137,9 @@ class OnboardingViewModel @Inject constructor(
                     preflightTargetAddress = snap.preflightAddress,
                     riskAcknowledged = snap.riskAcked,
                     teslaBtDeviceName = snap.teslaBtName,
-                    hasBluetoothPermission = snap.hasBluetooth
+                    teslaBtAddress = snap.teslaBtAddress,
+                    hasBluetoothPermission = snap.hasBluetooth,
+                    teslaDeviceMissing = snap.teslaDeviceMissing
                 )
             }
         }
@@ -135,9 +147,10 @@ class OnboardingViewModel @Inject constructor(
 
     /** Lädt die gekoppelten Bluetooth-Geräte für den Tesla-Auswahl-Dialog. */
     fun loadPairedDevices() {
+        _uiState.update { it.copy(pairedDevicesLoading = true, pairedDevices = emptyList()) }
         viewModelScope.launch {
             val devices = withContext(ioDispatcher) { bluetoothConnectionChecker.pairedDevices() }
-            _uiState.update { it.copy(pairedDevices = devices) }
+            _uiState.update { it.copy(pairedDevices = devices, pairedDevicesLoading = false) }
         }
     }
 
