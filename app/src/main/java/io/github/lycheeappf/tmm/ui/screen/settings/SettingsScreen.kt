@@ -1,5 +1,7 @@
 package io.github.lycheeappf.tmm.ui.screen.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +16,10 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
@@ -25,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +44,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.BuildConfig
 import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
 import io.github.lycheeappf.tmm.ui.component.MfsCardVariant
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -66,6 +73,33 @@ fun SettingsScreen(
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose { }
+    }
+
+    var showBudgetWarn by remember { mutableStateOf(false) }
+    var showDevicePicker by remember { mutableStateOf(false) }
+    val btPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { viewModel.refresh() }
+
+    if (showBudgetWarn) {
+        BudgetDisableDialog(
+            onConfirm = {
+                showBudgetWarn = false
+                viewModel.setBudgetEnabled(false)
+            },
+            onCancel = { showBudgetWarn = false }
+        )
+    }
+    if (showDevicePicker) {
+        TeslaDevicePickerDialog(
+            devices = state.pairedDevices,
+            selectedAddress = null,
+            onSelect = { device ->
+                showDevicePicker = false
+                viewModel.selectTeslaDevice(device.address, device.name)
+            },
+            onCancel = { showDevicePicker = false }
+        )
     }
 
     val context = LocalContext.current
@@ -116,25 +150,61 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_budget_title),
                 description = stringResource(R.string.settings_budget_desc)
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        pluralStringResource(R.plurals.settings_budget_messages, state.sendBudget, state.sendBudget),
+                        stringResource(R.string.settings_budget_enabled_label),
                         style = MaterialTheme.typography.bodyLarge
                     )
-                    Text(
-                        stringResource(R.string.settings_budget_today, state.sendCountToday),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (state.sendCountToday >= state.sendBudget)
-                            MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    Switch(
+                        checked = state.sendBudgetEnabled,
+                        onCheckedChange = { enabled ->
+                            // Einschalten sofort; Ausschalten erst nach Warn-Bestätigung.
+                            if (enabled) viewModel.setBudgetEnabled(true) else showBudgetWarn = true
+                        }
                     )
                 }
-                Slider(
-                    value = state.sendBudget.toFloat(),
-                    onValueChange = { viewModel.setSendBudget(it.toInt().coerceIn(10, 500)) },
-                    valueRange = 10f..500f
-                )
+                if (state.sendBudgetEnabled) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            pluralStringResource(R.plurals.settings_budget_messages, state.sendBudget, state.sendBudget),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            stringResource(R.string.settings_budget_today, state.sendCountToday),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (state.sendCountToday >= state.sendBudget)
+                                MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Slider(
+                        value = state.sendBudget.toFloat(),
+                        onValueChange = { viewModel.setSendBudget(it.toInt().coerceIn(10, 500)) },
+                        valueRange = 10f..500f
+                    )
+                } else {
+                    Text(
+                        stringResource(R.string.settings_budget_disabled_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
+
+            TeslaConnectionCard(
+                deviceName = state.teslaBtDeviceName,
+                hasPermission = state.hasBluetoothPermission,
+                onGrantPermission = { btPermLauncher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
+                onSelectDevice = {
+                    viewModel.loadPairedDevices()
+                    showDevicePicker = true
+                },
+                onClearDevice = { viewModel.clearTeslaDevice() }
+            )
 
             SectionHeader(stringResource(R.string.settings_section_apps))
             SettingCard(
@@ -233,6 +303,130 @@ private fun LanguageOption(label: String, selected: Boolean, onClick: () -> Unit
         RadioButton(selected = selected, onClick = null)
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+/** Warn-Dialog vor dem Abschalten des Tageslimits (zwei konkrete Risiken). */
+@Composable
+private fun BudgetDisableDialog(
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null) },
+        title = { Text(stringResource(R.string.settings_budget_dialog_title)) },
+        text = { Text(stringResource(R.string.settings_budget_dialog_text)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.settings_budget_dialog_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.settings_budget_dialog_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Karte „Tesla-Verbindung": zeigt das gewählte Gerät und steuert die Auswahl.
+ * Ohne BLUETOOTH_CONNECT-Permission gibt es nur den Erteilen-Button.
+ */
+@Composable
+private fun TeslaConnectionCard(
+    deviceName: String?,
+    hasPermission: Boolean,
+    onGrantPermission: () -> Unit,
+    onSelectDevice: () -> Unit,
+    onClearDevice: () -> Unit
+) {
+    SettingCard(
+        title = stringResource(R.string.settings_tesla_conn_title),
+        description = stringResource(R.string.settings_tesla_conn_desc)
+    ) {
+        Text(
+            if (deviceName != null) stringResource(R.string.settings_tesla_conn_selected, deviceName)
+            else stringResource(R.string.settings_tesla_conn_none),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (deviceName != null) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (!hasPermission) {
+            Text(
+                stringResource(R.string.settings_tesla_conn_perm_missing),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+            PrimaryActionButton(
+                text = stringResource(R.string.settings_tesla_conn_grant),
+                onClick = onGrantPermission
+            )
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onSelectDevice) {
+                    Text(
+                        if (deviceName != null) stringResource(R.string.settings_tesla_conn_change)
+                        else stringResource(R.string.settings_tesla_conn_select)
+                    )
+                }
+                if (deviceName != null) {
+                    TextButton(onClick = onClearDevice) {
+                        Text(stringResource(R.string.settings_tesla_conn_clear))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Auswahl-Dialog der gekoppelten Geräte; Tippen auf ein Gerät bestätigt sofort. */
+@Composable
+private fun TeslaDevicePickerDialog(
+    devices: List<PairedBtDevice>,
+    selectedAddress: String?,
+    onSelect: (PairedBtDevice) -> Unit,
+    onCancel: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.settings_tesla_conn_dialog_title)) },
+        text = {
+            if (devices.isEmpty()) {
+                Text(stringResource(R.string.settings_tesla_conn_dialog_empty))
+            } else {
+                Column(modifier = Modifier.selectableGroup()) {
+                    devices.forEach { device ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = device.address == selectedAddress,
+                                    role = Role.RadioButton,
+                                    onClick = { onSelect(device) }
+                                )
+                                .padding(vertical = MfsSpacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
+                        ) {
+                            RadioButton(selected = device.address == selectedAddress, onClick = null)
+                            Text(device.name, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.settings_tesla_conn_dialog_cancel))
+            }
+        }
+    )
 }
 
 @Composable

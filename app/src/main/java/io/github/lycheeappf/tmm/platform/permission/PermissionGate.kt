@@ -64,6 +64,16 @@ class PermissionGate @Inject constructor(
     }
 
     /**
+     * BLUETOOTH_CONNECT (Runtime ab API 31, minSdk 33 → kein SDK-Guard nötig).
+     * Wird gebraucht, um die verbundenen Bluetooth-Geräte/gekoppelten Geräte zu
+     * lesen und so zu erkennen, ob das Handy gerade mit dem Tesla verbunden ist.
+     */
+    fun hasBluetoothConnect(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.BLUETOOTH_CONNECT
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
      * Notification-Listener Access ist nicht runtime-grantbar – User muss in
      * Settings > Apps > Special access > Notification access aktivieren.
      */

@@ -11,6 +11,9 @@ import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.core.util.DiagnosticsExporter
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
+import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsEvent
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,7 +31,13 @@ import javax.inject.Inject
 data class SettingsUiState(
     val ttlHours: Int = SettingsStore.DEFAULT_TTL_HOURS,
     val sendBudget: Int = SettingsStore.DEFAULT_SEND_BUDGET,
+    val sendBudgetEnabled: Boolean = true,
     val sendCountToday: Int = 0,
+    /** Anzeigename des gewählten Tesla-Bluetooth-Geräts; null = keins gewählt. */
+    val teslaBtDeviceName: String? = null,
+    val hasBluetoothPermission: Boolean = false,
+    /** Gekoppelte Geräte für den Auswahl-Dialog (on-demand geladen). */
+    val pairedDevices: List<PairedBtDevice> = emptyList(),
     val teslaContactCount: Int = 0,
     val teslaContactsHasPermission: Boolean = false,
     val teslaContactsHasRead: Boolean = false,
@@ -52,6 +61,8 @@ class SettingsViewModel @Inject constructor(
     private val appLocaleManager: AppLocaleManager,
     private val notificationChannels: AppNotificationChannels,
     private val diagnosticsExporter: DiagnosticsExporter,
+    private val permissionGate: PermissionGate,
+    private val bluetoothConnectionChecker: BluetoothConnectionChecker,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -100,7 +111,10 @@ class SettingsViewModel @Inject constructor(
                 it.copy(
                     ttlHours = store.mappingTtlHours(),
                     sendBudget = store.sendBudgetPerDay(),
+                    sendBudgetEnabled = store.isSendBudgetEnabled(),
                     sendCountToday = store.dailySendCount(),
+                    teslaBtDeviceName = store.teslaBtName(),
+                    hasBluetoothPermission = permissionGate.hasBluetoothConnect(),
                     preflightStatus = store.preflightResult(),
                     developerMode = store.isDeveloperMode(),
                     languageTag = appLocaleManager.currentTag()
@@ -178,6 +192,41 @@ class SettingsViewModel @Inject constructor(
     fun setSendBudget(value: Int) {
         viewModelScope.launch(ioDispatcher) {
             store.setSendBudgetPerDay(value)
+            refreshSettings()
+        }
+    }
+
+    /** Schaltet das Tageslimit ([SendBudget]) ganz ab/an. */
+    fun setBudgetEnabled(value: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            store.setSendBudgetEnabled(value)
+            refreshSettings()
+        }
+    }
+
+    /**
+     * Lädt die gekoppelten Bluetooth-Geräte für den Tesla-Auswahl-Dialog. Braucht
+     * BLUETOOTH_CONNECT — ohne Permission bleibt die Liste leer.
+     */
+    fun loadPairedDevices() {
+        viewModelScope.launch(ioDispatcher) {
+            val devices = bluetoothConnectionChecker.pairedDevices()
+            _uiState.update { it.copy(pairedDevices = devices) }
+        }
+    }
+
+    /** Merkt sich das gewählte Tesla-Gerät → ab jetzt wird nur verbunden weitergeleitet. */
+    fun selectTeslaDevice(address: String, name: String) {
+        viewModelScope.launch(ioDispatcher) {
+            store.setTeslaBtDevice(address, name)
+            refreshSettings()
+        }
+    }
+
+    /** Hebt die Tesla-Gerätewahl auf → Verbindungs-Gate aus, Weiterleitung wieder rund um die Uhr. */
+    fun clearTeslaDevice() {
+        viewModelScope.launch(ioDispatcher) {
+            store.clearTeslaBtDevice()
             refreshSettings()
         }
     }

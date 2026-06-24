@@ -6,7 +6,10 @@ import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.locale.AppLocaleManager
 import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -38,10 +41,13 @@ class SettingsViewModelTest {
     private val appLocaleManager = mockk<AppLocaleManager>(relaxed = true)
     private val notificationChannels = mockk<AppNotificationChannels>(relaxed = true)
     private val diagnosticsExporter = mockk<io.github.lycheeappf.tmm.core.util.DiagnosticsExporter>(relaxed = true)
+    private val permissionGate = mockk<PermissionGate>(relaxed = true)
+    private val bluetoothConnectionChecker = mockk<BluetoothConnectionChecker>(relaxed = true)
 
     private fun viewModel() = SettingsViewModel(
         store, contactSyncWriter, teslaContactResync, preFlightTester,
-        appLocaleManager, notificationChannels, diagnosticsExporter, dispatcher
+        appLocaleManager, notificationChannels, diagnosticsExporter,
+        permissionGate, bluetoothConnectionChecker, dispatcher
     )
 
     @Before
@@ -74,5 +80,38 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertThat(vm.uiState.value.languageTag).isEqualTo("de")
+    }
+
+    @Test
+    fun `setBudgetEnabled writes the flag to the store`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.setBudgetEnabled(false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { store.setSendBudgetEnabled(false) }
+    }
+
+    @Test
+    fun `selectTeslaDevice persists address and name`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.selectTeslaDevice("AA:BB:CC:DD:EE:FF", "Model Y")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { store.setTeslaBtDevice("AA:BB:CC:DD:EE:FF", "Model Y") }
+    }
+
+    @Test
+    fun `clearTeslaDevice removes the stored device`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.clearTeslaDevice()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { store.clearTeslaBtDevice() }
     }
 }

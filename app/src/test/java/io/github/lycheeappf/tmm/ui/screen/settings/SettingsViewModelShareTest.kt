@@ -7,6 +7,8 @@ import io.github.lycheeappf.tmm.core.locale.AppLocaleManager
 import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.core.util.DiagnosticsExporter
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsEvent
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import io.mockk.coEvery
@@ -41,10 +43,13 @@ class SettingsViewModelShareTest {
     private val appLocaleManager = mockk<AppLocaleManager>(relaxed = true)
     private val notificationChannels = mockk<AppNotificationChannels>(relaxed = true)
     private val exporter = mockk<DiagnosticsExporter>()
+    private val permissionGate = mockk<PermissionGate>(relaxed = true)
+    private val bluetoothConnectionChecker = mockk<BluetoothConnectionChecker>(relaxed = true)
 
     private fun vm() = SettingsViewModel(
         store, contactSyncWriter, teslaContactResync, preFlightTester,
-        appLocaleManager, notificationChannels, exporter, dispatcher
+        appLocaleManager, notificationChannels, exporter,
+        permissionGate, bluetoothConnectionChecker, dispatcher
     )
 
     @Test fun `shareDiagnostics emits Share on success`() = runTest(dispatcher) {

@@ -4,6 +4,29 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-06-24
+
+### Added
+- **Forward only while connected to your Tesla.** A new **Settings → Forwarding → "Tesla
+  connection"** card lets you pick your car once from the paired Bluetooth devices. From
+  then on, messenger notifications are injected as fake SMS **only while that device is
+  connected** — so being away from the car no longer fills the daily limit with messages
+  you can't hear anyway. When not connected, the message is dropped (no buffering). The
+  check runs before the daily-limit reserve, so a disconnected phone never burns budget.
+  Requires the **BLUETOOTH_CONNECT** permission (requested from the same card). Until a
+  device is selected — or if the permission isn't granted — forwarding behaves as before
+  (24/7), so nothing silently stops working before you've set it up.
+- **Daily limit can be switched off.** The **Settings → Forwarding → "Daily limit"** card
+  now has an on/off switch (**on by default**). Turning it off shows a warning explaining
+  the risks — without a cap, a misbehaving messenger could write unlimited fake SMS into
+  the message database, and in the unlikely event a carrier delivers the `+888` reply SMS,
+  reply costs would be uncapped. While off, the limit slider and today's count are hidden.
+
+### Changed
+- The inbound capture pipeline (`NotificationCapture`) gained a Bluetooth-connection gate
+  between the default-SMS-role check and the send-budget reserve. `SendBudget` is now a
+  no-op (always allows, never counts) when the daily limit is switched off.
+
 ## [0.6.0] — 2026-06-24
 
 ### Added

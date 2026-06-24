@@ -15,11 +15,30 @@
 
     <string name="settings_budget_title">Daily limit</string>
     <string name="settings_budget_desc">Maximum number of forwarded messages per day — a safety net.</string>
+    <string name="settings_budget_enabled_label">Daily limit active</string>
     <plurals name="settings_budget_messages">
         <item quantity="one">%1$d message</item>
         <item quantity="other">%1$d messages</item>
     </plurals>
     <string name="settings_budget_today">today: %1$d</string>
+    <string name="settings_budget_disabled_hint">Limit off — every message is forwarded, with no daily cap.</string>
+    <string name="settings_budget_dialog_title">Turn off the daily limit?</string>
+    <string name="settings_budget_dialog_text">Without a limit, a misbehaving messenger could write an unlimited number of fake SMS into your message database.\n\nAnd in the unlikely event your carrier actually delivers the +888 reply SMS instead of discarding it, reply costs would have no cap.</string>
+    <string name="settings_budget_dialog_confirm">Turn off</string>
+    <string name="settings_budget_dialog_cancel">Keep limit</string>
+
+    <string name="settings_tesla_conn_title">Tesla connection</string>
+    <string name="settings_tesla_conn_desc">Messages are only forwarded while your Tesla is connected via Bluetooth.</string>
+    <string name="settings_tesla_conn_selected">Selected: %1$s</string>
+    <string name="settings_tesla_conn_none">No device selected — messages are forwarded at all times.</string>
+    <string name="settings_tesla_conn_select">Select device</string>
+    <string name="settings_tesla_conn_change">Change device</string>
+    <string name="settings_tesla_conn_clear">Remove</string>
+    <string name="settings_tesla_conn_perm_missing">Bluetooth permission required to detect the connection.</string>
+    <string name="settings_tesla_conn_grant">Grant Bluetooth permission</string>
+    <string name="settings_tesla_conn_dialog_title">Select your Tesla</string>
+    <string name="settings_tesla_conn_dialog_empty">No paired Bluetooth devices found. Pair your Tesla in the system Bluetooth settings first.</string>
+    <string name="settings_tesla_conn_dialog_cancel">Cancel</string>
 
     <string name="settings_section_apps">Apps</string>
     <string name="settings_whitelist_title">Allowed apps</string>

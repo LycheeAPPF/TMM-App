@@ -27,6 +27,13 @@
          API-Key konfiguriert, werden keine Outbound-Calls gemacht. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- BLUETOOTH_CONNECT: erkennt, ob das Handy mit dem gewählten Tesla verbunden
+         ist (verbundene HFP/A2DP-Geräte lesen). Nur dann werden Nachrichten
+         weitergeleitet. Optional — ohne Auswahl/Permission greift Fail-Open. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
 
     <queries>
         <intent>
