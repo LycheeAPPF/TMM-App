@@ -9,6 +9,7 @@ import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.location.ILocationProvider
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,6 +38,7 @@ class LlmTurnRunner @Inject constructor(
     private val rateLimiter: LlmRateLimiter,
     private val formatter: LlmResponseFormatter,
     private val toolRegistry: ToolRegistry,
+    private val locationProvider: ILocationProvider,
     private val logBuffer: LogBuffer,
     private val clock: Clock
 ) {
@@ -73,9 +75,10 @@ class LlmTurnRunner @Inject constructor(
             // sonst "du kannst suchen" sagen, ohne die Tools mitzuschicken — oder umgekehrt).
             val webSearch = prefs.webSearchEnabled()
             val xSearch = prefs.xSearchEnabled()
+            val location = locationProvider.lastKnownLocation()
             val req = LlmRequest(
                 model = model,
-                systemPrompt = prefs.systemPrompt(webSearch, xSearch),
+                systemPrompt = prefs.systemPrompt(webSearch, xSearch, location),
                 history = historyBefore,
                 userMessage = userText,
                 tools = toolRegistry.activeSchemas(),
