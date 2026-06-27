@@ -18,6 +18,7 @@ import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,6 +52,7 @@ data class AssistantUiState(
     val triggerInFlight: Boolean = false,
     val keyTestRunning: Boolean = false,
     val keyTestResult: KeyTestOutcome? = null,
+    val hasLocationPermission: Boolean = false,
     val lastFeedback: String? = null
 )
 
@@ -63,6 +65,7 @@ class AssistantViewModel @Inject constructor(
     private val coordinator: AssistantTriggerCoordinator,
     private val contactProvisioner: AssistantContactProvisioner,
     private val teslaContactResync: TeslaContactResync,
+    private val permissionGate: PermissionGate,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -95,7 +98,8 @@ class AssistantViewModel @Inject constructor(
                     webSearchEnabled = prefs.webSearchEnabled(),
                     xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
-                    voiceAliasName = prefs.voiceAliasName()
+                    voiceAliasName = prefs.voiceAliasName(),
+                    hasLocationPermission = permissionGate.hasLocationAccess()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
