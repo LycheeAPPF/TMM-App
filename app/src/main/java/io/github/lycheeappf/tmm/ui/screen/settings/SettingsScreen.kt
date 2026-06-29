@@ -57,7 +57,7 @@ import io.github.lycheeappf.tmm.ui.component.TeslaDevicePickerDialog
 import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
 import io.github.lycheeappf.tmm.ui.component.mfsExpandExit
 import io.github.lycheeappf.tmm.ui.component.preflightStatusUi
-import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsEvent
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
 import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsShare
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
@@ -129,10 +129,13 @@ fun SettingsScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is DiagnosticsEvent.Share ->
+                is SettingsEvent.Share ->
                     context.startActivity(DiagnosticsShare.chooser(context, event.file, chooserTitle))
-                DiagnosticsEvent.ExportFailed ->
+                SettingsEvent.ExportFailed ->
                     android.widget.Toast.makeText(context, exportFailed, android.widget.Toast.LENGTH_SHORT).show()
+                is SettingsEvent.OpenTeslaAuthUrl ->
+                    androidx.browser.customtabs.CustomTabsIntent.Builder().build()
+                        .launchUrl(context, android.net.Uri.parse(event.url))
             }
         }
     }
@@ -230,6 +233,9 @@ fun SettingsScreen(
                 onClearDevice = { viewModel.clearTeslaDevice() }
             )
 
+            SectionHeader(stringResource(R.string.tesla_api_section))
+            TeslaFleetApiCard(state = state, viewModel = viewModel)
+
             SectionHeader(stringResource(R.string.settings_section_apps))
             SettingCard(
                 title = stringResource(R.string.settings_whitelist_title),
@@ -286,6 +292,80 @@ fun SettingsScreen(
                 developerMode = state.developerMode,
                 onEnableDeveloperMode = { viewModel.setDeveloperMode(true) }
             )
+        }
+    }
+}
+
+@Composable
+private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewModel) {
+    val authState = state.teslaAuthState
+    SettingCard(
+        title = stringResource(R.string.tesla_api_card_title),
+        description = stringResource(R.string.tesla_api_card_desc)
+    ) {
+        when (authState) {
+            is TeslaAuthState.NotAuthenticated -> {
+                PrimaryActionButton(
+                    text = stringResource(R.string.tesla_api_connect),
+                    onClick = { viewModel.startTeslaLogin() }
+                )
+            }
+            is TeslaAuthState.Loading -> {
+                Text(
+                    stringResource(R.string.tesla_api_status_loading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            is TeslaAuthState.Authenticated -> {
+                StatusPill(
+                    text = stringResource(R.string.tesla_api_status_connected),
+                    status = MfsStatus.Success
+                )
+                val vin = authState.selectedVin
+                Text(
+                    if (vin != null) stringResource(R.string.tesla_api_vehicle_label) + ": $vin"
+                    else stringResource(R.string.tesla_api_no_vehicle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (state.teslaVehicles.isNotEmpty()) {
+                    Column {
+                        state.teslaVehicles.forEach { vehicle ->
+                            MfsListItem(
+                                title = vehicle.displayName.ifBlank { vehicle.vin },
+                                subtitle = vehicle.vin,
+                                trailing = if (vehicle.vin == vin) ({
+                                    RadioButton(selected = true, onClick = null)
+                                }) else ({
+                                    RadioButton(selected = false, onClick = { viewModel.selectTeslaVehicle(vehicle.vin) })
+                                }),
+                                onClick = { viewModel.selectTeslaVehicle(vehicle.vin) }
+                            )
+                        }
+                    }
+                } else {
+                    PrimaryActionButton(
+                        text = stringResource(R.string.tesla_api_vehicle_label),
+                        loading = state.teslaVehiclesLoading,
+                        onClick = { viewModel.loadTeslaVehicles() }
+                    )
+                }
+                androidx.compose.material3.TextButton(onClick = { viewModel.logoutTesla() }) {
+                    Text(stringResource(R.string.tesla_api_disconnect))
+                }
+            }
+            is TeslaAuthState.Error -> {
+                Text(
+                    stringResource(R.string.tesla_api_error_prefix, authState.message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+                PrimaryActionButton(
+                    text = stringResource(R.string.tesla_api_connect),
+                    onClick = { viewModel.startTeslaLogin() }
+                )
+            }
         }
     }
 }

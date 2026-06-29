@@ -1,9 +1,11 @@
 package io.github.lycheeappf.tmm
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,14 +37,25 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var teslaAuthManager: TeslaAuthManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // OAuth-Callback auch bei Kaltstart verarbeiten.
+        intent?.data?.let { teslaAuthManager.postCallbackUri(it) }
         setContent {
             MfsTheme {
                 MfsApp()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Tesla-OAuth-Redirect: io.github.lycheeappf.tmm://tesla/callback?code=...
+        intent.data?.let { teslaAuthManager.postCallbackUri(it) }
     }
 }
 

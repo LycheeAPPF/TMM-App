@@ -14,15 +14,21 @@ import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
-import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsEvent
+import io.github.lycheeappf.tmm.platform.tesla.api.VehicleInfo
+import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -54,8 +60,19 @@ data class SettingsUiState(
     /** Aktive App-Sprache: "" = Systemsprache folgen, sonst BCP-47-Tag ("de"/"en"). */
     val languageTag: String = "",
     /** Läuft, während der „Diagnose senden"-Export geschrieben wird. */
-    val sendingDiagnostics: Boolean = false
+    val sendingDiagnostics: Boolean = false,
+    /** Tesla Fleet API Auth-Status. */
+    val teslaAuthState: TeslaAuthState = TeslaAuthState.Loading,
+    /** Fahrzeuge des eingeloggten Tesla-Accounts (geladen nach Login). */
+    val teslaVehicles: List<VehicleInfo> = emptyList(),
+    val teslaVehiclesLoading: Boolean = false
 )
+
+sealed class SettingsEvent {
+    data class Share(val file: java.io.File) : SettingsEvent()
+    data object ExportFailed : SettingsEvent()
+    data class OpenTeslaAuthUrl(val url: String) : SettingsEvent()
+}
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -68,17 +85,35 @@ class SettingsViewModel @Inject constructor(
     private val diagnosticsExporter: DiagnosticsExporter,
     private val permissionGate: PermissionGate,
     private val bluetoothConnectionChecker: BluetoothConnectionChecker,
+    private val teslaAuthManager: TeslaAuthManager,
+    private val teslaCommandClient: TeslaVehicleCommandClient,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    /** One-Shot-Events (Share-Sheet öffnen / Fehler-Toast) an die UI-Schicht. */
-    private val shareEvents = Channel<DiagnosticsEvent>(Channel.BUFFERED)
-    val events: Flow<DiagnosticsEvent> = shareEvents.receiveAsFlow()
+    /** One-Shot-Events (Share-Sheet öffnen / Fehler-Toast / Tesla-Auth-URL) an die UI. */
+    private val _events = Channel<SettingsEvent>(Channel.BUFFERED)
+    val events: Flow<SettingsEvent> = _events.receiveAsFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        // Tesla-Auth-State live beobachten und in UiState spiegeln.
+        viewModelScope.launch {
+            teslaAuthManager.init()
+            teslaAuthManager.state.collect { authState ->
+                _uiState.update { it.copy(teslaAuthState = authState) }
+            }
+        }
+        // OAuth-Callback-Code abarbeiten, wenn MainActivity ihn posted.
+        viewModelScope.launch {
+            teslaAuthManager.pendingCode.collect { code ->
+                withContext(ioDispatcher) { teslaAuthManager.exchangeCode(code) }
+                loadTeslaVehicles()
+            }
+        }
+    }
 
     /**
      * „Diagnose senden": schreibt den redigierten Export (IO) und emittiert ein
@@ -92,8 +127,8 @@ class SettingsViewModel @Inject constructor(
                 coRunCatching { diagnosticsExporter.exportToCache() }.getOrNull()
             }
             _uiState.update { it.copy(sendingDiagnostics = false) }
-            shareEvents.send(
-                if (file != null) DiagnosticsEvent.Share(file) else DiagnosticsEvent.ExportFailed
+            _events.send(
+                if (file != null) SettingsEvent.Share(file) else SettingsEvent.ExportFailed
             )
         }
     }
@@ -269,6 +304,38 @@ class SettingsViewModel @Inject constructor(
             }
             refreshSettings()
             _uiState.update { it.copy(preflightRunning = false) }
+        }
+    }
+
+    // ---- Tesla Fleet API ----------------------------------------------------
+
+    fun startTeslaLogin() {
+        if (TeslaOAuthConfig.CLIENT_ID == "TODO_REPLACE_WITH_YOUR_CLIENT_ID") {
+            _uiState.update {
+                it.copy(teslaAuthState = TeslaAuthState.Error("client_id nicht konfiguriert — siehe TeslaOAuthConfig.kt"))
+            }
+            return
+        }
+        val url = teslaAuthManager.startAuth()
+        viewModelScope.launch { _events.send(SettingsEvent.OpenTeslaAuthUrl(url)) }
+    }
+
+    fun selectTeslaVehicle(vin: String) {
+        viewModelScope.launch(ioDispatcher) { teslaAuthManager.selectVin(vin) }
+    }
+
+    fun logoutTesla() {
+        viewModelScope.launch(ioDispatcher) { teslaAuthManager.logout() }
+        _uiState.update { it.copy(teslaVehicles = emptyList()) }
+    }
+
+    fun loadTeslaVehicles() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(teslaVehiclesLoading = true) }
+            val vehicles = withContext(ioDispatcher) {
+                coRunCatching { teslaCommandClient.listVehicles() }.getOrDefault(emptyList())
+            }
+            _uiState.update { it.copy(teslaVehicles = vehicles, teslaVehiclesLoading = false) }
         }
     }
 
