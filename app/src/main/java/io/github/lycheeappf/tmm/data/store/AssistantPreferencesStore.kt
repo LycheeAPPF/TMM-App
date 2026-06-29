@@ -11,6 +11,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.core.locale.LocaleProvider
+import io.github.lycheeappf.tmm.platform.location.LocationFix
+import kotlin.math.abs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -80,6 +82,26 @@ class AssistantPreferencesStore @Inject constructor(
         }
     }
 
+    // Coordinates use Locale.US (dot decimal separator) — this goes to the AI, not the UI.
+    // Cardinal directions: N/S are identical in DE and EN; longitude uses "O" (Ost) in DE, "E" in EN.
+    private fun locationClause(fix: LocationFix): String {
+        val latAbs = String.format(java.util.Locale.US, "%.4f", abs(fix.latitude))
+        val lonAbs = String.format(java.util.Locale.US, "%.4f", abs(fix.longitude))
+        val latDir = if (fix.latitude >= 0) "N" else "S"
+        val accuracyInMeters = fix.accuracyInMeters.toInt()
+        return if (isEnglish()) {
+            val lonDir = if (fix.longitude >= 0) "E" else "W"
+            "The user's current GPS position is approximately $latAbs° $latDir, " +
+                "$lonAbs° $lonDir (accuracy: about $accuracyInMeters m). " +
+                "Use this when answering location-based questions."
+        } else {
+            val lonDir = if (fix.longitude >= 0) "O" else "W"
+            "Die aktuelle GPS-Position des Nutzers ist ungefähr $latAbs° $latDir, " +
+                "$lonAbs° $lonDir (Genauigkeit: ca. $accuracyInMeters m). " +
+                "Nutze das bei standortbezogenen Fragen."
+        }
+    }
+
     // ---- Model & Prompt -----------------------------------------------------
 
     suspend fun model(): String =
@@ -100,11 +122,18 @@ class AssistantPreferencesStore @Inject constructor(
      * Aufrufer liest die Flags EINMAL und reicht sie hier UND in den Request, damit
      * Prompt und gesendete Tools nicht auseinanderlaufen.
      */
-    suspend fun systemPrompt(webSearch: Boolean, xSearch: Boolean): String {
+    suspend fun systemPrompt(
+        webSearch: Boolean,
+        xSearch: Boolean,
+        location: LocationFix? = null
+    ): String {
         val base = resolveDriverTemplate(systemPromptRaw(), driverName(), currentLocale())
         // Ein bewusst geleerter Prompt bleibt leer (kein „\n\n"-Vorspann, keine Klausel).
         if (base.isBlank()) return base
-        return base + "\n\n" + searchCapabilityClause(webSearch, xSearch)
+        val sb = StringBuilder(base)
+        sb.append("\n\n").append(searchCapabilityClause(webSearch, xSearch))
+        if (location != null) sb.append("\n\n").append(locationClause(location))
+        return sb.toString()
     }
 
     /**

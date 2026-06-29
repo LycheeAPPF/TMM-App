@@ -74,6 +74,20 @@ class PermissionGate @Inject constructor(
         ) == PackageManager.PERMISSION_GRANTED
 
     /**
+     * Returns true when either ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION is granted.
+     * Both suffice for [android.location.LocationManager.getLastKnownLocation].
+     * Without this permission [LocationProvider] returns null and no coordinates are
+     * forwarded to Grok.
+     */
+    fun hasLocationAccess(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
      * Notification-Listener Access ist nicht runtime-grantbar – User muss in
      * Settings > Apps > Special access > Notification access aktivieren.
      */

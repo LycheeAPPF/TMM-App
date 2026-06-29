@@ -8,6 +8,10 @@
     <string name="assistant_consent_granted">Consent given — start enabled.</string>
     <string name="assistant_consent_not_granted">Not consented yet — start blocked.</string>
 
+    <string name="assistant_location_title">Location access</string>
+    <string name="assistant_location_desc">Lets Grok answer location-based questions ("best restaurant nearby"). GPS coordinates are included in each xAI request — same trust boundary as your dictation.</string>
+    <string name="assistant_location_action">Grant permission</string>
+
     <string name="assistant_apikey_title">xAI API key</string>
     <string name="assistant_apikey_desc">Stored encrypted on the device and not included in backups.</string>
     <string name="assistant_apikey_active">Key active</string>
