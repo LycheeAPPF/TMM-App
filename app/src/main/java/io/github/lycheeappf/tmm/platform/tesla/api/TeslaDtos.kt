@@ -18,7 +18,12 @@ data class NavigationRequestBody(
 )
 
 @Serializable
-data class NavigationValue(@SerialName("android.intent.extra.TEXT") val text: String)
+data class NavigationValue(
+    @SerialName("android.intent.ACTION") val action: String = "android.intent.action.SEND",
+    @SerialName("android.intent.TYPE") val type: String = "text/plain",
+    @SerialName("android.intent.TEXT") val text: String,
+    @SerialName("android.intent.extra.TEXT") val extraText: String
+)
 
 @Serializable
 data class NavigationGpsBody(val lat: Double, val lon: Double, val order: Int = 0)
@@ -28,6 +33,12 @@ data class CommandResponse(val response: CommandResult? = null, val error: Strin
 
 @Serializable
 data class CommandResult(val result: Boolean = false, val reason: String? = null)
+
+@Serializable
+data class WakeUpResponse(val response: WakeUpResult? = null, val error: String? = null)
+
+@Serializable
+data class WakeUpResult(val state: String = "")
 
 @Serializable
 data class VehiclesResponse(

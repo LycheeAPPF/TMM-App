@@ -29,6 +29,12 @@ interface TeslaFleetApi {
     ): Response<VehiclesResponse>
 
     @POST
+    suspend fun wakeUp(
+        @Url url: String,
+        @Header("Authorization") auth: String
+    ): Response<WakeUpResponse>
+
+    @POST
     suspend fun navigationRequest(
         @Url url: String,
         @Header("Authorization") auth: String,

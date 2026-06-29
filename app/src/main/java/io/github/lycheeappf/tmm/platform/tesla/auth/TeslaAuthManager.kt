@@ -3,6 +3,7 @@ package io.github.lycheeappf.tmm.platform.tesla.auth
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import io.github.lycheeappf.tmm.BuildConfig
 import io.github.lycheeappf.tmm.core.di.TeslaHttpClient
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -110,6 +111,8 @@ class TeslaAuthManager @Inject constructor(
                 .add("code", code)
                 .add("code_verifier", verifier)
                 .add("client_id", TeslaOAuthConfig.CLIENT_ID)
+                .add("client_secret", BuildConfig.TESLA_CLIENT_SECRET)
+                .add("audience", TeslaOAuthConfig.TOKEN_AUDIENCE)
                 .add("redirect_uri", TeslaOAuthConfig.REDIRECT_URI)
                 .build()
             val req = Request.Builder().url(TeslaOAuthConfig.TOKEN_URL).post(body).build()
@@ -147,6 +150,8 @@ class TeslaAuthManager @Inject constructor(
                 .add("grant_type", "refresh_token")
                 .add("refresh_token", refreshToken)
                 .add("client_id", TeslaOAuthConfig.CLIENT_ID)
+                .add("client_secret", BuildConfig.TESLA_CLIENT_SECRET)
+                .add("audience", TeslaOAuthConfig.TOKEN_AUDIENCE)
                 .build()
             val req = Request.Builder().url(TeslaOAuthConfig.TOKEN_URL).post(body).build()
             val resp = httpClient.newCall(req).execute()
@@ -167,9 +172,10 @@ class TeslaAuthManager @Inject constructor(
     /** Gibt den aktuell gespeicherten Access-Token zurück (nach ggf. Refresh via [refreshIfNeeded]). */
     suspend fun readAccessToken(): String? = tokenStore.readAccessToken()
 
-    /** Aktualisiert den gespeicherten VIN und emittiert neuen State. */
-    suspend fun selectVin(vin: String) {
+    /** Aktualisiert den gespeicherten VIN + numerische ID und emittiert neuen State. */
+    suspend fun selectVehicle(vin: String, id: Long) {
         tokenStore.writeSelectedVin(vin)
+        tokenStore.writeSelectedVehicleId(id)
         _state.update { current ->
             if (current is TeslaAuthState.Authenticated) current.copy(selectedVin = vin) else current
         }

@@ -16,6 +16,12 @@ val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) FileInputStream(keystorePropertiesFile).use { load(it) }
 }
 
+// Secrets aus local.properties (gitignored) — nie in Source-Code oder SCM committen.
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
+}
+
 // Fail-fast: ein signiertes Release darf NIE versehentlich unsigniert entstehen.
 // Greift nur, wenn ein Release-Packaging-Task explizit angefordert wurde
 // (Konfigurationszeit-Check → configuration-cache-kompatibel).
@@ -43,6 +49,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // Tesla Fleet API client_secret — kommt aus local.properties (gitignored).
+        buildConfigField(
+            "String",
+            "TESLA_CLIENT_SECRET",
+            "\"${localProperties.getProperty("tesla.clientSecret", "")}\""
+        )
 
         // i18n: unterstützte Sprachen. Default-Resources (values/) sind Englisch,
         // values-de/ liefert die deutsche Übersetzung. Begrenzt zugleich die

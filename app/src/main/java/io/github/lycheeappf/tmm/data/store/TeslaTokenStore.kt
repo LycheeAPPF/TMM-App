@@ -57,13 +57,19 @@ class TeslaTokenStore @Inject constructor(
 
     suspend fun readFleetApiBaseUrl(): String? = store.data.first()[KEY_FLEET_URL]
 
-    suspend fun writeFleetApiBaseUrl(url: String) { store.edit { it[KEY_FLEET_URL] = url } }
+    suspend fun writeFleetApiBaseUrl(url: String?) {
+        store.edit { if (url != null) it[KEY_FLEET_URL] = url else it.remove(KEY_FLEET_URL) }
+    }
 
     suspend fun readSelectedVin(): String? = store.data.first()[KEY_VIN]
 
     suspend fun writeSelectedVin(vin: String) { store.edit { it[KEY_VIN] = vin } }
 
     fun selectedVinFlow(): Flow<String?> = store.data.map { it[KEY_VIN] }
+
+    suspend fun readSelectedVehicleId(): Long? = store.data.first()[KEY_VEHICLE_ID]
+
+    suspend fun writeSelectedVehicleId(id: Long) { store.edit { it[KEY_VEHICLE_ID] = id } }
 
     // ---- State helpers ------------------------------------------------------
 
@@ -83,6 +89,7 @@ class TeslaTokenStore @Inject constructor(
             prefs.remove(KEY_EXPIRES_AT)
             prefs.remove(KEY_FLEET_URL)
             prefs.remove(KEY_VIN)
+            prefs.remove(KEY_VEHICLE_ID)
         }
     }
 
@@ -158,6 +165,7 @@ class TeslaTokenStore @Inject constructor(
         private val KEY_EXPIRES_AT = longPreferencesKey("tesla_expires_at_ms")
         private val KEY_FLEET_URL = stringPreferencesKey("tesla_fleet_api_base_url")
         private val KEY_VIN = stringPreferencesKey("tesla_selected_vin")
+        private val KEY_VEHICLE_ID = longPreferencesKey("tesla_selected_vehicle_id")
     }
 }
 

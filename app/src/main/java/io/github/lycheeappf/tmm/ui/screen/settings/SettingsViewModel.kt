@@ -65,7 +65,11 @@ data class SettingsUiState(
     val teslaAuthState: TeslaAuthState = TeslaAuthState.Loading,
     /** Fahrzeuge des eingeloggten Tesla-Accounts (geladen nach Login). */
     val teslaVehicles: List<VehicleInfo> = emptyList(),
-    val teslaVehiclesLoading: Boolean = false
+    val teslaVehiclesLoading: Boolean = false,
+    /** Fehlermeldung vom letzten Fahrzeugladen — null = kein Fehler. */
+    val teslaVehiclesError: String? = null,
+    /** Rohausgabe der Region-Diagnose — nur bei Fehler gefüllt. */
+    val teslaRegionDiagnostic: String? = null
 )
 
 sealed class SettingsEvent {
@@ -310,18 +314,12 @@ class SettingsViewModel @Inject constructor(
     // ---- Tesla Fleet API ----------------------------------------------------
 
     fun startTeslaLogin() {
-        if (TeslaOAuthConfig.CLIENT_ID == "TODO_REPLACE_WITH_YOUR_CLIENT_ID") {
-            _uiState.update {
-                it.copy(teslaAuthState = TeslaAuthState.Error("client_id nicht konfiguriert — siehe TeslaOAuthConfig.kt"))
-            }
-            return
-        }
         val url = teslaAuthManager.startAuth()
         viewModelScope.launch { _events.send(SettingsEvent.OpenTeslaAuthUrl(url)) }
     }
 
-    fun selectTeslaVehicle(vin: String) {
-        viewModelScope.launch(ioDispatcher) { teslaAuthManager.selectVin(vin) }
+    fun selectTeslaVehicle(vin: String, id: Long) {
+        viewModelScope.launch(ioDispatcher) { teslaAuthManager.selectVehicle(vin, id) }
     }
 
     fun logoutTesla() {
@@ -331,11 +329,23 @@ class SettingsViewModel @Inject constructor(
 
     fun loadTeslaVehicles() {
         viewModelScope.launch {
-            _uiState.update { it.copy(teslaVehiclesLoading = true) }
-            val vehicles = withContext(ioDispatcher) {
-                coRunCatching { teslaCommandClient.listVehicles() }.getOrDefault(emptyList())
+            _uiState.update { it.copy(teslaVehiclesLoading = true, teslaVehiclesError = null, teslaRegionDiagnostic = null) }
+            val result = withContext(ioDispatcher) {
+                coRunCatching { teslaCommandClient.listVehicles() }
             }
-            _uiState.update { it.copy(teslaVehicles = vehicles, teslaVehiclesLoading = false) }
+            val diagnostic = if (result.isFailure) {
+                withContext(ioDispatcher) {
+                    coRunCatching { teslaCommandClient.regionDiagnosticInfo() }.getOrDefault("Diagnose fehlgeschlagen")
+                }
+            } else null
+            _uiState.update {
+                it.copy(
+                    teslaVehicles = result.getOrDefault(emptyList()),
+                    teslaVehiclesLoading = false,
+                    teslaVehiclesError = result.exceptionOrNull()?.message,
+                    teslaRegionDiagnostic = diagnostic
+                )
+            }
         }
     }
 

@@ -338,13 +338,29 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                                 trailing = if (vehicle.vin == vin) ({
                                     RadioButton(selected = true, onClick = null)
                                 }) else ({
-                                    RadioButton(selected = false, onClick = { viewModel.selectTeslaVehicle(vehicle.vin) })
+                                    RadioButton(selected = false, onClick = { viewModel.selectTeslaVehicle(vehicle.vin, vehicle.id) })
                                 }),
-                                onClick = { viewModel.selectTeslaVehicle(vehicle.vin) }
+
+                                onClick = { viewModel.selectTeslaVehicle(vehicle.vin, vehicle.id) }
                             )
                         }
                     }
                 } else {
+                    state.teslaVehiclesError?.let { error ->
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    state.teslaRegionDiagnostic?.let { diag ->
+                        Text(
+                            text = diag,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
                     PrimaryActionButton(
                         text = stringResource(R.string.tesla_api_vehicle_label),
                         loading = state.teslaVehiclesLoading,
