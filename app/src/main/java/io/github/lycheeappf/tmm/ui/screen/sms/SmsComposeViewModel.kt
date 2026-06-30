@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.ui.screen.sms
 
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,10 +27,16 @@ data class SmsComposeUiState(
 @HiltViewModel
 class SmsComposeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val sender: SmsSender
+    private val sender: SmsSender,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SmsComposeUiState())
+    private val _uiState = MutableStateFlow(
+        SmsComposeUiState(
+            recipient = savedStateHandle.get<String>("recipient") ?: "",
+            body = savedStateHandle.get<String>("body") ?: ""
+        )
+    )
     val uiState: StateFlow<SmsComposeUiState> = _uiState.asStateFlow()
 
     fun setRecipient(value: String) = _uiState.update { it.copy(recipient = value) }

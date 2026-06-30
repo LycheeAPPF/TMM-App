@@ -87,7 +87,17 @@ fun MfsNavHost(
         ) {
             SmsThreadScreen(onBack = { navController.popBackStack() })
         }
-        composable(MfsDestination.SmsCompose.route) {
+        composable(
+            route = "${MfsDestination.SmsCompose.route}?recipient={recipient}&body={body}",
+            arguments = listOf(
+                navArgument("recipient") {
+                    type = NavType.StringType; nullable = true; defaultValue = null
+                },
+                navArgument("body") {
+                    type = NavType.StringType; nullable = true; defaultValue = null
+                }
+            )
+        ) {
             SmsComposeScreen(onBack = { navController.popBackStack() })
         }
         // Entwickler-/Diagnose-Oberflächen: nur registriert wenn Developer-Mode an

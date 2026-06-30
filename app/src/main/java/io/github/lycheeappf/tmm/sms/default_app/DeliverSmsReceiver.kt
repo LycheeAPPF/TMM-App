@@ -8,13 +8,13 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import io.github.lycheeappf.tmm.MainActivity
 import io.github.lycheeappf.tmm.MfsApplication
 import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.locale.localizedString
@@ -22,13 +22,8 @@ import io.github.lycheeappf.tmm.core.locale.localizedString
 /**
  * Empfängt echte eingehende SMS, wenn unsere App Default-SMS-App ist.
  *
- * - Schreibt SMS via ContentResolver in `content://sms/inbox` MIT `THREAD_ID`,
- *   damit Google Messages parallel sie zur richtigen Konversation ordnet.
- * - Postet eine eigene System-Notification, weil Google Messages (als nicht-Default
- *   SMS App) seine eigenen Notifications unterdrückt — sonst verpasst der User
- *   alle SMS inkl. 2FA-Codes.
- * - Tap öffnet die SMS-Konversation in Google Messages (Fallback: generisches
- *   smsto-Intent).
+ * - Schreibt SMS via ContentResolver in `content://sms/inbox`.
+ * - Postet eine Notification; Tap öffnet direkt den TMM-SmsThreadScreen.
  */
 class DeliverSmsReceiver : BroadcastReceiver() {
 
@@ -45,9 +40,6 @@ class DeliverSmsReceiver : BroadcastReceiver() {
         val subId = intent.getIntExtra("subscription", -1)
 
         // goAsync(): SMS_DELIVER ist ein priority broadcast mit ~10 s ANR-Limit.
-        // `Telephony.Threads.getOrCreateThreadId` und `contentResolver.insert`
-        // sind beide Binder + Disk-IO — werden hier auf einen Worker-Thread
-        // ausgelagert, sodass der Main-Thread des Receivers nicht blockiert.
         val pending = goAsync()
         Thread {
             try {
@@ -90,14 +82,15 @@ class DeliverSmsReceiver : BroadcastReceiver() {
             null
         }
 
-        Log.d(TAG, "Inserted real SMS from $address (${body.length} chars), uri=$insertedUri")
-        postIncomingSmsNotification(context, address, body)
+        Log.d(TAG, "Inserted real SMS from $address (${body.length} chars), uri=$insertedUri, threadId=$threadId")
+        postIncomingSmsNotification(context, address, body, threadId)
     }
 
     private fun postIncomingSmsNotification(
         context: Context,
         address: String,
-        body: String
+        body: String,
+        threadId: Long
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
@@ -111,25 +104,14 @@ class DeliverSmsReceiver : BroadcastReceiver() {
 
         val nm = context.getSystemService<NotificationManager>() ?: return
 
-        val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse("smsto:$address")).apply {
-            setPackage(GOOGLE_MESSAGES_PKG)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse("smsto:$address")).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        val chosenIntent =
-            if (openIntent.resolveActivity(context.packageManager) != null) openIntent
-            else fallbackIntent
-
         val pi = PendingIntent.getActivity(
             context,
             address.hashCode(),
-            chosenIntent,
+            MainActivity.threadIntent(context, threadId),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_DIAGNOSTIC)
+        val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_FALLBACK)
             .setSmallIcon(android.R.drawable.sym_action_email)
             .setContentTitle(context.localizedString(R.string.sms_incoming_title, address))
             .setContentText(body)
@@ -150,7 +132,6 @@ class DeliverSmsReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "DeliverSmsReceiver"
-        private const val GOOGLE_MESSAGES_PKG = "com.google.android.apps.messaging"
         private const val NOTIF_ID_BASE = 3000
     }
 }
