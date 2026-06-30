@@ -19,6 +19,9 @@ data class ToolCall(
     val argumentsJson: String
 )
 
+/** Ergebnis eines Tool-Calls, bereit zum Zurücksenden an den Provider. */
+data class ToolResult(val callId: String, val output: String)
+
 data class TokenUsage(
     val inputTokens: Int,
     val outputTokens: Int,

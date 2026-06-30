@@ -18,6 +18,7 @@ import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,7 +52,9 @@ data class AssistantUiState(
     val triggerInFlight: Boolean = false,
     val keyTestRunning: Boolean = false,
     val keyTestResult: KeyTestOutcome? = null,
-    val lastFeedback: String? = null
+    val hasLocationPermission: Boolean = false,
+    val lastFeedback: String? = null,
+    val isSystemPromptCustomized: Boolean = false
 )
 
 @HiltViewModel
@@ -63,6 +66,7 @@ class AssistantViewModel @Inject constructor(
     private val coordinator: AssistantTriggerCoordinator,
     private val contactProvisioner: AssistantContactProvisioner,
     private val teslaContactResync: TeslaContactResync,
+    private val permissionGate: PermissionGate,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -95,7 +99,9 @@ class AssistantViewModel @Inject constructor(
                     webSearchEnabled = prefs.webSearchEnabled(),
                     xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
-                    voiceAliasName = prefs.voiceAliasName()
+                    voiceAliasName = prefs.voiceAliasName(),
+                    hasLocationPermission = permissionGate.hasLocationAccess(),
+                    isSystemPromptCustomized = prefs.isSystemPromptCustomized()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
@@ -225,7 +231,17 @@ class AssistantViewModel @Inject constructor(
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
 
     fun setSystemPrompt(value: String) =
-        edit("system_prompt", { it.copy(systemPrompt = value) }) { prefs.setSystemPrompt(value) }
+        edit("system_prompt", { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
+            prefs.setSystemPrompt(value)
+        }
+
+    fun resetSystemPromptToDefault() {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.resetSystemPromptToDefault()
+            val defaultPrompt = prefs.systemPromptRaw()
+            _uiState.update { it.copy(systemPrompt = defaultPrompt, isSystemPromptCustomized = false) }
+        }
+    }
 
     fun setWelcome(value: String) =
         edit("welcome", { it.copy(welcomeMessage = value) }) { prefs.setWelcomeMessage(value) }

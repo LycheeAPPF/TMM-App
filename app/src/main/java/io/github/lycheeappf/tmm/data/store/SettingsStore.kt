@@ -99,6 +99,48 @@ class SettingsStore @Inject constructor(
         store.edit { it[intPreferencesKey(KEY_SEND_BUDGET)] = value }
     }
 
+    /**
+     * Schaltet das Tageslimit ([SendBudget]) komplett ab/an. Default `true` —
+     * ohne Limit kann ein Messenger-Runaway beliebig viele Fake-SMS in die
+     * SMS-DB schreiben, und im (unwahrscheinlichen) Fall eines Carriers, der die
+     * +888-Antwort doch zustellt, entstehen Reply-Kosten ohne Obergrenze.
+     */
+    suspend fun isSendBudgetEnabled(): Boolean =
+        store.data.first()[androidx.datastore.preferences.core.booleanPreferencesKey(KEY_SEND_BUDGET_ENABLED)] ?: true
+
+    suspend fun setSendBudgetEnabled(value: Boolean) {
+        store.edit { it[androidx.datastore.preferences.core.booleanPreferencesKey(KEY_SEND_BUDGET_ENABLED)] = value }
+    }
+
+    // ---------- Tesla-Bluetooth-Verbindung ----------
+
+    /**
+     * MAC-Adresse des gekoppelten Tesla-Geräts. Ist sie gesetzt, leitet die App
+     * Nachrichten nur weiter, während genau dieses Gerät per Bluetooth verbunden
+     * ist (siehe `BluetoothConnectionChecker`). Null = kein Gerät gewählt → Gate
+     * inaktiv (Fail-Open, leitet rund um die Uhr weiter wie vorher).
+     */
+    suspend fun teslaBtAddress(): String? =
+        store.data.first()[stringPreferencesKey(KEY_TESLA_BT_ADDRESS)]?.takeIf { it.isNotBlank() }
+
+    /** Anzeigename des gewählten Tesla-Geräts (nur für die UI). */
+    suspend fun teslaBtName(): String? =
+        store.data.first()[stringPreferencesKey(KEY_TESLA_BT_NAME)]?.takeIf { it.isNotBlank() }
+
+    suspend fun setTeslaBtDevice(address: String, name: String) {
+        store.edit {
+            it[stringPreferencesKey(KEY_TESLA_BT_ADDRESS)] = address
+            it[stringPreferencesKey(KEY_TESLA_BT_NAME)] = name
+        }
+    }
+
+    suspend fun clearTeslaBtDevice() {
+        store.edit {
+            it.remove(stringPreferencesKey(KEY_TESLA_BT_ADDRESS))
+            it.remove(stringPreferencesKey(KEY_TESLA_BT_NAME))
+        }
+    }
+
     // ---------- TTL ----------
 
     suspend fun mappingTtlHours(): Int =
@@ -184,6 +226,9 @@ class SettingsStore @Inject constructor(
         private const val KEY_NEXT_MAPPING_ID = "next_mapping_id_global"
         private const val KEY_LAST_OUTBOX_ID = "last_outbox_id"
         private const val KEY_SEND_BUDGET = "send_budget_per_day"
+        private const val KEY_SEND_BUDGET_ENABLED = "send_budget_enabled"
+        private const val KEY_TESLA_BT_ADDRESS = "tesla_bt_address"
+        private const val KEY_TESLA_BT_NAME = "tesla_bt_name"
         private const val KEY_TTL_HOURS = "mapping_ttl_hours"
         private const val KEY_PREFLIGHT_RESULT = "preflight_result"
         private const val KEY_ONBOARDED = "is_onboarded"

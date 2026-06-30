@@ -64,7 +64,18 @@ class GrokProvider @Inject constructor(
             req.history.forEach { turn ->
                 add(ResponsesInputItem(role = turn.role, content = turn.content))
             }
+            // User-Turn gehört zum ersten API-Call und steht immer vor den Tool-Items.
             add(ResponsesInputItem(role = "user", content = req.userMessage))
+            // Zwischenstände des Tool-Execution-Loops (leer beim ersten Call):
+            // function_call-Block des Modells, dann unsere function_call_output-Ergebnisse.
+            req.inFlightToolCalls.forEach { call ->
+                add(ResponsesInputItem(type = "function_call", callId = call.id,
+                    name = call.name, arguments = call.argumentsJson))
+            }
+            req.inFlightToolResults.forEach { result ->
+                add(ResponsesInputItem(type = "function_call_output",
+                    callId = result.callId, output = result.output))
+            }
         }
         // Client-Function-Tools (V2 leer) + server-seitige Agent-Tools (web/x search).
         val tools = buildList {

@@ -98,4 +98,19 @@
     <string name="quickreply_failed_text_generic">Tap, um SMS in Google Messages zu öffnen</string>
     <string name="quickreply_failed_big">Das System hat über diese App eine Quick-Reply-SMS senden wollen (z.B. aus der Anruf-UI). Diese App sendet keine SMS — bitte öffne Google Messages und sende den Text manuell.\n\n%1$s</string>
     <string name="shell_not_full_client_toast">Tesla Messages Manager ist kein vollwertiger SMS-Client. Installiere Google Messages, um echte SMS zu senden.</string>
+
+    <!-- Tesla Fleet API settings -->
+    <string name="tesla_api_section">Tesla Fleet API</string>
+    <string name="tesla_api_card_title">Tesla-Fahrzeugverbindung</string>
+    <string name="tesla_api_card_desc">Mit Tesla-Account einloggen, um per Grok direkt Navigationsziele an das Fahrzeug zu senden.</string>
+    <string name="tesla_api_connect">Mit Tesla verbinden</string>
+    <string name="tesla_api_disconnect">Verbindung trennen</string>
+    <string name="tesla_api_status_connected">Verbunden</string>
+    <string name="tesla_api_status_not_connected">Nicht verbunden</string>
+    <string name="tesla_api_status_loading">Lädt…</string>
+    <string name="tesla_api_vehicle_label">Fahrzeug</string>
+    <string name="tesla_api_no_vehicle">Kein Fahrzeug gewählt</string>
+    <string name="tesla_api_token_expires">Token läuft ab: %1$s</string>
+    <string name="tesla_api_error_prefix">Fehler: %1$s</string>
+    <string name="tesla_api_client_id_missing">client_id nicht konfiguriert — siehe TeslaOAuthConfig.kt</string>
 </resources>

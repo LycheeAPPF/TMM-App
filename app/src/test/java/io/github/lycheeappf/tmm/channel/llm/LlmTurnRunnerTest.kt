@@ -8,6 +8,7 @@ import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.location.ILocationProvider
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
@@ -26,13 +27,14 @@ class LlmTurnRunnerTest {
     private val limiter: LlmRateLimiter = mockk()
     private val formatter = LlmResponseFormatter()
     private val toolRegistry: ToolRegistry = mockk(relaxed = true)
+    private val locationProvider: ILocationProvider = mockk(relaxed = true)
     private val logBuffer: LogBuffer = mockk(relaxed = true)
 
     private lateinit var runner: LlmTurnRunner
 
     @Before fun setup() {
         coEvery { prefs.model() } returns "grok-4.3"
-        coEvery { prefs.systemPrompt(any(), any()) } returns "Sys"
+        coEvery { prefs.systemPrompt(any(), any(), anyNullable()) } returns "Sys"
         coEvery { prefs.maxTokens() } returns 256
         coEvery { prefs.temperature() } returns 0.7f
         coEvery { prefs.webSearchEnabled() } returns false
@@ -42,7 +44,9 @@ class LlmTurnRunnerTest {
         // refund() wird bei Provider-Failure / EmptyResponse aufgerufen — mockk
         // wirft sonst MockKException ("missing answer").
         coEvery { limiter.refund(any()) } returns Unit
-        runner = LlmTurnRunner(store, provider, prefs, limiter, formatter, toolRegistry, logBuffer) { 1_000L }
+        runner = LlmTurnRunner(
+            store, provider, prefs, limiter, formatter, toolRegistry, locationProvider, logBuffer
+        ) { 1_000L }
     }
 
     @Test fun `success appends user and assistant turns`() = runTest {
@@ -74,7 +78,7 @@ class LlmTurnRunnerTest {
         runner.run(7L, "Frage?")
         assertThat(captured.captured.webSearch).isTrue()
         assertThat(captured.captured.xSearch).isTrue()
-        coVerify { prefs.systemPrompt(true, true) }
+        coVerify { prefs.systemPrompt(true, true, anyNullable()) }
     }
 
     @Test fun `provider failure keeps history clean`() = runTest {

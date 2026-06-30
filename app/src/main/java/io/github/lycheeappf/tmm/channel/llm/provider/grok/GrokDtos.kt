@@ -39,9 +39,11 @@ data class ResponsesRequest(
 data class ResponsesInputItem(
     val role: String? = null,
     val content: String? = null,
-    val type: String? = null,                          // "function_call_output" für tool result
+    val type: String? = null,      // "function_call" | "function_call_output"
     @SerialName("call_id") val callId: String? = null,
-    val output: String? = null
+    val output: String? = null,    // für function_call_output
+    val name: String? = null,      // für function_call (Modell-Output, im Folge-Request wiederholt)
+    val arguments: String? = null  // für function_call
 )
 
 /**
