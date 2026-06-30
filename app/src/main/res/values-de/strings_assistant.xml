@@ -60,6 +60,7 @@
 
     <string name="assistant_behavior_title">Verhalten von Grok</string>
     <string name="assistant_behavior_desc">Leitet Grok an, wie es antworten soll. {driver} wird durch deinen Namen ersetzt. Kurz halten — geht in jede Anfrage ein.</string>
+    <string name="assistant_behavior_reset">Standard wiederherstellen</string>
 
     <string name="assistant_ttl_title">Verlauf verwerfen nach</string>
     <string name="assistant_ttl_desc">Nach so vielen Sekunden ohne Eingabe wird der Gesprächsverlauf gelöscht.</string>

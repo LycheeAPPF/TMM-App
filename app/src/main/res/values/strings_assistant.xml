@@ -60,6 +60,7 @@
 
     <string name="assistant_behavior_title">Grok behavior</string>
     <string name="assistant_behavior_desc">Instructs Grok how it should reply. {driver} is replaced by your name. Keep it short — it goes into every request.</string>
+    <string name="assistant_behavior_reset">Restore default</string>
 
     <string name="assistant_ttl_title">Discard history after</string>
     <string name="assistant_ttl_desc">After this many seconds without input, the conversation history is deleted.</string>

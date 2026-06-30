@@ -53,7 +53,8 @@ data class AssistantUiState(
     val keyTestRunning: Boolean = false,
     val keyTestResult: KeyTestOutcome? = null,
     val hasLocationPermission: Boolean = false,
-    val lastFeedback: String? = null
+    val lastFeedback: String? = null,
+    val isSystemPromptCustomized: Boolean = false
 )
 
 @HiltViewModel
@@ -99,7 +100,8 @@ class AssistantViewModel @Inject constructor(
                     xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
                     voiceAliasName = prefs.voiceAliasName(),
-                    hasLocationPermission = permissionGate.hasLocationAccess()
+                    hasLocationPermission = permissionGate.hasLocationAccess(),
+                    isSystemPromptCustomized = prefs.isSystemPromptCustomized()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
@@ -229,7 +231,17 @@ class AssistantViewModel @Inject constructor(
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
 
     fun setSystemPrompt(value: String) =
-        edit("system_prompt", { it.copy(systemPrompt = value) }) { prefs.setSystemPrompt(value) }
+        edit("system_prompt", { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
+            prefs.setSystemPrompt(value)
+        }
+
+    fun resetSystemPromptToDefault() {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.resetSystemPromptToDefault()
+            val defaultPrompt = prefs.systemPromptRaw()
+            _uiState.update { it.copy(systemPrompt = defaultPrompt, isSystemPromptCustomized = false) }
+        }
+    }
 
     fun setWelcome(value: String) =
         edit("welcome", { it.copy(welcomeMessage = value) }) { prefs.setWelcomeMessage(value) }

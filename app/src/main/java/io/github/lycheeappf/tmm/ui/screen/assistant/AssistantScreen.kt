@@ -340,6 +340,11 @@ fun AssistantScreen(
                     maxLines = 10,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (state.isSystemPromptCustomized) {
+                    TextButton(onClick = { viewModel.resetSystemPromptToDefault() }) {
+                        Text(stringResource(R.string.assistant_behavior_reset))
+                    }
+                }
             }
 
             // ---- Parameter ----

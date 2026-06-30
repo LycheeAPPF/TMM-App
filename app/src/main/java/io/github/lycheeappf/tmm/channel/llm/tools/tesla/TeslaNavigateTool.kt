@@ -23,7 +23,7 @@ import javax.inject.Inject
  * (z.B. "Navigiere mich zur nächsten Apotheke"). Das Tool leitet den Zielort
  * an [TeslaVehicleCommandClient] weiter, der die Fleet-API-Call ausführt.
  *
- * GPS-Koordinaten haben Vorrang vor der Adresse (präziser für das Tesla-Navi).
+ * Bei vagen Zielen sucht Grok via Websuche die konkrete Adresse, bevor es das Tool aufruft.
  */
 class TeslaNavigateTool @Inject constructor(
     private val commandClient: TeslaVehicleCommandClient,
@@ -34,7 +34,10 @@ class TeslaNavigateTool @Inject constructor(
         name = "tesla_navigate",
         description = "Sends a navigation destination to the driver's Tesla vehicle via the Fleet API. " +
             "Call this when the driver asks to navigate somewhere, find a route, or go to a place. " +
-            "Pass the destination as address text; do NOT pass GPS coordinates. " +
+            "Always pass a specific, concrete address or place name — never a vague query. " +
+            "For vague destinations (e.g. 'nearest pharmacy', 'Italian restaurant nearby'): " +
+            "use web search first to find the actual address near the driver, " +
+            "then call this tool with the specific address found. " +
             "Requires Tesla account login in the app settings. " +
             "If it fails with 'Kein Tesla-Fahrzeug konfiguriert', tell the driver to connect their Tesla account in the app settings.",
         parametersJson = buildJsonObject {
