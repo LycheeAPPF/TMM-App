@@ -27,6 +27,22 @@
          API-Key konfiguriert, werden keine Outbound-Calls gemacht. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- BLUETOOTH_CONNECT: erkennt, ob das Handy mit dem gewählten Tesla verbunden
+         ist (verbundene HFP/A2DP-Geräte lesen). Nur dann werden Nachrichten
+         weitergeleitet. Optional — ohne Auswahl/Permission greift Fail-Open. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
+    <!-- ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION: aktueller Standort wird als
+         Kontext an Grok übermittelt, damit standortbezogene Fragen ("Restaurant in
+         der Nähe") korrekt beantwortet werden können. Optional — ohne Permission
+         wird kein Standort gesendet; die übrige Funktionalität ist unberührt. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
 
     <queries>
         <intent>
@@ -57,10 +73,21 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.TeslaMessagesManager">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Tesla OAuth2 Callback-URL -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="io.github.lycheeappf.tmm"
+                    android:host="tesla"
+                    android:path="/callback" />
             </intent-filter>
         </activity>
 

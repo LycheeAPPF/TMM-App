@@ -17,6 +17,7 @@ dataStore = "1.1.1"
 serializationJson = "1.7.3"
 coroutines = "1.9.0"
 startup = "1.2.0"
+browser = "1.8.0"
 junit = "4.13.2"
 junitExt = "1.2.1"
 androidxTestCore = "1.6.1"
@@ -31,6 +32,7 @@ retrofit = "2.11.0"
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-startup = { module = "androidx.startup:startup-runtime", version.ref = "startup" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }

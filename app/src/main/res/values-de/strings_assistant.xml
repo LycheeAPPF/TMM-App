@@ -8,6 +8,10 @@
     <string name="assistant_consent_granted">Eingewilligt — Start freigegeben.</string>
     <string name="assistant_consent_not_granted">Noch nicht eingewilligt — Start blockiert.</string>
 
+    <string name="assistant_location_title">Standortzugriff</string>
+    <string name="assistant_location_desc">Lässt Grok standortbezogene Fragen beantworten ("bestes Restaurant in der Nähe"). Die GPS-Koordinaten werden mit jeder xAI-Anfrage übermittelt — gleiche Vertrauensgrenze wie das Diktat.</string>
+    <string name="assistant_location_action">Berechtigung erteilen</string>
+
     <string name="assistant_apikey_title">xAI-API-Key</string>
     <string name="assistant_apikey_desc">Wird verschlüsselt auf dem Gerät gespeichert und nicht ins Backup übernommen.</string>
     <string name="assistant_apikey_active">Key aktiv</string>
@@ -56,6 +60,7 @@
 
     <string name="assistant_behavior_title">Verhalten von Grok</string>
     <string name="assistant_behavior_desc">Leitet Grok an, wie es antworten soll. {driver} wird durch deinen Namen ersetzt. Kurz halten — geht in jede Anfrage ein.</string>
+    <string name="assistant_behavior_reset">Standard wiederherstellen</string>
 
     <string name="assistant_ttl_title">Verlauf verwerfen nach</string>
     <string name="assistant_ttl_desc">Nach so vielen Sekunden ohne Eingabe wird der Gesprächsverlauf gelöscht.</string>

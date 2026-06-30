@@ -304,7 +304,7 @@ class MappingRepositoryImplTest {
     }
 
     @Test
-    fun `sweepStaleAssistantMappings removes non-reserved LLM rows and preserves id 0`() = runTest {
+    fun `sweepStaleAssistantMappings removes non-reserved LLM rows and preserves ids 0 and 1`() = runTest {
         val now = System.currentTimeMillis()
         fun llm(id: Long) = MappingEntity(
             mappingId = id,
@@ -329,9 +329,39 @@ class MappingRepositoryImplTest {
             contactSyncWriter.deleteContact("+88810000003")
             dao.deleteById(3L, ChannelId.LLM.code)
         }
-        // Reservierte id 0 bleibt unangetastet.
+        // Beide reservierte Ids (Grok id 0 + Sprach-Alias id 1) bleiben unangetastet.
         coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
+    }
+
+    @Test
+    fun `sweepStaleAssistantMappings preserves voice alias id 1 when stale LLM row with id 1 exists`() = runTest {
+        // Regressionstest: vor der Einführung von RESERVED_MAPPING_IDS = {0, 1} konnte
+        // nextMappingId() id=1 an eine LLM-Session vergeben. Diese Altlast-Row hat
+        // fakeAddress=+88810000001 — exakt die Sprach-Alias-Adresse. Der Sweep DARF
+        // sie weder löschen (Kontakt) noch aus der DB entfernen.
+        val now = System.currentTimeMillis()
+        val staleVoiceAliasRow = MappingEntity(
+            mappingId = 1L,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+88810000001",
+            conversationKey = "default-assistant-1",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(staleVoiceAliasRow)
+
+        val removed = repository.sweepStaleAssistantMappings()
+
+        assertThat(removed).isEqualTo(0)
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
     @Test
@@ -349,7 +379,7 @@ class MappingRepositoryImplTest {
             replyCount = 0,
             replyable = true
         )
-        // Zwei Altlast-Rows neben der reservierten id 0 → beide müssen weg (count == 2).
+        // Zwei Altlast-Rows neben den reservierten Ids 0 und 1 → beide müssen weg (count == 2).
         // Schützt gegen eine break-/return-nach-erstem-Regression, die nur 1 entfernte.
         coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(llm(0L), llm(3L), llm(4L))
         coEvery { dao.deleteById(3L, ChannelId.LLM.code) } returns 1
@@ -362,9 +392,11 @@ class MappingRepositoryImplTest {
         coVerify { contactSyncWriter.deleteContact("+88810000004") }
         coVerify { dao.deleteById(3L, ChannelId.LLM.code) }
         coVerify { dao.deleteById(4L, ChannelId.LLM.code) }
-        // Reservierte id 0 unangetastet.
+        // Reservierte Ids 0 und 1 unangetastet.
         coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
     @Test

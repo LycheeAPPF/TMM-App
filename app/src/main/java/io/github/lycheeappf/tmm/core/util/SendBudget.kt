@@ -30,6 +30,10 @@ class SendBudget @Inject constructor(
     private val mutex = kotlinx.coroutines.sync.Mutex()
 
     suspend fun checkAndIncrement(): Boolean {
+        // Limit per Settings abgeschaltet → unbegrenzt erlauben: kein Count, kein
+        // Overflow-Notif. Früher Ausstieg vor Mutex/Read, damit der „Aus"-Pfad
+        // keinerlei DataStore-Schreibzugriff verursacht.
+        if (!settingsStore.isSendBudgetEnabled()) return true
         // Check + Increment werden über einen Mutex serialisiert, damit unter
         // gleichzeitig ankommenden Notifications zwei Aufrufer nicht beide den
         // Budget-Check passieren und dann jeweils inkrementieren (count overshoot).
@@ -55,6 +59,10 @@ class SendBudget @Inject constructor(
      * laufender check+inc keinen stale Count sieht.
      */
     suspend fun rollback() {
+        // Bei abgeschaltetem Limit wurde in [checkAndIncrement] nichts reserviert —
+        // ein Decrement würde einen evtl. noch von früher (Limit war an) stehenden
+        // Tageszähler fälschlich verringern. Daher symmetrisch früh aussteigen.
+        if (!settingsStore.isSendBudgetEnabled()) return
         mutex.withLock { settingsStore.decrementDailySendCount() }
     }
 

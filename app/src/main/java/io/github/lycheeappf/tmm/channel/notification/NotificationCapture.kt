@@ -10,6 +10,7 @@ import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
 import io.github.lycheeappf.tmm.listener.filter.MessagingStyleExtractor
 import io.github.lycheeappf.tmm.listener.filter.WhitelistFilter
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
 import io.github.lycheeappf.tmm.sms.provider.SmsContentProviderWriter
 import kotlinx.coroutines.sync.Mutex
@@ -28,9 +29,11 @@ import javax.inject.Singleton
  * 3. **Dedup**: gleicher (conversationKey, bodyHash) wie vorher → skip
  *    (Messenger posten oft mehrere Update-Events für dieselbe Nachricht)
  * 4. roleManager.isDefault()
- * 5. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
- * 6. Mapping allocate/reuse + ActionCache + injectIncoming
- * 7. Bei Insert-Fehler: SendBudget.rollback() ← reservierten Slot wieder freigeben
+ * 5. **Bluetooth**: gewählter Tesla verbunden? (sonst droppen — vor dem Budget,
+ *    damit „nicht im Auto" das Tageslimit nicht verbraucht). Fail-open ohne Auswahl.
+ * 6. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
+ * 7. Mapping allocate/reuse + ActionCache + injectIncoming
+ * 8. Bei Insert-Fehler: SendBudget.rollback() ← reservierten Slot wieder freigeben
  */
 @Singleton
 class NotificationCapture @Inject constructor(
@@ -42,6 +45,7 @@ class NotificationCapture @Inject constructor(
     private val smsWriter: SmsContentProviderWriter,
     private val sendBudget: SendBudget,
     private val roleManager: DefaultSmsRoleManager,
+    private val bluetoothConnectionChecker: BluetoothConnectionChecker,
     private val settingsStore: SettingsStore,
     private val logBuffer: LogBuffer
 ) {
@@ -59,6 +63,13 @@ class NotificationCapture @Inject constructor(
      * Speicherkosten: 500 Einträge × Ø 80 Bytes = ~40 KB. Vertretbar.
      */
     private val lastBodies = ConcurrentHashMap<String, String>()
+
+    /**
+     * Throttle für die „Tesla nicht verbunden"-Log-Zeile: nur einmal pro
+     * Disconnect-Phase schreiben (zurückgesetzt sobald wieder weitergeleitet wird).
+     * Kein @Volatile nötig — Zugriff ausschließlich serialisiert unter [captureMutex].
+     */
+    private var disconnectedDropLogged = false
 
     suspend fun onPosted(sbn: StatusBarNotification) {
         try {
@@ -86,6 +97,22 @@ class NotificationCapture @Inject constructor(
             logBuffer.warn(TAG, "Skipped ${sbn.key}: not default SMS app")
             return
         }
+
+        // Nur weiterleiten, wenn das Handy mit dem gewählten Tesla verbunden ist.
+        // VOR dem Budget-Reserve, damit „nicht im Auto" das Tageslimit nicht
+        // verbraucht. Fail-open, solange kein Gerät gewählt/Permission fehlt.
+        if (!bluetoothConnectionChecker.isTeslaConnected()) {
+            Log.i(TAG, "Skipping capture: Tesla not connected — ${sbn.key} dropped")
+            // Nur EINMAL pro Disconnect-Phase ins exportierbare LogBuffer schreiben —
+            // sonst flutet jede gedroppte Notification das (geteilte) Diagnose-Log.
+            if (!disconnectedDropLogged) {
+                logBuffer.info(TAG, "Tesla not connected — dropping notifications until reconnect")
+                disconnectedDropLogged = true
+            }
+            return
+        }
+        // Verbindung steht wieder → nächste Disconnect-Phase darf erneut einmal loggen.
+        disconnectedDropLogged = false
 
         if (!sendBudget.checkAndIncrement()) {
             Log.w(TAG, "Skipping capture: send budget reached for today")

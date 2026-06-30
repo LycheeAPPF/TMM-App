@@ -9,6 +9,7 @@ import io.github.lycheeappf.tmm.channel.llm.GrokKeyTester
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.mockk
@@ -47,9 +48,11 @@ class AssistantViewModelTest {
     private val coordinator = mockk<AssistantTriggerCoordinator>(relaxed = true)
     private val contactProvisioner = mockk<AssistantContactProvisioner>(relaxed = true)
     private val teslaContactResync = mockk<TeslaContactResync>(relaxed = true)
+    private val permissionGate = mockk<PermissionGate>(relaxed = true)
 
     private fun viewModel() = AssistantViewModel(
-        context, prefs, apiKeyStore, keyTester, coordinator, contactProvisioner, teslaContactResync, dispatcher
+        context, prefs, apiKeyStore, keyTester, coordinator, contactProvisioner,
+        teslaContactResync, permissionGate, dispatcher
     )
 
     @Before

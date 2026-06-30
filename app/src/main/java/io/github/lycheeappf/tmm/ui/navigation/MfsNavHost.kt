@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -35,7 +36,12 @@ fun MfsNavHost(
             OnboardingScreen(
                 onFinished = {
                     navController.navigate(MfsDestination.Home.route) {
-                        popUpTo(MfsDestination.Onboarding.route) { inclusive = true }
+                        // Kompletten Back-Stack leeren — korrekt für BEIDE Einstiege:
+                        // Erststart (Start=Onboarding) und „Setup erneut" aus den Settings
+                        // (Start=Home). Danach liegt nur Home auf dem Stack, Zurück verlässt
+                        // die App (kein doppeltes Home, kein verwaister Settings-Eintrag).
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onOpenWhitelist = { navController.navigate(MfsDestination.Whitelist.route) }
@@ -56,7 +62,11 @@ fun MfsNavHost(
                 bottomBar = bottomBar,
                 onOpenWhitelist = { navController.navigate(MfsDestination.Whitelist.route) },
                 onOpenDiagnostics = { navController.navigate(MfsDestination.Diagnostics.route) },
-                onOpenChannels = { navController.navigate(MfsDestination.Channels.route) }
+                onOpenChannels = { navController.navigate(MfsDestination.Channels.route) },
+                // Setup erneut ansehen (Dev): Onboarding-Screen öffnen. Setzt das
+                // Onboarded-Flag NICHT zurück — die Schritte zeigen ihren Ist-Zustand;
+                // „Fertig" landet wieder auf Home.
+                onRestartSetup = { navController.navigate(MfsDestination.Onboarding.route) }
             )
         }
         composable(MfsDestination.Assistant.route) {
@@ -77,7 +87,17 @@ fun MfsNavHost(
         ) {
             SmsThreadScreen(onBack = { navController.popBackStack() })
         }
-        composable(MfsDestination.SmsCompose.route) {
+        composable(
+            route = "${MfsDestination.SmsCompose.route}?recipient={recipient}&body={body}",
+            arguments = listOf(
+                navArgument("recipient") {
+                    type = NavType.StringType; nullable = true; defaultValue = null
+                },
+                navArgument("body") {
+                    type = NavType.StringType; nullable = true; defaultValue = null
+                }
+            )
+        ) {
             SmsComposeScreen(onBack = { navController.popBackStack() })
         }
         // Entwickler-/Diagnose-Oberflächen: nur registriert wenn Developer-Mode an

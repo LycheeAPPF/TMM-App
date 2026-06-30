@@ -169,7 +169,7 @@ class MappingRepositoryImpl @Inject constructor(
         var removed = 0
         val llmRows = dao.findByChannel(ChannelId.LLM.code)
         for (entity in llmRows) {
-            if (entity.mappingId == AssistantIdentity.RESERVED_MAPPING_ID) continue
+            if (entity.mappingId in AssistantIdentity.RESERVED_MAPPING_IDS) continue
             // ZUERST Kontakt löschen (fakeAddress als Lookup-Key), DANN die Row.
             coRunCatching { contactSyncWriter.deleteContact(entity.fakeAddress) }
             dao.deleteById(entity.mappingId, ChannelId.LLM.code)

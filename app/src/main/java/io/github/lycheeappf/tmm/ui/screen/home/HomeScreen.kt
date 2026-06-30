@@ -162,10 +162,15 @@ fun HomeScreen(
                     )
                     StatusRow(
                         stringResource(R.string.home_status_forwarded_label),
-                        stringResource(
-                            R.string.home_status_forwarded_value,
-                            state.sendCountToday,
-                            state.sendBudget
+                        if (state.sendBudgetEnabled)
+                            stringResource(
+                                R.string.home_status_forwarded_value,
+                                state.sendCountToday,
+                                state.sendBudget
+                            )
+                        else stringResource(
+                            R.string.home_status_forwarded_unlimited,
+                            state.sendCountToday
                         )
                     )
                     StatusRow(

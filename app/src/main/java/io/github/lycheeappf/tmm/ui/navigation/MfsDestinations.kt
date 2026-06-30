@@ -34,6 +34,18 @@ const val ARG_THREAD_ID = "threadId"
 /** Konkrete Route in einen SMS-Thread mit gegebener `thread_id`. */
 fun smsThreadRoute(threadId: Long): String = "sms_thread/$threadId"
 
+/** Konkrete Route zum SMS-Compose-Screen, optional mit vorausgefülltem Empfänger/Text. */
+fun smsComposeRoute(recipient: String? = null, body: String? = null): String = buildString {
+    append(MfsDestination.SmsCompose.route)
+    val params = listOfNotNull(
+        recipient?.takeIf { it.isNotBlank() }
+            ?.let { "recipient=${android.net.Uri.encode(it)}" },
+        body?.takeIf { it.isNotBlank() }
+            ?.let { "body=${android.net.Uri.encode(it)}" }
+    )
+    if (params.isNotEmpty()) append("?${params.joinToString("&")}")
+}
+
 /**
  * Einträge der unteren NavigationBar: die drei Haupt-Ziele, zwischen denen der
  * User häufig wechselt. Whitelist/Channels/Diagnose sind Detail-/Dev-Routen und

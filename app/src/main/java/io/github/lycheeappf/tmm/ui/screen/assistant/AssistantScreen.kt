@@ -1,5 +1,7 @@
 package io.github.lycheeappf.tmm.ui.screen.assistant
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -45,6 +47,7 @@ import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.component.MfsStatus
 import io.github.lycheeappf.tmm.ui.component.PrimaryActionButton
 import io.github.lycheeappf.tmm.ui.component.SettingCard
+import io.github.lycheeappf.tmm.ui.component.StatusCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
@@ -69,6 +72,10 @@ fun AssistantScreen(
             viewModel.consumeFeedback()
         }
     }
+
+    val locationPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { viewModel.refresh() }
 
     MfsScaffold(
         title = stringResource(R.string.assistant_title),
@@ -109,6 +116,17 @@ fun AssistantScreen(
                     )
                 }
             }
+
+            // ---- Standort-Permission ----
+            StatusCard(
+                title = stringResource(R.string.assistant_location_title),
+                description = stringResource(R.string.assistant_location_desc),
+                isGranted = state.hasLocationPermission,
+                actionLabel = stringResource(R.string.assistant_location_action),
+                onAction = {
+                    locationPermLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            )
 
             // ---- API-Key ----
             SettingCard(
@@ -322,6 +340,11 @@ fun AssistantScreen(
                     maxLines = 10,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (state.isSystemPromptCustomized) {
+                    TextButton(onClick = { viewModel.resetSystemPromptToDefault() }) {
+                        Text(stringResource(R.string.assistant_behavior_reset))
+                    }
+                }
             }
 
             // ---- Parameter ----
