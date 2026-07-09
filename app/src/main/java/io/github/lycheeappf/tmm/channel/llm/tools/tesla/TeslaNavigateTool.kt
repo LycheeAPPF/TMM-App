@@ -19,6 +19,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Grok-Tool: sendet ein Navigationsziel an das Tesla-Fahrzeug per Fleet API.
@@ -29,6 +30,7 @@ import javax.inject.Inject
  *
  * Bei vagen Zielen sucht Grok via Websuche die konkrete Adresse, bevor es das Tool aufruft.
  */
+@Singleton
 class TeslaNavigateTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val commandClient: TeslaVehicleCommandClient,

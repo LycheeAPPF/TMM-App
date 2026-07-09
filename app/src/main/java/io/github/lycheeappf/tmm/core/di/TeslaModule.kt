@@ -5,9 +5,6 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.IntoSet
-import io.github.lycheeappf.tmm.channel.llm.tools.AssistantTool
-import io.github.lycheeappf.tmm.channel.llm.tools.tesla.TeslaNavigateTool
 import io.github.lycheeappf.tmm.data.store.DataStoreTeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.KeystoreTeslaTokenStore
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
@@ -64,11 +61,6 @@ object TeslaModule {
     @Singleton
     fun provideTeslaFleetApi(@TeslaRetrofit retrofit: Retrofit): TeslaFleetApi =
         retrofit.create(TeslaFleetApi::class.java)
-
-    @Provides
-    @Singleton
-    @IntoSet
-    fun provideTeslaNavigateTool(impl: TeslaNavigateTool): AssistantTool = impl
 
     /** Produktions-Endpunkte; Tests konstruieren [TeslaOAuthEndpoints] mit MockWebServer-URLs. */
     @Provides
