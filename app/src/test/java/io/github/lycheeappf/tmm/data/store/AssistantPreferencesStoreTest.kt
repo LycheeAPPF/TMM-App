@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.lycheeappf.tmm.platform.location.LocationFix
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -100,8 +101,15 @@ class AssistantPreferencesStoreTest {
 
     @Test
     fun `web and x search default off and persist`() = runTest {
+        // Suspend-Accessor UND Flow-Variante müssen VOR dem Setzen geprüft werden
+        // (der DataStore ist testübergreifend geteilt — ein eigener Test nach dem
+        // Persist-Teil sähe die mutierten Werte). Schützt vor einem erneuten
+        // Auseinanderlaufen der Defaults (der Suspend-Default war stillschweigend
+        // auf true gekippt worden).
         assertThat(store.webSearchEnabled()).isFalse()
         assertThat(store.xSearchEnabled()).isFalse()
+        assertThat(store.webSearchEnabledFlow().first()).isFalse()
+        assertThat(store.xSearchEnabledFlow().first()).isFalse()
 
         store.setWebSearchEnabled(true)
         store.setXSearchEnabled(true)
@@ -226,6 +234,53 @@ class AssistantPreferencesStoreTest {
     }
 
     @Test
+    fun `stored legacy3 default system-prompt migrates to the new default`() = runTest {
+        // Vor-Vorgänger (Navigations-Tool ohne Websuche-Vorschritt, „Im Erfolgsfall
+        // schweige") — unverändert gespeichert gilt weiterhin als Seed.
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY3_DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `stored legacy3 EN default system-prompt migrates to the new EN default`() = runTest {
+        locale = Locale.ENGLISH
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY3_DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `stored legacy2 default system-prompt migrates to the new default`() = runTest {
+        // Default aus der Zeit VOR dem Navigations-Tool („steuerst du nichts im Auto").
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY2_DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `stored legacy2 EN default system-prompt migrates to the new EN default`() = runTest {
+        locale = Locale.ENGLISH
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY2_DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `stored legacy seed follows a locale switch like an unmodified default`() = runTest {
+        // Ein Seed ist sprachneutral erkannt: alter DE-Default + Wechsel auf EN
+        // liefert den NEUEN EN-Default (nicht den DE-Text, nicht den Legacy-Text).
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY2_DEFAULT_SYSTEM_PROMPT)
+        locale = Locale.ENGLISH
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+    }
+
+    @Test
     fun `stored legacy default system-prompt migrates to the new default`() = runTest {
         store.setSystemPrompt(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT)
         // Wird als Seed erkannt → liefert den NEUEN (umformulierten) Default, nicht den Legacy-Text.
@@ -244,5 +299,73 @@ class AssistantPreferencesStoreTest {
             .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
         assertThat(store.systemPromptRaw())
             .isNotEqualTo(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT_EN)
+    }
+
+    // ---- isSystemPromptCustomized + Reset -----------------------------------
+
+    @Test
+    fun `never-touched system-prompt does not count as customized`() = runTest {
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `unmodified stored default does not count as customized in either locale`() = runTest {
+        store.setSystemPrompt(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+
+        locale = Locale.ENGLISH
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `genuinely custom system-prompt counts as customized`() = runTest {
+        store.setSystemPrompt("Antworte immer in Reimen, {driver}.")
+        assertThat(store.isSystemPromptCustomized()).isTrue()
+
+        locale = Locale.ENGLISH
+        assertThat(store.isSystemPromptCustomized()).isTrue()
+    }
+
+    @Test
+    fun `deliberately emptied system-prompt counts as customized`() = runTest {
+        // Ein bewusst geleertes Feld ist eine Nutzerentscheidung — der Reset-Button
+        // in den Settings muss dafür anwählbar bleiben.
+        store.setSystemPrompt("")
+        assertThat(store.isSystemPromptCustomized()).isTrue()
+    }
+
+    @Test
+    fun `reset clears a custom system-prompt back to the localized default`() = runTest {
+        store.setSystemPrompt("Sei knapp und sprich wie ein Pirat.")
+
+        store.resetSystemPromptToDefault()
+
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `reset restores the default after a deliberately emptied prompt`() = runTest {
+        store.setSystemPrompt("")
+
+        store.resetSystemPromptToDefault()
+
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `reset prompt follows a later locale switch like a fresh install`() = runTest {
+        store.setSystemPrompt("Ganz eigener Text.")
+        store.resetSystemPromptToDefault()
+
+        locale = Locale.ENGLISH
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+        locale = Locale.GERMAN
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
     }
 }

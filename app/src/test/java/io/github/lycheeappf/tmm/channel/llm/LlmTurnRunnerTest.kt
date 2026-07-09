@@ -24,6 +24,8 @@ import io.mockk.unmockkStatic
 import io.mockk.coVerify
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -204,6 +206,79 @@ class LlmTurnRunnerTest {
 
         runner.run(7L, "Frage?")
         coVerify { limiter.refund(7L) }
+    }
+
+    @Test fun `tool loop happy path executes the tool and feeds the result into a follow-up completion`() = runTest {
+        val toolOutput = """{"status":"ok","destination":"Alexanderplatz"}"""
+        val argsCaptured = slot<JsonObject>()
+        coEvery { toolRegistry.invoke("tesla_navigate", capture(argsCaptured)) } returns
+            ToolInvocationResult.Success(toolOutput)
+        val requests = mutableListOf<LlmRequest>()
+        coEvery { provider.complete(capture(requests)) } returnsMany listOf(
+            LlmResponse(
+                content = null,
+                toolCalls = listOf(ToolCall("c1", "tesla_navigate", """{"address":"Alexanderplatz"}""")),
+                finishReason = "tool_calls", usage = null, responseId = "r1"
+            ),
+            LlmResponse(
+                content = "Ich navigiere dich zum Alexanderplatz.", toolCalls = emptyList(),
+                finishReason = "stop", usage = null, responseId = "r2"
+            )
+        )
+
+        val result = runner.run(7L, "Navigier mich zum Alexanderplatz")
+
+        assertThat(result).isInstanceOf(LlmTurnRunner.TurnResult.Success::class.java)
+        assertThat((result as LlmTurnRunner.TurnResult.Success).assistantText)
+            .isEqualTo("Ich navigiere dich zum Alexanderplatz.")
+        // Tool genau einmal mit den geparsten Argumenten aufgerufen.
+        coVerify(exactly = 1) { toolRegistry.invoke("tesla_navigate", any()) }
+        assertThat(argsCaptured.captured["address"]?.jsonPrimitive?.content)
+            .isEqualTo("Alexanderplatz")
+        // Erster Request ohne In-Flight-Items; der Follow-up trägt Call + Result
+        // (Result-Output = unverändertes Tool-JSON, callId matcht den Tool-Call).
+        assertThat(requests).hasSize(2)
+        assertThat(requests[0].inFlightToolCalls).isEmpty()
+        assertThat(requests[0].inFlightToolResults).isEmpty()
+        assertThat(requests[1].inFlightToolCalls).hasSize(1)
+        assertThat(requests[1].inFlightToolCalls[0].name).isEqualTo("tesla_navigate")
+        assertThat(requests[1].inFlightToolResults).hasSize(1)
+        assertThat(requests[1].inFlightToolResults[0].callId).isEqualTo("c1")
+        assertThat(requests[1].inFlightToolResults[0].output).isEqualTo(toolOutput)
+        // Normaler Erfolg: History persistiert, kein Refund.
+        assertThat(store.snapshot(store.sessionFor(7L))).hasSize(2)
+        coVerify(exactly = 0) { limiter.refund(any()) }
+    }
+
+    @Test fun `tool failure is sent back to the model and its spoken error becomes the turn result`() = runTest {
+        coEvery { toolRegistry.invoke("tesla_navigate", any()) } returns
+            ToolInvocationResult.Failure("no vehicle configured")
+        val requests = mutableListOf<LlmRequest>()
+        coEvery { provider.complete(capture(requests)) } returnsMany listOf(
+            LlmResponse(
+                content = null,
+                toolCalls = listOf(ToolCall("c1", "tesla_navigate", "{}")),
+                finishReason = "tool_calls", usage = null, responseId = "r1"
+            ),
+            LlmResponse(
+                content = "Die Navigation hat leider nicht geklappt.", toolCalls = emptyList(),
+                finishReason = "stop", usage = null, responseId = "r2"
+            )
+        )
+
+        val result = runner.run(7L, "Navigier mich")
+
+        // Der Tool-Fehler geht als error-JSON an das Modell zurück …
+        assertThat(requests).hasSize(2)
+        assertThat(requests[1].inFlightToolResults[0].output)
+            .isEqualTo("""{"error":"no vehicle configured"}""")
+        // … und dessen verbalisierte Fehlermeldung wird als normaler Success
+        // vorgelesen — NICHT die Erfolgs-Fallback-Bestätigung.
+        assertThat(result).isInstanceOf(LlmTurnRunner.TurnResult.Success::class.java)
+        assertThat((result as LlmTurnRunner.TurnResult.Success).assistantText)
+            .isEqualTo("Die Navigation hat leider nicht geklappt.")
+        assertThat(result.assistantText).isNotEqualTo(FALLBACK_TEXT)
+        assertThat(store.snapshot(store.sessionFor(7L))).hasSize(2)
     }
 
     @Test fun `blank reply after successful tool call falls back to a localized confirmation`() = runTest {
