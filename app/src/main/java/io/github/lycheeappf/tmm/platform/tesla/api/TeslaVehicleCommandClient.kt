@@ -75,8 +75,9 @@ class TeslaVehicleCommandClient @Inject constructor(
         sendWithWakeUpRetry(vin, "navigation_request") {
             api.navigationRequest("${base}api/1/vehicles/$vin/command/navigation_request", "Bearer ${requireToken()}", body)
         }
-        logBuffer.info(TAG, "navigation_request OK")
-        Log.i(TAG, "navigation_request OK (vin=$vin, address=$address)")
+        // NIE Ziel/VIN loggen — nur Metadaten (siehe CLAUDE.md PII-Regel).
+        logBuffer.info(TAG, "navigation_request OK (address len=${address.length})")
+        Log.i(TAG, "navigation_request OK (address len=${address.length})")
     }
 
     /** Sendet GPS-Koordinaten als Navigationsziel, weckt das Fahrzeug vorher auf falls nötig. */
@@ -86,8 +87,9 @@ class TeslaVehicleCommandClient @Inject constructor(
         sendWithWakeUpRetry(vin, "navigation_gps_request") {
             api.navigationGps("${base}api/1/vehicles/$vin/command/navigation_gps_request", "Bearer ${requireToken()}", body)
         }
+        // NIE Koordinaten/VIN loggen — nur Metadaten (siehe CLAUDE.md PII-Regel).
         logBuffer.info(TAG, "navigation_gps_request OK")
-        Log.i(TAG, "navigation_gps_request OK (vin=$vin, lat=$lat, lon=$lon)")
+        Log.i(TAG, "navigation_gps_request OK")
     }
 
     /**
@@ -101,21 +103,22 @@ class TeslaVehicleCommandClient @Inject constructor(
     ) {
         var resp = call()
         if (!resp.isSuccessful && resp.code() in listOf(404, 408)) {
-            val body = resp.errorBody()?.string()
-            Log.w(TAG, "$endpoint offline (${resp.code()}): $body — waking up vehicle")
-            logBuffer.warn(TAG, "$endpoint: HTTP ${resp.code()} — Fahrzeug schläft, wake_up wird gesendet")
+            // Error-Body NIE loggen (könnte Request-Daten spiegeln) — nur Metadaten.
+            val bodyLen = resp.errorBody()?.string()?.length ?: 0
+            Log.w(TAG, "$endpoint offline (HTTP ${resp.code()}, body len=$bodyLen) — waking up vehicle")
+            logBuffer.warn(TAG, "$endpoint: HTTP ${resp.code()} — vehicle asleep, sending wake_up")
             wakeUpByVin(vin)
             delay(15_000L)
             resp = call()
         }
         val errorBody = if (!resp.isSuccessful) resp.errorBody()?.string() else null
         if (!resp.isSuccessful) {
-            logBuffer.error(TAG, "$endpoint fehlgeschlagen: HTTP ${resp.code()} — ${errorBody?.take(200)}")
-            mapErrorWithBody(resp.code(), errorBody)
+            logBuffer.error(TAG, "$endpoint failed: HTTP ${resp.code()} (body len=${errorBody?.length ?: 0})")
+            mapError(resp.code(), errorBody)
         }
         resp.body()?.response?.let { result ->
             if (!result.result) {
-                logBuffer.error(TAG, "$endpoint abgelehnt: ${result.reason}")
+                logBuffer.error(TAG, "$endpoint rejected (reason len=${result.reason?.length ?: 0})")
                 throw TeslaCommandError.CommandRejected(result.reason)
             }
         }
@@ -183,13 +186,6 @@ class TeslaVehicleCommandClient @Inject constructor(
     private fun mapError(code: Int, body: String?): Nothing = when (code) {
         401, 403 -> throw TeslaCommandError.Unauthorized()
         404 -> throw TeslaCommandError.VehicleNotFound()
-        else -> throw TeslaCommandError.Unknown(code, body?.take(200))
-    }
-
-    /** Wie [mapError], aber gibt bei 404 den Body mit aus (hilft bei der Fehlerdiagnose). */
-    private fun mapErrorWithBody(code: Int, body: String?): Nothing = when (code) {
-        401, 403 -> throw TeslaCommandError.Unauthorized()
-        404 -> throw TeslaCommandError.Unknown(404, "Fahrzeug nicht gefunden/offline: ${body?.take(150)}")
         else -> throw TeslaCommandError.Unknown(code, body?.take(200))
     }
 
