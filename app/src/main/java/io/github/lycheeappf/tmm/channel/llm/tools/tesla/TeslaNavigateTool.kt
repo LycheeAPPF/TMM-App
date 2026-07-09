@@ -13,7 +13,6 @@ import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
 import io.github.lycheeappf.tmm.platform.tesla.api.userMessage
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -71,13 +70,24 @@ class TeslaNavigateTool @Inject constructor(
 
         return try {
             commandClient.navigate(vin, address)
-            ToolInvocationResult.Success("""{"status":"ok","destination":"${address.replace("\"", "\\\"")
-                .take(200)}"}""")
+            // Ziel-Echo im Tool-Result, damit das Modell die gestartete Navigation in
+            // seiner Bestätigung benennen kann. Rohwert VOR dem Encoden kürzen —
+            // Escaping (Quotes/Backslashes/Newlines) übernimmt kotlinx.serialization.
+            val result = buildJsonObject {
+                put("status", "ok")
+                put("destination", address.take(MAX_DESTINATION_ECHO_CHARS))
+            }
+            ToolInvocationResult.Success(result.toString())
         } catch (e: TeslaCommandError) {
             ToolInvocationResult.Failure(e.userMessage(context))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             ToolInvocationResult.Failure(context.localizedString(R.string.tesla_error_network))
         }
+    }
+
+    companion object {
+        /** Max. Zeichen des Ziel-Echos im Tool-Result (nicht des Fleet-API-Calls). */
+        private const val MAX_DESTINATION_ECHO_CHARS = 200
     }
 }
