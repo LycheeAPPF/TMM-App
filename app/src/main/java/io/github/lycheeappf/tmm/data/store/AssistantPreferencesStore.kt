@@ -291,6 +291,21 @@ class AssistantPreferencesStore @Inject constructor(
     fun xSearchEnabledFlow(): Flow<Boolean> =
         store.data.map { it[KEY_X_SEARCH_ENABLED] ?: false }
 
+    // ---- Standort-Kontext ---------------------------------------------------
+
+    /**
+     * Darf die aktuelle GPS-Position als Kontext-Klausel in den System-Prompt?
+     * Opt-in, Default `false` — Koordinaten gehen an xAI, das entscheidet allein
+     * der User. Wirkt zusätzlich zur Runtime-Permission: [LlmTurnRunner] fragt den
+     * Standort nur ab, wenn der Schalter an ist UND die Permission erteilt wurde.
+     */
+    suspend fun locationContextEnabled(): Boolean =
+        store.data.first()[KEY_LOCATION_CONTEXT_ENABLED] ?: false
+
+    suspend fun setLocationContextEnabled(value: Boolean) {
+        store.edit { it[KEY_LOCATION_CONTEXT_ENABLED] = value }
+    }
+
     // ---- Sprach-Ansprech-Kontakt (zusätzlicher Alias) ----------------------
 
     /**
@@ -656,6 +671,7 @@ class AssistantPreferencesStore @Inject constructor(
         private val KEY_VOICE_ALIAS_NAME = stringPreferencesKey("voice_alias_name")
         private val KEY_WEB_SEARCH_ENABLED = booleanPreferencesKey("web_search_enabled")
         private val KEY_X_SEARCH_ENABLED = booleanPreferencesKey("x_search_enabled")
+        private val KEY_LOCATION_CONTEXT_ENABLED = booleanPreferencesKey("location_context_enabled")
     }
 }
 

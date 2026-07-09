@@ -8,11 +8,14 @@ import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.platform.location.ILocationProvider
+import io.github.lycheeappf.tmm.platform.location.LocationFix
+import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.coVerify
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -27,18 +30,21 @@ class LlmTurnRunnerTest {
     private val limiter: LlmRateLimiter = mockk()
     private val formatter = LlmResponseFormatter()
     private val toolRegistry: ToolRegistry = mockk(relaxed = true)
-    private val locationProvider: ILocationProvider = mockk(relaxed = true)
+    // Bewusst strikt: schlägt fehl, wenn der Runner den Standort trotz
+    // deaktiviertem Opt-in abfragt.
+    private val locationProvider: LocationProvider = mockk()
     private val logBuffer: LogBuffer = mockk(relaxed = true)
 
     private lateinit var runner: LlmTurnRunner
 
     @Before fun setup() {
         coEvery { prefs.model() } returns "grok-4.3"
-        coEvery { prefs.systemPrompt(any(), any(), anyNullable()) } returns "Sys"
+        coEvery { prefs.systemPrompt(any(), any(), isNull()) } returns "Sys"
         coEvery { prefs.maxTokens() } returns 256
         coEvery { prefs.temperature() } returns 0.7f
         coEvery { prefs.webSearchEnabled() } returns false
         coEvery { prefs.xSearchEnabled() } returns false
+        coEvery { prefs.locationContextEnabled() } returns false
         coEvery { toolRegistry.activeSchemas() } returns emptyList()
         coEvery { limiter.checkAndAcquire(any()) } returns LlmRateLimiter.Decision.Allow
         // refund() wird bei Provider-Failure / EmptyResponse aufgerufen — mockk
@@ -78,7 +84,49 @@ class LlmTurnRunnerTest {
         runner.run(7L, "Frage?")
         assertThat(captured.captured.webSearch).isTrue()
         assertThat(captured.captured.xSearch).isTrue()
-        coVerify { prefs.systemPrompt(true, true, anyNullable()) }
+        coVerify { prefs.systemPrompt(true, true, null) }
+    }
+
+    @Test fun `location clause is included when opt-in is enabled and a fresh fix exists`() = runTest {
+        val fix = LocationFix(latitude = 48.1373, longitude = 11.5754, accuracyInMeters = 12f)
+        coEvery { prefs.locationContextEnabled() } returns true
+        every { locationProvider.lastKnownLocation() } returns fix
+        coEvery { prefs.systemPrompt(false, false, fix) } returns "Sys mit Standort"
+        coEvery { provider.complete(any()) } returns LlmResponse(
+            content = "Antwort!", toolCalls = emptyList(), finishReason = "stop",
+            usage = null, responseId = "r1"
+        )
+
+        val result = runner.run(7L, "Frage?")
+
+        assertThat(result).isInstanceOf(LlmTurnRunner.TurnResult.Success::class.java)
+        coVerify { prefs.systemPrompt(false, false, fix) }
+    }
+
+    @Test fun `location is not queried at all when the opt-in toggle is off`() = runTest {
+        coEvery { provider.complete(any()) } returns LlmResponse(
+            content = "Antwort!", toolCalls = emptyList(), finishReason = "stop",
+            usage = null, responseId = "r1"
+        )
+
+        runner.run(7L, "Frage?")
+
+        verify(exactly = 0) { locationProvider.lastKnownLocation() }
+        coVerify { prefs.systemPrompt(false, false, null) }
+    }
+
+    @Test fun `turn proceeds without location clause when the provider has no fresh fix`() = runTest {
+        coEvery { prefs.locationContextEnabled() } returns true
+        every { locationProvider.lastKnownLocation() } returns null
+        coEvery { provider.complete(any()) } returns LlmResponse(
+            content = "Antwort!", toolCalls = emptyList(), finishReason = "stop",
+            usage = null, responseId = "r1"
+        )
+
+        val result = runner.run(7L, "Frage?")
+
+        assertThat(result).isInstanceOf(LlmTurnRunner.TurnResult.Success::class.java)
+        coVerify { prefs.systemPrompt(false, false, null) }
     }
 
     @Test fun `provider failure keeps history clean`() = runTest {

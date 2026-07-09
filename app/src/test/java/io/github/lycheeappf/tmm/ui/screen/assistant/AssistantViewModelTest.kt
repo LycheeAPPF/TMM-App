@@ -12,6 +12,7 @@ import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -129,4 +130,56 @@ class AssistantViewModelTest {
         coVerify { prefs.setXSearchEnabled(true) }
         assertThat(vm.uiState.value.xSearchEnabled).isTrue()
     }
+
+    @Test
+    fun `setLocationContextEnabled persists and mirrors to ui state`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.setLocationContextEnabled(true)
+        advanceUntilIdle()
+
+        coVerify { prefs.setLocationContextEnabled(true) }
+        assertThat(vm.uiState.value.locationContextEnabled).isTrue()
+    }
+
+    @Test
+    fun `location permission level NONE without any location grant`() = runTest(dispatcher) {
+        every { permissionGate.hasLocationAccess() } returns false
+
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        assertThat(vm.uiState.value.locationPermission).isEqualTo(LocationPermissionLevel.NONE)
+    }
+
+    @Test
+    fun `location permission level WHILE_IN_USE without background grant`() = runTest(dispatcher) {
+        every { permissionGate.hasLocationAccess() } returns true
+        every { permissionGate.hasBackgroundLocationAccess() } returns false
+
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        assertThat(vm.uiState.value.locationPermission)
+            .isEqualTo(LocationPermissionLevel.WHILE_IN_USE)
+    }
+
+    @Test
+    fun `location permission level ALWAYS with background grant and refresh picks up changes`() =
+        runTest(dispatcher) {
+            every { permissionGate.hasLocationAccess() } returns true
+            every { permissionGate.hasBackgroundLocationAccess() } returns true
+
+            val vm = viewModel()
+            advanceUntilIdle()
+            assertThat(vm.uiState.value.locationPermission).isEqualTo(LocationPermissionLevel.ALWAYS)
+
+            // Rückkehr aus den System-Einstellungen (Grant entzogen) → refresh()
+            // muss den neuen Stand spiegeln.
+            every { permissionGate.hasLocationAccess() } returns false
+            vm.refresh()
+            advanceUntilIdle()
+            assertThat(vm.uiState.value.locationPermission).isEqualTo(LocationPermissionLevel.NONE)
+        }
 }

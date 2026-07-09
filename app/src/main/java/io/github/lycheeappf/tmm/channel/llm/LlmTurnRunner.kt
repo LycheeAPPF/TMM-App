@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.platform.location.ILocationProvider
+import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,7 +43,7 @@ class LlmTurnRunner @Inject constructor(
     private val rateLimiter: LlmRateLimiter,
     private val formatter: LlmResponseFormatter,
     private val toolRegistry: ToolRegistry,
-    private val locationProvider: ILocationProvider,
+    private val locationProvider: LocationProvider,
     private val logBuffer: LogBuffer,
     private val clock: Clock
 ) {
@@ -80,7 +80,10 @@ class LlmTurnRunner @Inject constructor(
             // sonst "du kannst suchen" sagen, ohne die Tools mitzuschicken — oder umgekehrt).
             val webSearch = prefs.webSearchEnabled()
             val xSearch = prefs.xSearchEnabled()
-            val location = locationProvider.lastKnownLocation()
+            // Standort nur bei aktivem Opt-in ÜBERHAUPT abfragen; die Permission
+            // prüft der Provider selbst (fehlend/stale → null, Turn läuft ohne
+            // Standort-Klausel weiter).
+            val location = if (prefs.locationContextEnabled()) locationProvider.lastKnownLocation() else null
             val req = LlmRequest(
                 model = model,
                 systemPrompt = prefs.systemPrompt(webSearch, xSearch, location),

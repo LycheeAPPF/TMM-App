@@ -4,7 +4,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import io.github.lycheeappf.tmm.platform.location.ILocationProvider
+import io.github.lycheeappf.tmm.platform.location.AndroidLocationProvider
 import io.github.lycheeappf.tmm.platform.location.LocationProvider
 
 @Module
@@ -12,5 +12,5 @@ import io.github.lycheeappf.tmm.platform.location.LocationProvider
 abstract class LocationModule {
 
     @Binds
-    abstract fun bindLocationProvider(impl: LocationProvider): ILocationProvider
+    abstract fun bindLocationProvider(impl: AndroidLocationProvider): LocationProvider
 }

@@ -4,13 +4,19 @@
     <string name="assistant_intro">Your dictations from the Tesla go to Grok (xAI). Your Tesla reads the reply aloud. The conversation context for Grok stays in memory only briefly. Your dictations are additionally logged locally on the device (for diagnostics and re-delivery) and only ever leave it toward xAI.</string>
 
     <string name="assistant_consent_title">Consent</string>
-    <string name="assistant_consent_desc">Mandatory before the first start — confirms that dictations go to xAI.</string>
+    <string name="assistant_consent_desc">Mandatory before the first start — confirms that dictations (and, if location sharing is enabled, your GPS position) go to xAI.</string>
     <string name="assistant_consent_granted">Consent given — start enabled.</string>
     <string name="assistant_consent_not_granted">Not consented yet — start blocked.</string>
 
-    <string name="assistant_location_title">Location access</string>
-    <string name="assistant_location_desc">Lets Grok answer location-based questions ("best restaurant nearby"). GPS coordinates are included in each xAI request — same trust boundary as your dictation.</string>
+    <string name="assistant_location_title">Share location with Grok</string>
+    <string name="assistant_location_desc">Lets Grok answer location-based questions (\"best restaurant nearby\"). When enabled, GPS coordinates are included in each xAI request — same trust boundary as your dictation. Off by default.</string>
     <string name="assistant_location_action">Grant permission</string>
+    <string name="assistant_location_on">Location sharing on.</string>
+    <string name="assistant_location_off">Location sharing off.</string>
+    <string name="assistant_location_on_no_permission">On — but the location permission is missing.</string>
+    <string name="assistant_location_background_title">In-car use needs \"Allow all the time\"</string>
+    <string name="assistant_location_background_desc">Grok replies are processed in the background while you drive — Android only provides a location then if access is set to \"Allow all the time\". Choose it in the app settings under Permissions &gt; Location.</string>
+    <string name="assistant_location_background_action">Open app settings</string>
 
     <string name="assistant_apikey_title">xAI API key</string>
     <string name="assistant_apikey_desc">Stored encrypted on the device and not included in backups.</string>
