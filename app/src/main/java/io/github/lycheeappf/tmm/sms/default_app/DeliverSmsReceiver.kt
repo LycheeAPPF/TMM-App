@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Telephony
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -86,7 +87,8 @@ class DeliverSmsReceiver : BroadcastReceiver() {
         postIncomingSmsNotification(context, address, body, threadId)
     }
 
-    private fun postIncomingSmsNotification(
+    @VisibleForTesting
+    internal fun postIncomingSmsNotification(
         context: Context,
         address: String,
         body: String,
