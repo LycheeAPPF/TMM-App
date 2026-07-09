@@ -18,7 +18,6 @@ import io.github.lycheeappf.tmm.platform.tesla.api.VehicleInfo
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
-import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
@@ -103,18 +102,21 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refresh()
-        // Tesla-Auth-State live beobachten und in UiState spiegeln.
+        // Tesla-Auth-State live beobachten und in UiState spiegeln. Der OAuth-
+        // Callback-Exchange läuft application-scoped im TeslaAuthManager (auch
+        // ohne lebende UI) — hier wird nur beobachtet; beim Übergang zu
+        // Authenticated werden die Fahrzeuge für den Auswahl-Dialog geladen.
         viewModelScope.launch {
             teslaAuthManager.init()
+            var previous: TeslaAuthState? = null
             teslaAuthManager.state.collect { authState ->
                 _uiState.update { it.copy(teslaAuthState = authState) }
-            }
-        }
-        // OAuth-Callback-Code abarbeiten, wenn MainActivity ihn posted.
-        viewModelScope.launch {
-            teslaAuthManager.pendingCode.collect { code ->
-                withContext(ioDispatcher) { teslaAuthManager.exchangeCode(code) }
-                loadTeslaVehicles()
+                if (authState is TeslaAuthState.Authenticated && previous != null &&
+                    previous !is TeslaAuthState.Authenticated
+                ) {
+                    loadTeslaVehicles()
+                }
+                previous = authState
             }
         }
     }

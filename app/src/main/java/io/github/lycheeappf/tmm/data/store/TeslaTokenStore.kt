@@ -3,6 +3,18 @@ package io.github.lycheeappf.tmm.data.store
 import kotlinx.coroutines.flow.Flow
 
 /**
+ * Zwischenzustand eines laufenden OAuth-Flows: pro [startAuth]-Aufruf frisch
+ * per SecureRandom generierter `state`-Parameter + PKCE-Verifier. Persistiert
+ * (statt in-memory), damit der Callback-Exchange auch dann funktioniert, wenn
+ * der Prozess zwischen Auth-Start (Custom Tab) und Redirect gestorben ist.
+ */
+data class TeslaPendingAuth(
+    val state: String,
+    val codeVerifier: String,
+    val createdAtMs: Long
+)
+
+/**
  * Persistenz-Seam für Tesla Fleet API Tokens. Interface, damit Tests einen
  * In-Memory-Fake nutzen können (Android Keystore + DataStore sind unter
  * Robolectric umständlich) — gleiches Muster wie
@@ -38,6 +50,15 @@ interface TeslaTokenStore {
     suspend fun readSelectedVehicleId(): Long?
 
     suspend fun writeSelectedVehicleId(id: Long)
+
+    /**
+     * Pending-OAuth-Flow lesen; null wenn keiner läuft oder der Verifier nicht
+     * mehr entschlüsselbar ist (Keystore-Reset).
+     */
+    suspend fun readPendingAuth(): TeslaPendingAuth?
+
+    /** Persistiert den Pending-Flow; null räumt ihn ab (one-shot Verbrauch im Callback). */
+    suspend fun writePendingAuth(pending: TeslaPendingAuth?)
 
     /** TRUE sobald ein Refresh-Token persistiert wurde (Schnellpfad ohne Decrypt). */
     suspend fun isAuthenticated(): Boolean

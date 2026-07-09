@@ -68,6 +68,45 @@ class KeystoreTeslaTokenStore @Inject constructor(
 
     override suspend fun writeSelectedVehicleId(id: Long) { store.edit { it[KEY_VEHICLE_ID] = id } }
 
+    // ---- Pending OAuth flow ---------------------------------------------------
+
+    override suspend fun readPendingAuth(): TeslaPendingAuth? {
+        val prefs = try {
+            store.data.first()
+        } catch (e: java.io.IOException) {
+            Log.w(TAG, "DataStore read failed for pending auth", e)
+            return null
+        }
+        val state = prefs[KEY_OAUTH_STATE] ?: return null
+        val verifierCt = prefs[KEY_PKCE_VERIFIER_CT] ?: return null
+        val createdAt = prefs[KEY_OAUTH_CREATED_AT] ?: return null
+        val verifier = try {
+            decrypt(ALIAS_PKCE, verifierCt)
+        } catch (e: Exception) {
+            Log.w(TAG, "Decrypt failed for pending auth — treating as missing", e)
+            return null
+        }
+        return TeslaPendingAuth(state = state, codeVerifier = verifier, createdAtMs = createdAt)
+    }
+
+    override suspend fun writePendingAuth(pending: TeslaPendingAuth?) {
+        if (pending == null) {
+            store.edit { prefs ->
+                prefs.remove(KEY_OAUTH_STATE)
+                prefs.remove(KEY_PKCE_VERIFIER_CT)
+                prefs.remove(KEY_OAUTH_CREATED_AT)
+            }
+            return
+        }
+        // PKCE-Verifier ist security-sensitiv → verschlüsselt wie die Tokens.
+        val verifierCt = encrypt(ALIAS_PKCE, pending.codeVerifier)
+        store.edit { prefs ->
+            prefs[KEY_OAUTH_STATE] = pending.state
+            prefs[KEY_PKCE_VERIFIER_CT] = verifierCt
+            prefs[KEY_OAUTH_CREATED_AT] = pending.createdAtMs
+        }
+    }
+
     // ---- State helpers ------------------------------------------------------
 
     override suspend fun isAuthenticated(): Boolean = store.data.first()[KEY_REFRESH_CT] != null
@@ -75,7 +114,7 @@ class KeystoreTeslaTokenStore @Inject constructor(
     override suspend fun clear() {
         runCatching {
             val ks = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
-            for (alias in listOf(ALIAS_ACCESS, ALIAS_REFRESH)) {
+            for (alias in listOf(ALIAS_ACCESS, ALIAS_REFRESH, ALIAS_PKCE)) {
                 if (ks.containsAlias(alias)) ks.deleteEntry(alias)
             }
         }.onFailure { Log.w(TAG, "Keystore entry delete failed", it) }
@@ -85,6 +124,9 @@ class KeystoreTeslaTokenStore @Inject constructor(
             prefs.remove(KEY_EXPIRES_AT)
             prefs.remove(KEY_VIN)
             prefs.remove(KEY_VEHICLE_ID)
+            prefs.remove(KEY_OAUTH_STATE)
+            prefs.remove(KEY_PKCE_VERIFIER_CT)
+            prefs.remove(KEY_OAUTH_CREATED_AT)
         }
     }
 
@@ -146,6 +188,7 @@ class KeystoreTeslaTokenStore @Inject constructor(
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
         private const val ALIAS_ACCESS = "io.github.lycheeappf.tmm.tesla.access_token"
         private const val ALIAS_REFRESH = "io.github.lycheeappf.tmm.tesla.refresh_token"
+        private const val ALIAS_PKCE = "io.github.lycheeappf.tmm.tesla.pkce_verifier"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val GCM_IV_LENGTH = 12
         private const val GCM_TAG_BITS = 128
@@ -155,6 +198,9 @@ class KeystoreTeslaTokenStore @Inject constructor(
         private val KEY_EXPIRES_AT = longPreferencesKey("tesla_expires_at_ms")
         private val KEY_VIN = stringPreferencesKey("tesla_selected_vin")
         private val KEY_VEHICLE_ID = longPreferencesKey("tesla_selected_vehicle_id")
+        private val KEY_OAUTH_STATE = stringPreferencesKey("tesla_oauth_state")
+        private val KEY_PKCE_VERIFIER_CT = stringPreferencesKey("tesla_pkce_verifier_ct")
+        private val KEY_OAUTH_CREATED_AT = longPreferencesKey("tesla_oauth_created_at_ms")
     }
 }
 

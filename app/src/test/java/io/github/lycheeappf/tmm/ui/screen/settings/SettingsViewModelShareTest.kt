@@ -17,7 +17,6 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -51,12 +50,11 @@ class SettingsViewModelShareTest {
     private val permissionGate = mockk<PermissionGate>(relaxed = true)
     private val bluetoothConnectionChecker = mockk<BluetoothConnectionChecker>(relaxed = true)
 
-    // Konkrete Manager-Klasse: state/pendingCode werden im init des ViewModels
-    // collected — echte (leere) Flows liefern, sonst hinge der Collector auf
-    // einem Mock-Flow. Der Rest bleibt relaxed.
+    // Konkrete Manager-Klasse: state wird im init des ViewModels collected —
+    // einen echten Flow liefern, sonst hinge der Collector auf einem Mock-Flow.
+    // Der Rest bleibt relaxed.
     private val teslaAuthManager = mockk<TeslaAuthManager>(relaxed = true) {
         every { state } returns MutableStateFlow(TeslaAuthState.NotAuthenticated)
-        every { pendingCode } returns MutableSharedFlow()
     }
     private val teslaCommandClient = mockk<TeslaVehicleCommandClient>(relaxed = true)
 
