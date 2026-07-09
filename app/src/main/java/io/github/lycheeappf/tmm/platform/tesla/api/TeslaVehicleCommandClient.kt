@@ -6,6 +6,7 @@ import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.util.Locale
 import javax.inject.Inject
@@ -205,6 +206,9 @@ class TeslaVehicleCommandClient @Inject constructor(
                     val body = if (resp.isSuccessful) resp.body().toString()
                     else resp.errorBody()?.string()?.take(500)
                     append(body).append("\n\n")
+                } catch (e: CancellationException) {
+                    // NIE schlucken — sonst wird ein Abbruch als Diagnose-Text ausgegeben.
+                    throw e
                 } catch (e: Exception) {
                     append("Exception: ${e.message?.take(200)}\n\n")
                 }
