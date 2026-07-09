@@ -112,5 +112,5 @@
     <string name="tesla_api_no_vehicle">Kein Fahrzeug gewählt</string>
     <string name="tesla_api_token_expires">Token läuft ab: %1$s</string>
     <string name="tesla_api_error_prefix">Fehler: %1$s</string>
-    <string name="tesla_api_client_id_missing">client_id nicht konfiguriert — siehe TeslaOAuthConfig.kt</string>
+    <string name="tesla_api_missing_credentials">Keine Tesla-API-Zugangsdaten hinterlegt. Erstelle eine eigene App auf developer.tesla.com und hinterlege deren Client-ID und Client-Secret in den App-Einstellungen, um Fahrzeug-Funktionen zu aktivieren.</string>
 </resources>

@@ -314,8 +314,12 @@ class SettingsViewModel @Inject constructor(
     // ---- Tesla Fleet API ----------------------------------------------------
 
     fun startTeslaLogin() {
-        val url = teslaAuthManager.startAuth()
-        viewModelScope.launch { _events.send(SettingsEvent.OpenTeslaAuthUrl(url)) }
+        viewModelScope.launch {
+            // null = keine Credentials hinterlegt; der Manager hat den State
+            // bereits auf MissingCredentials gesetzt → UI zeigt den Hinweis.
+            val url = teslaAuthManager.startAuth() ?: return@launch
+            _events.send(SettingsEvent.OpenTeslaAuthUrl(url))
+        }
     }
 
     fun selectTeslaVehicle(vin: String, id: Long) {

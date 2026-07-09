@@ -1,8 +1,13 @@
 package io.github.lycheeappf.tmm.platform.tesla.auth
 
-/** Statische, nicht-geheime OAuth-Konstanten. */
+/**
+ * Statische, nicht-geheime OAuth-Konstanten. Die App-Credentials (client_id /
+ * client_secret) sind bewusst NICHT hier — sie sind vollständig nutzer-
+ * bereitgestellt und liegen verschlüsselt im
+ * [io.github.lycheeappf.tmm.core.security.TeslaCredentialsStore]; es wird
+ * nichts einkompiliert.
+ */
 object TeslaOAuthConfig {
-    const val CLIENT_ID = "294e0fb4-83b4-4a23-b0f6-942fc8df5d8f"
 
     /**
      * Muss exakt so in der Tesla-App-Registrierung des Nutzers hinterlegt sein

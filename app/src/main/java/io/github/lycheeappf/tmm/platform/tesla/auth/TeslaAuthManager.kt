@@ -3,9 +3,10 @@ package io.github.lycheeappf.tmm.platform.tesla.auth
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
-import io.github.lycheeappf.tmm.BuildConfig
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.di.TeslaHttpClient
+import io.github.lycheeappf.tmm.core.security.TeslaCredentials
+import io.github.lycheeappf.tmm.core.security.TeslaCredentialsStore
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
@@ -31,6 +32,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed class TeslaAuthState {
+    /**
+     * Keine (oder nicht mehr entschlüsselbare) Nutzer-Credentials hinterlegt —
+     * alle Fleet-Features sind aus, die UI zeigt den Einrichtungshinweis.
+     * Pendant zu `LlmProviderError.MissingKey` beim xAI-Key.
+     */
+    data object MissingCredentials : TeslaAuthState()
     data object NotAuthenticated : TeslaAuthState()
     data object Loading : TeslaAuthState()
     data class Authenticated(val selectedVin: String?, val expiresAtMs: Long) : TeslaAuthState()
@@ -53,6 +60,7 @@ sealed class TeslaAuthState {
 @Singleton
 class TeslaAuthManager @Inject constructor(
     private val tokenStore: TeslaTokenStore,
+    private val credentialsStore: TeslaCredentialsStore,
     private val regionStore: TeslaRegionStore,
     @TeslaHttpClient private val httpClient: OkHttpClient,
     private val endpoints: TeslaOAuthEndpoints,
@@ -76,31 +84,61 @@ class TeslaAuthManager @Inject constructor(
     private var pendingVerifier: String? = null
 
     suspend fun init() {
-        val authenticated = tokenStore.isAuthenticated()
-        if (authenticated) {
-            _state.update {
+        when {
+            !credentialsStore.isSet() -> _state.update { TeslaAuthState.MissingCredentials }
+            tokenStore.isAuthenticated() -> _state.update {
                 TeslaAuthState.Authenticated(
                     selectedVin = tokenStore.readSelectedVin(),
                     expiresAtMs = tokenStore.readExpiresAtMs()
                 )
             }
-        } else {
-            _state.update { TeslaAuthState.NotAuthenticated }
+            else -> _state.update { TeslaAuthState.NotAuthenticated }
         }
+    }
+
+    /**
+     * Schnellcheck für Turn-/Tool-Zeit-Gates (Grok-Navigations-Tool): sind
+     * Nutzer-Credentials hinterlegt? Wird bei JEDEM Fleet-Call erneut geprüft,
+     * weil der Tesla-Auto-Reply-Pfad die UI-Gates umgeht.
+     */
+    suspend fun hasCredentials(): Boolean = credentialsStore.isSet()
+
+    /** Persistiert Nutzer-Credentials (verschlüsselt) und aktualisiert den Auth-State. */
+    suspend fun setCredentials(clientId: String, clientSecret: String): Unit =
+        withContext(ioDispatcher) {
+            credentialsStore.write(TeslaCredentials(clientId = clientId, clientSecret = clientSecret))
+            init()
+        }
+
+    /**
+     * Entfernt die Credentials und ALLE davon abhängigen Artefakte (Tokens,
+     * Region) — ohne client_id/secret sind die Tokens nicht mehr refreshbar.
+     */
+    suspend fun clearCredentials(): Unit = withContext(ioDispatcher) {
+        credentialsStore.clear()
+        tokenStore.clear()
+        regionStore.writeFleetApiBaseUrl(null)
+        _state.update { TeslaAuthState.MissingCredentials }
     }
 
     /**
      * Generiert PKCE-Verifier + Challenge und baut die Authorization-URL auf.
      * Die UI öffnet diese URL in einem Chrome Custom Tab.
+     * Null, wenn keine Credentials hinterlegt sind (State → [TeslaAuthState.MissingCredentials]).
      */
-    fun startAuth(): String {
+    suspend fun startAuth(): String? = withContext(ioDispatcher) {
+        val credentials = credentialsStore.read()
+        if (credentials == null) {
+            _state.update { TeslaAuthState.MissingCredentials }
+            return@withContext null
+        }
         val verifier = generateCodeVerifier()
         pendingVerifier = verifier
         val challenge = generateCodeChallenge(verifier)
-        return buildString {
+        buildString {
             append(endpoints.authUrl)
             append("?response_type=code")
-            append("&client_id=").append(Uri.encode(TeslaOAuthConfig.CLIENT_ID))
+            append("&client_id=").append(Uri.encode(credentials.clientId))
             append("&redirect_uri=").append(Uri.encode(TeslaOAuthConfig.REDIRECT_URI))
             append("&scope=").append(Uri.encode(TeslaOAuthConfig.SCOPES))
             append("&code_challenge=").append(challenge)
@@ -123,14 +161,19 @@ class TeslaAuthManager @Inject constructor(
             _state.update { TeslaAuthState.Error("PKCE-Verifier fehlt — bitte erneut einloggen") }
             return@withContext
         }
+        val credentials = credentialsStore.read()
+        if (credentials == null) {
+            _state.update { TeslaAuthState.MissingCredentials }
+            return@withContext
+        }
         coRunCatching {
             requestToken(
                 FormBody.Builder()
                     .add("grant_type", "authorization_code")
                     .add("code", code)
                     .add("code_verifier", verifier)
-                    .add("client_id", TeslaOAuthConfig.CLIENT_ID)
-                    .add("client_secret", BuildConfig.TESLA_CLIENT_SECRET)
+                    .add("client_id", credentials.clientId)
+                    .add("client_secret", credentials.clientSecret)
                     .add("audience", tokenAudience())
                     .add("redirect_uri", TeslaOAuthConfig.REDIRECT_URI)
                     .build()
@@ -161,13 +204,20 @@ class TeslaAuthManager @Inject constructor(
         refreshMutex.withLock {
             if (!needsRefresh()) return@withLock // paralleler Caller hat schon refresht
             val refreshToken = tokenStore.readRefreshToken() ?: return@withLock
+            val credentials = credentialsStore.read()
+            if (credentials == null) {
+                // Turn-Zeit-Re-Check: Credentials wurden entfernt/unlesbar →
+                // Refresh unmöglich, Fleet-Features typisiert gegated.
+                _state.update { TeslaAuthState.MissingCredentials }
+                return@withLock
+            }
             coRunCatching {
                 requestToken(
                     FormBody.Builder()
                         .add("grant_type", "refresh_token")
                         .add("refresh_token", refreshToken)
-                        .add("client_id", TeslaOAuthConfig.CLIENT_ID)
-                        .add("client_secret", BuildConfig.TESLA_CLIENT_SECRET)
+                        .add("client_id", credentials.clientId)
+                        .add("client_secret", credentials.clientSecret)
                         .add("audience", tokenAudience())
                         .build()
                 )
@@ -199,7 +249,10 @@ class TeslaAuthManager @Inject constructor(
         tokenStore.clear()
         // Region ist account-abhängig (EU vs. NA) → beim Logout mit verwerfen.
         regionStore.writeFleetApiBaseUrl(null)
-        _state.update { TeslaAuthState.NotAuthenticated }
+        _state.update {
+            if (credentialsStore.isSet()) TeslaAuthState.NotAuthenticated
+            else TeslaAuthState.MissingCredentials
+        }
     }
 
     // ---- Internals ----------------------------------------------------------

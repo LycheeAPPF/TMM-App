@@ -304,6 +304,15 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
         description = stringResource(R.string.tesla_api_card_desc)
     ) {
         when (authState) {
+            is TeslaAuthState.MissingCredentials -> {
+                // Vollständige Credentials-Eingabe folgt mit der Settings-UI (D1);
+                // bis dahin nur der Einrichtungshinweis — Fleet-Features sind gegated.
+                Text(
+                    stringResource(R.string.tesla_api_missing_credentials),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             is TeslaAuthState.NotAuthenticated -> {
                 PrimaryActionButton(
                     text = stringResource(R.string.tesla_api_connect),

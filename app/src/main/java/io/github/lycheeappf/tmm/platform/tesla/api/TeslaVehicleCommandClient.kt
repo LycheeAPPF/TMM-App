@@ -12,6 +12,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed class TeslaCommandError(message: String?) : Exception(message) {
+    /** Keine Nutzer-Credentials hinterlegt — Fleet-Features sind nicht eingerichtet. */
+    class MissingCredentials : TeslaCommandError(
+        "Tesla-API-Zugangsdaten fehlen — bitte in den Einstellungen hinterlegen"
+    )
     class Unauthorized : TeslaCommandError("Tesla-Auth abgelaufen — bitte erneut einloggen")
     class VehicleNotFound : TeslaCommandError("Fahrzeug nicht gefunden oder offline")
     class CommandRejected(reason: String?) : TeslaCommandError("Befehl abgelehnt: $reason")
@@ -169,6 +173,9 @@ class TeslaVehicleCommandClient @Inject constructor(
     }
 
     private suspend fun requireToken(): String {
+        // Turn-/Tool-Zeit-Re-Check: der Tesla-Auto-Reply-Pfad umgeht die UI-Gates,
+        // daher wird das Credentials-Gate bei JEDEM Fleet-Call erneut geprüft.
+        if (!authManager.hasCredentials()) throw TeslaCommandError.MissingCredentials()
         authManager.refreshIfNeeded()
         return authManager.readAccessToken() ?: throw TeslaCommandError.Unauthorized()
     }
