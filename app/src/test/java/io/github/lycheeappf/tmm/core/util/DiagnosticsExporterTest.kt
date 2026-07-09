@@ -11,7 +11,9 @@ import io.github.lycheeappf.tmm.data.db.PayloadJson
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryDao
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryEntity
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -32,9 +34,15 @@ class DiagnosticsExporterTest {
     private val replyHistoryDao = mockk<ReplyHistoryDao>()
     private val settingsStore = mockk<SettingsStore>(relaxed = true)
     private val logFileStore = LogFileStore(File(context.cacheDir, "diag-test"), Dispatchers.Unconfined)
+    private val teslaTokenStore = mockk<TeslaTokenStore> {
+        coEvery { isAuthenticated() } returns false
+        coEvery { readSelectedVin() } returns null
+        coEvery { readFleetApiBaseUrl() } returns null
+        coEvery { readExpiresAtMs() } returns 0L
+    }
 
     private fun exporter() =
-        DiagnosticsExporter(context, mappingDao, replyHistoryDao, logFileStore, settingsStore)
+        DiagnosticsExporter(context, mappingDao, replyHistoryDao, logFileStore, settingsStore, teslaTokenStore)
 
     @Test fun `export redacts contact names, conversation key and reply text`() = runTest {
         val payloadJson = PayloadJson.encode(
@@ -82,5 +90,8 @@ class DiagnosticsExporterTest {
         assertThat(content).contains("<len=16>")        // "secret dictation".length == 16
         assertThat(content).contains("com.whatsapp")     // Paketname bleibt
         assertThat(content).contains(BuildConfig.VERSION_NAME) // Build-Header gesetzt
+        // Tesla-API-Abschnitt vorhanden, nicht authentifiziert → kein Token-/VIN-Material
+        assertThat(content).contains("teslaApi")
+        assertThat(content).contains("\"authenticated\": false")
     }
 }

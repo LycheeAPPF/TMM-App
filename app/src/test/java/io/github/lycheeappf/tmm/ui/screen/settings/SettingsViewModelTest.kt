@@ -8,6 +8,9 @@ import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
+import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
 import io.mockk.coVerify
 import io.mockk.every
@@ -15,6 +18,8 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -44,10 +49,20 @@ class SettingsViewModelTest {
     private val permissionGate = mockk<PermissionGate>(relaxed = true)
     private val bluetoothConnectionChecker = mockk<BluetoothConnectionChecker>(relaxed = true)
 
+    // Konkrete Manager-Klasse: state/pendingCode werden im init des ViewModels
+    // collected — echte (leere) Flows liefern, sonst hinge der Collector auf
+    // einem Mock-Flow. Der Rest bleibt relaxed.
+    private val teslaAuthManager = mockk<TeslaAuthManager>(relaxed = true) {
+        every { state } returns MutableStateFlow(TeslaAuthState.NotAuthenticated)
+        every { pendingCode } returns MutableSharedFlow()
+    }
+    private val teslaCommandClient = mockk<TeslaVehicleCommandClient>(relaxed = true)
+
     private fun viewModel() = SettingsViewModel(
         store, contactSyncWriter, teslaContactResync, preFlightTester,
         appLocaleManager, notificationChannels, diagnosticsExporter,
-        permissionGate, bluetoothConnectionChecker, dispatcher
+        permissionGate, bluetoothConnectionChecker, teslaAuthManager,
+        teslaCommandClient, dispatcher
     )
 
     @Before
