@@ -1,12 +1,16 @@
 package io.github.lycheeappf.tmm.ui.screen.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.contact.ContactSyncWriter
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.locale.AppLocaleManager
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.core.util.DiagnosticsExporter
 import io.github.lycheeappf.tmm.core.util.coRunCatching
@@ -14,8 +18,10 @@ import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
+import io.github.lycheeappf.tmm.platform.tesla.api.TeslaCommandError
 import io.github.lycheeappf.tmm.platform.tesla.api.VehicleInfo
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
+import io.github.lycheeappf.tmm.platform.tesla.api.userMessage
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
 import io.github.lycheeappf.tmm.ui.screen.onboarding.PreFlightTester
@@ -79,6 +85,7 @@ sealed class SettingsEvent {
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val store: SettingsStore,
     private val contactSyncWriter: ContactSyncWriter,
     private val teslaContactResync: TeslaContactResync,
@@ -341,14 +348,19 @@ class SettingsViewModel @Inject constructor(
             }
             val diagnostic = if (result.isFailure) {
                 withContext(ioDispatcher) {
-                    coRunCatching { teslaCommandClient.regionDiagnosticInfo() }.getOrDefault("Diagnose fehlgeschlagen")
+                    // null = kein Token / Diagnose selbst gescheitert → lokalisierter Hinweis.
+                    coRunCatching { teslaCommandClient.regionDiagnosticInfo() }.getOrNull()
+                        ?: context.localizedString(R.string.tesla_api_diagnostic_failed)
                 }
             } else null
-            _uiState.update {
-                it.copy(
+            _uiState.update { state ->
+                state.copy(
                     teslaVehicles = result.getOrDefault(emptyList()),
                     teslaVehiclesLoading = false,
-                    teslaVehiclesError = result.exceptionOrNull()?.message,
+                    teslaVehiclesError = result.exceptionOrNull()?.let { e ->
+                        // Typisierte Fleet-Fehler lokalisiert anzeigen (EN+DE).
+                        if (e is TeslaCommandError) e.userMessage(context) else e.message
+                    },
                     teslaRegionDiagnostic = diagnostic
                 )
             }

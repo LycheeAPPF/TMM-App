@@ -20,6 +20,7 @@ class ToolRegistry @Inject constructor(
     suspend fun invoke(name: String, arguments: kotlinx.serialization.json.JsonObject):
         ToolInvocationResult =
         byName[name]?.invoke(arguments) ?: ToolInvocationResult.Failure(
-            "Tool '$name' ist nicht registriert"
+            // Model-facing (geht als Tool-Result zurück an Grok) — bewusst Englisch.
+            "tool '$name' is not registered"
         )
 }

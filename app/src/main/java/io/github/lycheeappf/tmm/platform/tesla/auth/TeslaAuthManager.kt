@@ -3,6 +3,8 @@ package io.github.lycheeappf.tmm.platform.tesla.auth
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import androidx.annotation.StringRes
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.di.ApplicationScope
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.di.TeslaHttpClient
@@ -42,7 +44,14 @@ sealed class TeslaAuthState {
     data object NotAuthenticated : TeslaAuthState()
     data object Loading : TeslaAuthState()
     data class Authenticated(val selectedVin: String?, val expiresAtMs: Long) : TeslaAuthState()
-    data class Error(val message: String) : TeslaAuthState()
+
+    /**
+     * Fehlgeschlagener Auth-Schritt. [messageRes] ist eine lokalisierte
+     * String-Ressource (EN+DE) und wird erst beim Rendern aufgelöst — so folgt
+     * die Meldung einem Sprachwechsel. [detail] ist optionale technische
+     * Zusatzinfo (HTTP-Status/OAuth-Fehlerbody), bewusst unübersetzt.
+     */
+    data class Error(@StringRes val messageRes: Int, val detail: String? = null) : TeslaAuthState()
 }
 
 /**
@@ -175,7 +184,7 @@ class TeslaAuthManager @Inject constructor(
 
         uri.getQueryParameter("error")?.let { error ->
             Log.w(TAG, "OAuth callback returned error (len=${error.length})")
-            _state.update { TeslaAuthState.Error("Tesla-Login abgebrochen") }
+            _state.update { TeslaAuthState.Error(R.string.tesla_error_login_cancelled) }
             return@withContext
         }
         val code = uri.getQueryParameter("code")
@@ -185,7 +194,7 @@ class TeslaAuthManager @Inject constructor(
         val expired = pending != null && clock.now() - pending.createdAtMs > AUTH_FLOW_TTL_MS
         if (pending == null || expired || returnedState.isNullOrBlank() || returnedState != pending.state) {
             Log.w(TAG, "OAuth state validation failed (pending=${pending != null}, expired=$expired)")
-            _state.update { TeslaAuthState.Error("OAuth-State ungültig oder abgelaufen — bitte Login erneut starten") }
+            _state.update { TeslaAuthState.Error(R.string.tesla_error_state_invalid) }
             return@withContext
         }
         val credentials = credentialsStore.read()
@@ -221,7 +230,9 @@ class TeslaAuthManager @Inject constructor(
             }
         }.onFailure { e ->
             Log.e(TAG, "Token exchange failed", e)
-            _state.update { TeslaAuthState.Error(e.message ?: "Token-Exchange fehlgeschlagen") }
+            _state.update {
+                TeslaAuthState.Error(R.string.tesla_error_token_exchange, detail = e.message)
+            }
         }
     }
 
@@ -359,8 +370,9 @@ class TeslaAuthManager @Inject constructor(
     private suspend fun requestToken(form: FormBody) {
         val req = Request.Builder().url(endpoints.tokenUrl).post(form).build()
         httpClient.newCall(req).execute().use { resp ->
-            val respBody = resp.body?.string() ?: error("Leerer Token-Response")
-            if (!resp.isSuccessful) error("Token-Request HTTP ${resp.code}: ${respBody.take(200)}")
+            // message landet nur als technisches Detail in TeslaAuthState.Error/Logcat.
+            val respBody = resp.body?.string() ?: error("empty token response")
+            if (!resp.isSuccessful) error("HTTP ${resp.code}: ${respBody.take(200)}")
             parseAndStoreTokens(respBody)
         }
     }

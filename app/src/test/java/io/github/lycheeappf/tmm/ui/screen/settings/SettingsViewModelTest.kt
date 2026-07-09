@@ -38,6 +38,7 @@ import org.junit.Test
 class SettingsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
+    private val context = mockk<android.content.Context>(relaxed = true)
     private val store = mockk<SettingsStore>(relaxed = true)
     private val contactSyncWriter = mockk<ContactSyncWriter>(relaxed = true)
     private val teslaContactResync = mockk<TeslaContactResync>(relaxed = true)
@@ -57,7 +58,7 @@ class SettingsViewModelTest {
     private val teslaCommandClient = mockk<TeslaVehicleCommandClient>(relaxed = true)
 
     private fun viewModel() = SettingsViewModel(
-        store, contactSyncWriter, teslaContactResync, preFlightTester,
+        context, store, contactSyncWriter, teslaContactResync, preFlightTester,
         appLocaleManager, notificationChannels, diagnosticsExporter,
         permissionGate, bluetoothConnectionChecker, teslaAuthManager,
         teslaCommandClient, dispatcher

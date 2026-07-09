@@ -113,4 +113,20 @@
     <string name="tesla_api_token_expires">Token läuft ab: %1$s</string>
     <string name="tesla_api_error_prefix">Fehler: %1$s</string>
     <string name="tesla_api_missing_credentials">Keine Tesla-API-Zugangsdaten hinterlegt. Erstelle eine eigene App auf developer.tesla.com und hinterlege deren Client-ID und Client-Secret in den App-Einstellungen, um Fahrzeug-Funktionen zu aktivieren.</string>
+    <string name="tesla_api_diagnostic_failed">Region-Diagnose fehlgeschlagen</string>
+
+    <!-- Tesla Fleet API errors (spoken via Grok and shown in settings) -->
+    <string name="tesla_error_missing_credentials">Tesla-API-Zugangsdaten fehlen — bitte in den App-Einstellungen hinterlegen</string>
+    <string name="tesla_error_unauthorized">Tesla-Login abgelaufen — bitte in den App-Einstellungen erneut einloggen</string>
+    <string name="tesla_error_vehicle_not_found">Fahrzeug nicht gefunden oder offline</string>
+    <string name="tesla_error_command_rejected">Befehl abgelehnt: %1$s</string>
+    <string name="tesla_error_reason_unknown">unbekannter Grund</string>
+    <string name="tesla_error_network">Netzwerkfehler bei der Verbindung zum Fahrzeug</string>
+    <string name="tesla_error_region_discovery">Kein passender Fleet-API-Endpunkt gefunden (EU und NA probiert). Bitte App-Registrierung auf developer.tesla.com prüfen.</string>
+    <string name="tesla_error_unknown">Fahrzeugbefehl fehlgeschlagen (HTTP %1$d)</string>
+    <string name="tesla_error_no_vehicle_configured">Kein Tesla-Fahrzeug konfiguriert — bitte in den App-Einstellungen einloggen</string>
+    <string name="tesla_error_no_destination">Kein Zielort angegeben</string>
+    <string name="tesla_error_login_cancelled">Tesla-Login abgebrochen</string>
+    <string name="tesla_error_state_invalid">Login-Versuch ungültig oder abgelaufen — bitte Tesla-Login erneut starten</string>
+    <string name="tesla_error_token_exchange">Tesla-Token-Exchange fehlgeschlagen</string>
 </resources>

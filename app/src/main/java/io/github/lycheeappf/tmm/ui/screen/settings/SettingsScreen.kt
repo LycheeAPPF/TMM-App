@@ -381,8 +381,11 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                 }
             }
             is TeslaAuthState.Error -> {
+                // Lokalisierte Fehlermeldung + optionales technisches Detail (HTTP/OAuth-Body).
+                val base = stringResource(authState.messageRes)
+                val message = authState.detail?.let { "$base ($it)" } ?: base
                 Text(
-                    stringResource(R.string.tesla_api_error_prefix, authState.message),
+                    stringResource(R.string.tesla_api_error_prefix, message),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )

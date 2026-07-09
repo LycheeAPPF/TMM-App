@@ -40,6 +40,7 @@ class SettingsViewModelShareTest {
     @Before fun setUp() { Dispatchers.setMain(dispatcher) }
     @After fun tearDown() { Dispatchers.resetMain() }
 
+    private val context = mockk<android.content.Context>(relaxed = true)
     private val store = mockk<SettingsStore>(relaxed = true)
     private val contactSyncWriter = mockk<ContactSyncWriter>(relaxed = true)
     private val teslaContactResync = mockk<TeslaContactResync>(relaxed = true)
@@ -59,7 +60,7 @@ class SettingsViewModelShareTest {
     private val teslaCommandClient = mockk<TeslaVehicleCommandClient>(relaxed = true)
 
     private fun vm() = SettingsViewModel(
-        store, contactSyncWriter, teslaContactResync, preFlightTester,
+        context, store, contactSyncWriter, teslaContactResync, preFlightTester,
         appLocaleManager, notificationChannels, exporter,
         permissionGate, bluetoothConnectionChecker, teslaAuthManager,
         teslaCommandClient, dispatcher

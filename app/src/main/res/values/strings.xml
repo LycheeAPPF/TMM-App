@@ -115,4 +115,20 @@
     <string name="tesla_api_token_expires">Token expires: %1$s</string>
     <string name="tesla_api_error_prefix">Error: %1$s</string>
     <string name="tesla_api_missing_credentials">No Tesla API credentials stored. Create your own app at developer.tesla.com and add its Client ID and Client Secret in the app settings to enable vehicle features.</string>
+    <string name="tesla_api_diagnostic_failed">Region diagnostics failed</string>
+
+    <!-- Tesla Fleet API errors (spoken via Grok and shown in settings) -->
+    <string name="tesla_error_missing_credentials">Tesla API credentials are missing — please add them in the app settings</string>
+    <string name="tesla_error_unauthorized">Tesla login expired — please log in again in the app settings</string>
+    <string name="tesla_error_vehicle_not_found">Vehicle not found or offline</string>
+    <string name="tesla_error_command_rejected">Command rejected: %1$s</string>
+    <string name="tesla_error_reason_unknown">unknown reason</string>
+    <string name="tesla_error_network">Network error while contacting the vehicle</string>
+    <string name="tesla_error_region_discovery">No matching Fleet API endpoint found (EU and NA tried). Please check your app registration on developer.tesla.com.</string>
+    <string name="tesla_error_unknown">Vehicle command failed (HTTP %1$d)</string>
+    <string name="tesla_error_no_vehicle_configured">No Tesla vehicle configured — please log in in the app settings</string>
+    <string name="tesla_error_no_destination">No destination provided</string>
+    <string name="tesla_error_login_cancelled">Tesla login cancelled</string>
+    <string name="tesla_error_state_invalid">Login attempt invalid or expired — please restart the Tesla login</string>
+    <string name="tesla_error_token_exchange">Tesla token exchange failed</string>
 </resources>

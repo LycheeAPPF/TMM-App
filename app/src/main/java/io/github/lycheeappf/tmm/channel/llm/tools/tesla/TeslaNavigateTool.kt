@@ -1,11 +1,16 @@
 package io.github.lycheeappf.tmm.channel.llm.tools.tesla
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.tools.AssistantTool
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolSchema
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaCommandError
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
+import io.github.lycheeappf.tmm.platform.tesla.api.userMessage
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -26,6 +31,7 @@ import javax.inject.Inject
  * Bei vagen Zielen sucht Grok via Websuche die konkrete Adresse, bevor es das Tool aufruft.
  */
 class TeslaNavigateTool @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val commandClient: TeslaVehicleCommandClient,
     private val tokenStore: TeslaTokenStore
 ) : AssistantTool {
@@ -39,13 +45,13 @@ class TeslaNavigateTool @Inject constructor(
             "use web search first to find the actual address near the driver, " +
             "then call this tool with the specific address found. " +
             "Requires Tesla account login in the app settings. " +
-            "If it fails with 'Kein Tesla-Fahrzeug konfiguriert', tell the driver to connect their Tesla account in the app settings.",
+            "If it fails because no vehicle or credentials are configured, tell the driver to connect their Tesla account in the app settings.",
         parametersJson = buildJsonObject {
             put("type", "object")
             putJsonObject("properties") {
                 putJsonObject("address") {
                     put("type", "string")
-                    put("description", "Full address or place name to navigate to (e.g. 'Alexanderplatz Berlin' or 'Nächste Apotheke')")
+                    put("description", "Full address or place name to navigate to (e.g. 'Alexanderplatz Berlin')")
                 }
             }
             putJsonArray("required") { add("address") }
@@ -54,20 +60,24 @@ class TeslaNavigateTool @Inject constructor(
 
     override suspend fun invoke(arguments: JsonObject): ToolInvocationResult {
         val vin = tokenStore.readSelectedVin()
-            ?: return ToolInvocationResult.Failure("Kein Tesla-Fahrzeug konfiguriert — bitte in den Einstellungen einloggen")
+            ?: return ToolInvocationResult.Failure(
+                context.localizedString(R.string.tesla_error_no_vehicle_configured)
+            )
 
         val address = arguments["address"]?.jsonPrimitive?.content.orEmpty()
-        if (address.isBlank()) return ToolInvocationResult.Failure("Kein Zielort angegeben")
+        if (address.isBlank()) {
+            return ToolInvocationResult.Failure(context.localizedString(R.string.tesla_error_no_destination))
+        }
 
         return try {
             commandClient.navigate(vin, address)
             ToolInvocationResult.Success("""{"status":"ok","destination":"${address.replace("\"", "\\\"")
                 .take(200)}"}""")
         } catch (e: TeslaCommandError) {
-            ToolInvocationResult.Failure(e.message ?: "Fahrzeugbefehl fehlgeschlagen")
+            ToolInvocationResult.Failure(e.userMessage(context))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            ToolInvocationResult.Failure("Netzwerkfehler: ${e.message?.take(100)}")
+            ToolInvocationResult.Failure(context.localizedString(R.string.tesla_error_network))
         }
     }
 }

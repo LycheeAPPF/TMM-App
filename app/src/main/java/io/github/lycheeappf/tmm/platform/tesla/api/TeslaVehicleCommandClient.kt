@@ -11,16 +11,21 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Typisierte Fleet-API-Fehler. Die Exception-`message` ist NUR für Logcat/Debugging
+ * (englisch, PII-frei) — die nutzer­gerichtete, lokalisierte Meldung liefert
+ * [userMessage] (EN+DE via `Context.localizedString`).
+ */
 sealed class TeslaCommandError(message: String?) : Exception(message) {
     /** Keine Nutzer-Credentials hinterlegt — Fleet-Features sind nicht eingerichtet. */
-    class MissingCredentials : TeslaCommandError(
-        "Tesla-API-Zugangsdaten fehlen — bitte in den Einstellungen hinterlegen"
-    )
-    class Unauthorized : TeslaCommandError("Tesla-Auth abgelaufen — bitte erneut einloggen")
-    class VehicleNotFound : TeslaCommandError("Fahrzeug nicht gefunden oder offline")
-    class CommandRejected(reason: String?) : TeslaCommandError("Befehl abgelehnt: $reason")
+    class MissingCredentials : TeslaCommandError("Tesla API credentials missing")
+    class Unauthorized : TeslaCommandError("Tesla auth expired")
+    class VehicleNotFound : TeslaCommandError("vehicle not found or offline")
+    class CommandRejected(val reason: String?) : TeslaCommandError("command rejected: $reason")
     class Network(cause: Throwable) : TeslaCommandError(cause.message)
-    class Unknown(code: Int, body: String?) : TeslaCommandError("HTTP $code: $body")
+    /** Kein Region-Endpunkt hat den Account akzeptiert (EU+NA jeweils 412). */
+    class RegionDiscoveryFailed : TeslaCommandError("no matching Fleet API endpoint (EU+NA probed)")
+    class Unknown(val code: Int, val body: String?) : TeslaCommandError("HTTP $code")
 }
 
 @Singleton
@@ -59,9 +64,8 @@ class TeslaVehicleCommandClient @Inject constructor(
                 else -> Log.w(TAG, "HTTP ${resp.code()} from $base")
             }
         }
-        val msg = "Region-Discovery: kein passender Fleet-API-Endpunkt (EU+NA probiert)"
-        logBuffer.error(TAG, msg)
-        throw TeslaCommandError.Unknown(412, "Kein passender Fleet-API-Endpunkt (EU+NA). Bitte Tesla-App-Registrierung prüfen.")
+        logBuffer.error(TAG, "region discovery failed: no matching Fleet API endpoint (EU+NA probed)")
+        throw TeslaCommandError.RegionDiscoveryFailed()
     }
 
     /** Sendet ein Text-Navigationsziel an das Fahrzeug, weckt es vorher auf falls nötig. */
@@ -131,7 +135,7 @@ class TeslaVehicleCommandClient @Inject constructor(
             ?: listVehicles().firstOrNull { it.vin == vin }?.id
             ?: run {
                 Log.w(TAG, "wakeUp: vehicle ID not found")
-                logBuffer.warn(TAG, "wake_up: Fahrzeug-ID nicht gefunden")
+                logBuffer.warn(TAG, "wake_up: vehicle ID not found")
                 return
             }
         val resp = api.wakeUp("${base}api/1/vehicles/$vehicleId/wake_up", "Bearer ${requireToken()}")
@@ -167,12 +171,8 @@ class TeslaVehicleCommandClient @Inject constructor(
                 }
             }
         }
-        logBuffer.error(TAG, "ensureRegion: kein passender Endpunkt (EU+NA), alle 412")
-        throw TeslaCommandError.Unknown(
-            412,
-            "Kein passender Fleet-API-Endpunkt gefunden (EU+NA probiert). " +
-                "Bitte App-Registrierung auf developer.tesla.com prüfen."
-        )
+        logBuffer.error(TAG, "ensureRegion: no matching endpoint (EU+NA), all 412")
+        throw TeslaCommandError.RegionDiscoveryFailed()
     }
 
     private suspend fun requireToken(): String {
@@ -189,9 +189,12 @@ class TeslaVehicleCommandClient @Inject constructor(
         else -> throw TeslaCommandError.Unknown(code, body?.take(200))
     }
 
-    /** Ruft /api/1/users/region auf allen bekannten Endpunkten auf und gibt die Rohantworten zurück. */
-    suspend fun regionDiagnosticInfo(): String {
-        val token = authManager.readAccessToken() ?: return "Kein Access-Token vorhanden"
+    /**
+     * Ruft /api/1/users/region auf allen bekannten Endpunkten auf und gibt die
+     * Rohantworten zurück; null, wenn kein Access-Token vorliegt (Caller lokalisiert).
+     */
+    suspend fun regionDiagnosticInfo(): String? {
+        val token = authManager.readAccessToken() ?: return null
         return buildString {
             for (base in TeslaOAuthConfig.REGION_CANDIDATES) {
                 val url = "${base}api/1/users/region"
