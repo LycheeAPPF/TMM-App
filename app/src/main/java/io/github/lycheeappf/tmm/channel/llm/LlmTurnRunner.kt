@@ -9,7 +9,7 @@ import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.platform.location.ILocationProvider
+import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,7 +38,7 @@ class LlmTurnRunner @Inject constructor(
     private val rateLimiter: LlmRateLimiter,
     private val formatter: LlmResponseFormatter,
     private val toolRegistry: ToolRegistry,
-    private val locationProvider: ILocationProvider,
+    private val locationProvider: LocationProvider,
     private val logBuffer: LogBuffer,
     private val clock: Clock
 ) {

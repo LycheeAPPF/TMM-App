@@ -8,7 +8,7 @@ import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.platform.location.ILocationProvider
+import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
@@ -27,7 +27,7 @@ class LlmTurnRunnerTest {
     private val limiter: LlmRateLimiter = mockk()
     private val formatter = LlmResponseFormatter()
     private val toolRegistry: ToolRegistry = mockk(relaxed = true)
-    private val locationProvider: ILocationProvider = mockk(relaxed = true)
+    private val locationProvider: LocationProvider = mockk(relaxed = true)
     private val logBuffer: LogBuffer = mockk(relaxed = true)
 
     private lateinit var runner: LlmTurnRunner
