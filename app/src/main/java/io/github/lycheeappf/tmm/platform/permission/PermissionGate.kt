@@ -76,8 +76,8 @@ class PermissionGate @Inject constructor(
     /**
      * Returns true when either ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION is granted.
      * Both suffice for [android.location.LocationManager.getLastKnownLocation].
-     * Without this permission [LocationProvider] returns null and no coordinates are
-     * forwarded to Grok.
+     * Without this permission [AndroidLocationProvider] returns null and no coordinates
+     * are forwarded to Grok.
      */
     fun hasLocationAccess(): Boolean =
         ContextCompat.checkSelfPermission(
@@ -85,6 +85,17 @@ class PermissionGate @Inject constructor(
         ) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(
             context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * ACCESS_BACKGROUND_LOCATION („Immer erlauben"). Der Grok-Turn läuft im
+     * Hintergrund (Tesla-Reply ohne UI) — ohne diese Stufe liefert der OS-Cache
+     * dort keine Koordinaten. Ab API 30 nicht per Runtime-Dialog anforderbar,
+     * nur über die App-Einstellungen (Settings.ACTION_APPLICATION_DETAILS_SETTINGS).
+     */
+    fun hasBackgroundLocationAccess(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
     /**

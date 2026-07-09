@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -60,6 +62,7 @@ fun AssistantScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var keyVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -73,8 +76,15 @@ fun AssistantScreen(
         }
     }
 
+    // FINE + COARSE gemeinsam anfordern: ab Android 12 wird ein FINE-only-Request
+    // still ignoriert (kein Dialog). Ein Coarse-only-Grant ist ok — der Standort-
+    // Kontext funktioniert dann mit reduzierter Genauigkeit.
+    val locationPermissions = arrayOf(
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.ACCESS_COARSE_LOCATION
+    )
     val locationPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
+        ActivityResultContracts.RequestMultiplePermissions()
     ) { viewModel.refresh() }
 
     MfsScaffold(
@@ -117,16 +127,66 @@ fun AssistantScreen(
                 }
             }
 
-            // ---- Standort-Permission ----
-            StatusCard(
+            // ---- Standort-Kontext (Opt-in) ----
+            SettingCard(
                 title = stringResource(R.string.assistant_location_title),
-                description = stringResource(R.string.assistant_location_desc),
-                isGranted = state.hasLocationPermission,
-                actionLabel = stringResource(R.string.assistant_location_action),
-                onAction = {
-                    locationPermLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                description = stringResource(R.string.assistant_location_desc)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
+                ) {
+                    Switch(
+                        checked = state.locationContextEnabled,
+                        onCheckedChange = { enabled ->
+                            viewModel.setLocationContextEnabled(enabled)
+                            if (enabled && state.locationPermission == LocationPermissionLevel.NONE) {
+                                locationPermLauncher.launch(locationPermissions)
+                            }
+                        }
+                    )
+                    Text(
+                        when {
+                            !state.locationContextEnabled ->
+                                stringResource(R.string.assistant_location_off)
+                            state.locationPermission == LocationPermissionLevel.NONE ->
+                                stringResource(R.string.assistant_location_on_no_permission)
+                            else -> stringResource(R.string.assistant_location_on)
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
-            )
+                if (state.locationContextEnabled &&
+                    state.locationPermission == LocationPermissionLevel.NONE
+                ) {
+                    FilledTonalButton(onClick = { locationPermLauncher.launch(locationPermissions) }) {
+                        Text(stringResource(R.string.assistant_location_action))
+                    }
+                }
+            }
+
+            // Hintergrund-Standort („Immer erlauben") ist ab API 30 nicht mehr über
+            // den Runtime-Dialog grantbar — Follow-up-Karte führt in die App-
+            // Einstellungen. refresh() im LifecycleResumeEffect greift den neuen
+            // Stand bei der Rückkehr auf.
+            if (state.locationContextEnabled &&
+                state.locationPermission == LocationPermissionLevel.WHILE_IN_USE
+            ) {
+                StatusCard(
+                    title = stringResource(R.string.assistant_location_background_title),
+                    description = stringResource(R.string.assistant_location_background_desc),
+                    isGranted = false,
+                    actionLabel = stringResource(R.string.assistant_location_background_action),
+                    onAction = {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", context.packageName, null)
+                            )
+                        )
+                    }
+                )
+            }
 
             // ---- API-Key ----
             SettingCard(

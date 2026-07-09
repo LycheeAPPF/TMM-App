@@ -16,11 +16,16 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -35,10 +40,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +68,7 @@ import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
 import io.github.lycheeappf.tmm.ui.component.mfsExpandExit
 import io.github.lycheeappf.tmm.ui.component.preflightStatusUi
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
 import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsShare
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
@@ -136,6 +147,8 @@ fun SettingsScreen(
                 is SettingsEvent.OpenTeslaAuthUrl ->
                     androidx.browser.customtabs.CustomTabsIntent.Builder().build()
                         .launchUrl(context, android.net.Uri.parse(event.url))
+                is SettingsEvent.Feedback ->
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -234,6 +247,7 @@ fun SettingsScreen(
             )
 
             SectionHeader(stringResource(R.string.tesla_api_section))
+            TeslaCredentialsCard(state = state, viewModel = viewModel)
             TeslaFleetApiCard(state = state, viewModel = viewModel)
 
             SectionHeader(stringResource(R.string.settings_section_apps))
@@ -296,6 +310,115 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Eingabe der nutzer-eigenen Tesla-App-Credentials (developer.tesla.com) —
+ * gleiches Muster wie die xAI-Key-Karte im Assistant-Screen: Status-Pill,
+ * maskierte Eingabefelder mit Sichtbarkeits-Toggle, Speichern/Entfernen.
+ * Zusätzlich die exakte Redirect-URI (kopierbar), die der Nutzer in seiner
+ * Tesla-App-Registrierung hinterlegen muss.
+ */
+@Composable
+private fun TeslaCredentialsCard(state: SettingsUiState, viewModel: SettingsViewModel) {
+    val clipboard = LocalClipboardManager.current
+    SettingCard(
+        title = stringResource(R.string.tesla_credentials_title),
+        description = stringResource(R.string.tesla_credentials_desc)
+    ) {
+        StatusPill(
+            text = if (state.teslaCredentialsSet) stringResource(R.string.tesla_credentials_status_set)
+            else stringResource(R.string.tesla_credentials_status_none),
+            status = if (state.teslaCredentialsSet) MfsStatus.Success else MfsStatus.Neutral
+        )
+        MaskedCredentialField(
+            value = state.teslaClientIdDraft,
+            onValueChange = viewModel::setTeslaClientIdDraft,
+            label = stringResource(R.string.tesla_credentials_client_id_label)
+        )
+        MaskedCredentialField(
+            value = state.teslaClientSecretDraft,
+            onValueChange = viewModel::setTeslaClientSecretDraft,
+            label = stringResource(R.string.tesla_credentials_client_secret_label)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm)) {
+            PrimaryActionButton(
+                text = stringResource(R.string.tesla_credentials_save),
+                onClick = { viewModel.saveTeslaCredentials() },
+                enabled = state.teslaClientIdDraft.isNotBlank() &&
+                    state.teslaClientSecretDraft.isNotBlank(),
+                loading = state.teslaCredentialsSaving
+            )
+            TextButton(
+                onClick = { viewModel.clearTeslaCredentials() },
+                enabled = state.teslaCredentialsSet && !state.teslaCredentialsSaving
+            ) { Text(stringResource(R.string.tesla_credentials_remove)) }
+        }
+        if (state.teslaCredentialsSet) {
+            Text(
+                stringResource(R.string.tesla_credentials_remove_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            stringResource(R.string.tesla_credentials_redirect_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                TeslaOAuthConfig.REDIRECT_URI,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = {
+                clipboard.setText(AnnotatedString(TeslaOAuthConfig.REDIRECT_URI))
+            }) {
+                Icon(
+                    Icons.Outlined.ContentCopy,
+                    contentDescription = stringResource(R.string.tesla_credentials_copy_redirect)
+                )
+            }
+        }
+    }
+}
+
+/** Maskiertes Eingabefeld mit Sichtbarkeits-Toggle — Spiegel des xAI-Key-Felds. */
+@Composable
+private fun MaskedCredentialField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String
+) {
+    var visible by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        visualTransformation = if (visible) VisualTransformation.None
+        else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) Icons.Outlined.VisibilityOff
+                    else Icons.Outlined.Visibility,
+                    contentDescription = if (visible) stringResource(R.string.tesla_credentials_hide)
+                    else stringResource(R.string.tesla_credentials_show)
+                )
+            }
+        },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+/** VIN ist PII — in der UI nur die letzten 4 Zeichen zeigen (wie im Diagnostics-Export). */
+private fun maskVin(vin: String): String = "…" + vin.takeLast(4)
+
 @Composable
 private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewModel) {
     val authState = state.teslaAuthState
@@ -304,6 +427,15 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
         description = stringResource(R.string.tesla_api_card_desc)
     ) {
         when (authState) {
+            is TeslaAuthState.MissingCredentials -> {
+                // Kein Connect ohne Credentials — der Hinweis verweist auf die
+                // Credentials-Karte direkt darüber ([TeslaCredentialsCard]).
+                Text(
+                    stringResource(R.string.tesla_api_missing_credentials),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             is TeslaAuthState.NotAuthenticated -> {
                 PrimaryActionButton(
                     text = stringResource(R.string.tesla_api_connect),
@@ -324,7 +456,8 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                 )
                 val vin = authState.selectedVin
                 Text(
-                    if (vin != null) stringResource(R.string.tesla_api_vehicle_label) + ": $vin"
+                    // VIN maskiert (…letzte 4) — volle VIN gehört nicht auf den Screen.
+                    if (vin != null) stringResource(R.string.tesla_api_vehicle_selected, maskVin(vin))
                     else stringResource(R.string.tesla_api_no_vehicle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -333,8 +466,8 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                     Column {
                         state.teslaVehicles.forEach { vehicle ->
                             MfsListItem(
-                                title = vehicle.displayName.ifBlank { vehicle.vin },
-                                subtitle = vehicle.vin,
+                                title = vehicle.displayName.ifBlank { maskVin(vehicle.vin) },
+                                subtitle = maskVin(vehicle.vin),
                                 trailing = if (vehicle.vin == vin) ({
                                     RadioButton(selected = true, onClick = null)
                                 }) else ({
@@ -353,16 +486,20 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-                    state.teslaRegionDiagnostic?.let { diag ->
-                        Text(
-                            text = diag,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
+                    // Region-Diagnose ist eine Dev-Oberfläche — nur im Developer-
+                    // Mode zeigen (das ViewModel erhebt sie auch nur dann).
+                    if (state.developerMode) {
+                        state.teslaRegionDiagnostic?.let { diag ->
+                            Text(
+                                text = diag,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                     PrimaryActionButton(
-                        text = stringResource(R.string.tesla_api_vehicle_label),
+                        text = stringResource(R.string.tesla_api_load_vehicles),
                         loading = state.teslaVehiclesLoading,
                         onClick = { viewModel.loadTeslaVehicles() }
                     )
@@ -372,8 +509,11 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                 }
             }
             is TeslaAuthState.Error -> {
+                // Lokalisierte Fehlermeldung + optionales technisches Detail (HTTP/OAuth-Body).
+                val base = stringResource(authState.messageRes)
+                val message = authState.detail?.let { "$base ($it)" } ?: base
                 Text(
-                    stringResource(R.string.tesla_api_error_prefix, authState.message),
+                    stringResource(R.string.tesla_api_error_prefix, message),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )

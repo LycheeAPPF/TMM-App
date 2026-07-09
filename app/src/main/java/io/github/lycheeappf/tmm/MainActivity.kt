@@ -49,7 +49,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        intent?.data?.let { teslaAuthManager.postCallbackUri(it) }
+        // OAuth-Callback auch bei Kaltstart verarbeiten: der Manager tauscht den
+        // Code eager in einem application-scoped Coroutine ein — es muss kein
+        // ViewModel/Screen leben, die UI beobachtet nur den Auth-State-Flow.
+        intent?.data?.let { teslaAuthManager.handleCallback(it) }
         handleSmsIntent(intent)
         setContent {
             MfsTheme {
@@ -60,7 +63,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let { teslaAuthManager.postCallbackUri(it) }
+        // Tesla-OAuth-Redirect: io.github.lycheeappf.tmm://tesla/callback?code=...&state=...
+        intent.data?.let { teslaAuthManager.handleCallback(it) }
         handleSmsIntent(intent)
     }
 

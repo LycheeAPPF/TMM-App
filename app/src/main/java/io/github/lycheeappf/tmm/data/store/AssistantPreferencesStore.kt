@@ -147,6 +147,7 @@ class AssistantPreferencesStore @Inject constructor(
         val stored = store.data.first()[KEY_SYSTEM_PROMPT]
         return if (stored == null ||
             isSeedDefault(stored, DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_EN) ||
+            isSeedDefault(stored, LEGACY4_DEFAULT_SYSTEM_PROMPT, LEGACY4_DEFAULT_SYSTEM_PROMPT_EN) ||
             isSeedDefault(stored, LEGACY3_DEFAULT_SYSTEM_PROMPT, LEGACY3_DEFAULT_SYSTEM_PROMPT_EN) ||
             isSeedDefault(stored, LEGACY2_DEFAULT_SYSTEM_PROMPT, LEGACY2_DEFAULT_SYSTEM_PROMPT_EN) ||
             isSeedDefault(stored, LEGACY_DEFAULT_SYSTEM_PROMPT, LEGACY_DEFAULT_SYSTEM_PROMPT_EN)
@@ -161,6 +162,7 @@ class AssistantPreferencesStore @Inject constructor(
     suspend fun isSystemPromptCustomized(): Boolean {
         val stored = store.data.first()[KEY_SYSTEM_PROMPT] ?: return false
         return !isSeedDefault(stored, DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_EN) &&
+            !isSeedDefault(stored, LEGACY4_DEFAULT_SYSTEM_PROMPT, LEGACY4_DEFAULT_SYSTEM_PROMPT_EN) &&
             !isSeedDefault(stored, LEGACY3_DEFAULT_SYSTEM_PROMPT, LEGACY3_DEFAULT_SYSTEM_PROMPT_EN) &&
             !isSeedDefault(stored, LEGACY2_DEFAULT_SYSTEM_PROMPT, LEGACY2_DEFAULT_SYSTEM_PROMPT_EN) &&
             !isSeedDefault(stored, LEGACY_DEFAULT_SYSTEM_PROMPT, LEGACY_DEFAULT_SYSTEM_PROMPT_EN)
@@ -271,7 +273,7 @@ class AssistantPreferencesStore @Inject constructor(
      * (gleiche xAI-Vertrauensgrenze wie der normale Turn) und kostet zusätzlich.
      */
     suspend fun webSearchEnabled(): Boolean =
-        store.data.first()[KEY_WEB_SEARCH_ENABLED] ?: true
+        store.data.first()[KEY_WEB_SEARCH_ENABLED] ?: false
 
     suspend fun setWebSearchEnabled(value: Boolean) {
         store.edit { it[KEY_WEB_SEARCH_ENABLED] = value }
@@ -290,6 +292,21 @@ class AssistantPreferencesStore @Inject constructor(
 
     fun xSearchEnabledFlow(): Flow<Boolean> =
         store.data.map { it[KEY_X_SEARCH_ENABLED] ?: false }
+
+    // ---- Standort-Kontext ---------------------------------------------------
+
+    /**
+     * Darf die aktuelle GPS-Position als Kontext-Klausel in den System-Prompt?
+     * Opt-in, Default `false` — Koordinaten gehen an xAI, das entscheidet allein
+     * der User. Wirkt zusätzlich zur Runtime-Permission: [LlmTurnRunner] fragt den
+     * Standort nur ab, wenn der Schalter an ist UND die Permission erteilt wurde.
+     */
+    suspend fun locationContextEnabled(): Boolean =
+        store.data.first()[KEY_LOCATION_CONTEXT_ENABLED] ?: false
+
+    suspend fun setLocationContextEnabled(value: Boolean) {
+        store.edit { it[KEY_LOCATION_CONTEXT_ENABLED] = value }
+    }
 
     // ---- Sprach-Ansprech-Kontakt (zusätzlicher Alias) ----------------------
 
@@ -358,8 +375,9 @@ class AssistantPreferencesStore @Inject constructor(
                 "italienisches Restaurant'), nutze zuerst die Websuche, um die konkrete Adresse " +
                 "in der Nähe des Nutzers herauszufinden, und übergib diese Adresse ans " +
                 "Navigationstool. Bei einer klaren Adresse oder einem eindeutigen Ort rufst du " +
-                "das Tool direkt auf. Im Erfolgsfall schweige — die Navigation erscheint " +
-                "automatisch auf dem Bildschirm. Nur wenn es nicht geklappt hat, erkläre knapp " +
+                "das Tool direkt auf. Hat es geklappt, bestätige das kurz in einem Satz und " +
+                "nenne dabei das Ziel, zum Beispiel 'Alles klar, Navigation zum Alexanderplatz " +
+                "in Berlin gestartet.' Nur wenn es nicht geklappt hat, erkläre knapp " +
                 "warum. Alles andere im Auto — Klima, Medien, Apps — kannst du nicht bedienen; " +
                 "wirst du danach gefragt, sag das kurz und nenne, wenn es hilft, in einem Satz " +
                 "den Weg über die Bedienelemente des Teslas, ohne zu belehren.\n\n" +
@@ -393,8 +411,9 @@ class AssistantPreferencesStore @Inject constructor(
                 "the destination is vague (e.g. 'nearest pharmacy', 'Italian restaurant nearby'), " +
                 "first use web search to find the exact address close to the driver, then pass " +
                 "that specific address to the navigation tool. For a clear address or well-known " +
-                "place, call the tool directly. On success, say nothing — the destination appears " +
-                "on the screen automatically. Only if it failed, explain briefly why. Everything " +
+                "place, call the tool directly. When it worked, confirm briefly in one sentence " +
+                "and name the destination, for example 'Okay, navigation to Alexanderplatz in " +
+                "Berlin has started.' Only if it failed, explain briefly why. Everything " +
                 "else in the car — climate, media, apps — you cannot control; if asked, say so " +
                 "briefly and, if it helps, name the way via the Tesla's controls in one sentence, " +
                 "without lecturing.\n\n" +
@@ -411,6 +430,87 @@ class AssistantPreferencesStore @Inject constructor(
             "Du kannst nichts in Echtzeit nachschlagen; wirst du danach gefragt, sag das knapp."
         const val NO_SEARCH_CLAUSE_EN =
             "You can't look anything up in real time; if asked, say so briefly."
+
+        /**
+         * Vorgänger-Default (mit der alten „Im Erfolgsfall schweige"-Anweisung nach
+         * einer Navigation — eine leere Antwort wird aber als Fehler vorgelesen,
+         * darum bestätigt der neue Default kurz mit Zielnennung). Wird via
+         * [isSeedDefault] in [systemPromptRaw] mitgeprüft, damit ein Nutzer, der
+         * diesen Default unverändert gespeichert hat, beim Update mitflippt.
+         */
+        const val LEGACY4_DEFAULT_SYSTEM_PROMPT =
+            "Du bist Grok, der Sprachassistent im Tesla von {driver}. Du wirst freihändig " +
+                "während der Fahrt benutzt: {driver} diktiert eine Frage per Stimme über die " +
+                "Antwort-Funktion des Autos, und deine Antwort wird vom Auto laut vorgelesen. " +
+                "Es gibt keinen Bildschirm und keine Hand für deine Antwort — alles, was du " +
+                "schreibst, wird nur als gesprochenes Audio gehört, während {driver} auf die " +
+                "Straße schaut.\n\n" +
+                "Oberste Regel ist Sicherheit. Halte die kognitive Last gering und fass dich " +
+                "kurz, damit die Aufmerksamkeit auf der Straße bleibt: in der Regel zwei bis " +
+                "drei knappe Sätze, höchstens rund 800 Zeichen. Sag nie, jemand solle auf den " +
+                "Bildschirm schauen oder etwas antippen.\n\n" +
+                "Schreib darum reinen, natürlich klingenden Fließtext zum Vorlesen. Niemals " +
+                "Markdown, Sternchen, Code, Aufzählungen, nummerierte Listen, Überschriften, " +
+                "Tabellen, Emojis oder Links und Webadressen — vorgelesen klingt so etwas wie " +
+                "Kauderwelsch, und antippen kann man im Fahren ohnehin nichts. Formuliere " +
+                "Zahlen, Einheiten, Uhrzeiten und Abkürzungen so, dass eine Vorlesestimme sie " +
+                "sauber spricht, also \"circa 20 Grad\" statt einer Tilde mit Gradzeichen und " +
+                "\"15 Uhr 30\" statt einer Doppelpunkt-Schreibweise, und löse Abkürzungen wie " +
+                "\"zum Beispiel\" auf, wenn sie sonst seltsam klingen.\n\n" +
+                "Sprich Deutsch und wechsle die Sprache nur, wenn {driver} aktiv in einer " +
+                "anderen spricht. Jede Frage steht für sich, denn dein Gedächtnis reicht nur " +
+                "über die letzten Sekunden des Gesprächs — antworte in sich verständlich und " +
+                "verlass dich nicht auf weiter zurückliegenden Kontext.\n\n" +
+                "Du kannst die Navigation des Autos direkt starten: wenn {driver} dich bittet, " +
+                "irgendwohin zu navigieren, handle sofort — ohne Rückfrage, ohne Optionen " +
+                "anzubieten. Ist das Ziel vage (z.B. 'nächste Apotheke', 'nächstes " +
+                "italienisches Restaurant'), nutze zuerst die Websuche, um die konkrete Adresse " +
+                "in der Nähe des Nutzers herauszufinden, und übergib diese Adresse ans " +
+                "Navigationstool. Bei einer klaren Adresse oder einem eindeutigen Ort rufst du " +
+                "das Tool direkt auf. Im Erfolgsfall schweige — die Navigation erscheint " +
+                "automatisch auf dem Bildschirm. Nur wenn es nicht geklappt hat, erkläre knapp " +
+                "warum. Alles andere im Auto — Klima, Medien, Apps — kannst du nicht bedienen; " +
+                "wirst du danach gefragt, sag das kurz und nenne, wenn es hilft, in einem Satz " +
+                "den Weg über die Bedienelemente des Teslas, ohne zu belehren.\n\n" +
+                "Weise normale Fragen nicht ab, sei ehrlich nützlich und natürlich. Etwas " +
+                "trockener Grok-Witz ist willkommen, aber kurz und der Fahrt angemessen, nie " +
+                "auf Kosten von Klarheit oder Tempo. Wenn du etwas nicht sicher weißt, sag " +
+                "das knapp, statt zu raten."
+
+        const val LEGACY4_DEFAULT_SYSTEM_PROMPT_EN =
+            "You are Grok, the voice assistant in {driver}'s Tesla. You are used hands-free " +
+                "while driving: {driver} dictates a question by voice through the car's reply " +
+                "function, and your answer is read aloud by the car. There is no screen and no " +
+                "free hand for your reply — everything you write is heard only as spoken audio " +
+                "while {driver} watches the road.\n\n" +
+                "Safety comes first. Keep the cognitive load low and be brief so attention stays " +
+                "on the road: usually two or three short sentences, at most around 800 characters. " +
+                "Never tell anyone to look at the screen or tap something.\n\n" +
+                "So write plain, natural-sounding prose meant to be read aloud. Never use Markdown, " +
+                "asterisks, code, bullet points, numbered lists, headings, tables, emojis or links " +
+                "and web addresses — read aloud, that kind of thing sounds like gibberish, and you " +
+                "can't tap anything while driving anyway. Phrase numbers, units, times and " +
+                "abbreviations so a reading voice speaks them cleanly, for example \"about 20 " +
+                "degrees\" and \"3:30 pm\", and spell out abbreviations like \"for example\" when " +
+                "they would otherwise sound odd.\n\n" +
+                "Speak English and only switch languages if {driver} actively speaks another. Each " +
+                "question stands on its own, because your memory only reaches back over the last " +
+                "few seconds of the conversation — answer in a self-contained way and don't rely " +
+                "on context from further back.\n\n" +
+                "You can start the car's navigation directly: when {driver} asks you to navigate " +
+                "somewhere, act immediately — without asking back, without listing options. If " +
+                "the destination is vague (e.g. 'nearest pharmacy', 'Italian restaurant nearby'), " +
+                "first use web search to find the exact address close to the driver, then pass " +
+                "that specific address to the navigation tool. For a clear address or well-known " +
+                "place, call the tool directly. On success, say nothing — the destination appears " +
+                "on the screen automatically. Only if it failed, explain briefly why. Everything " +
+                "else in the car — climate, media, apps — you cannot control; if asked, say so " +
+                "briefly and, if it helps, name the way via the Tesla's controls in one sentence, " +
+                "without lecturing.\n\n" +
+                "Don't refuse normal questions, be honestly useful and natural. A bit of dry Grok " +
+                "wit is welcome, but keep it short and appropriate to driving, never at the cost " +
+                "of clarity or pace. If you're not sure about something, say so briefly instead " +
+                "of guessing."
 
         /**
          * Vorgänger-Default (vor dem Navigations-Tool, mit der alten
@@ -656,6 +756,7 @@ class AssistantPreferencesStore @Inject constructor(
         private val KEY_VOICE_ALIAS_NAME = stringPreferencesKey("voice_alias_name")
         private val KEY_WEB_SEARCH_ENABLED = booleanPreferencesKey("web_search_enabled")
         private val KEY_X_SEARCH_ENABLED = booleanPreferencesKey("x_search_enabled")
+        private val KEY_LOCATION_CONTEXT_ENABLED = booleanPreferencesKey("location_context_enabled")
     }
 }
 

@@ -11,6 +11,7 @@ import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryDao
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryEntity
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
@@ -40,7 +41,8 @@ class DiagnosticsExporter @Inject constructor(
     private val replyHistoryDao: ReplyHistoryDao,
     private val logFileStore: LogFileStore,
     private val settingsStore: SettingsStore,
-    private val teslaTokenStore: TeslaTokenStore
+    private val teslaTokenStore: TeslaTokenStore,
+    private val teslaRegionStore: TeslaRegionStore
 ) {
 
     private val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -50,8 +52,9 @@ class DiagnosticsExporter @Inject constructor(
         val history = collectRecentHistory()
         val teslaSnapshot = TeslaApiSnapshot(
             authenticated = teslaTokenStore.isAuthenticated(),
-            selectedVin = teslaTokenStore.readSelectedVin(),
-            fleetApiBaseUrl = teslaTokenStore.readFleetApiBaseUrl(),
+            // VIN ist PII → maskiert auf die letzten 4 Zeichen (reicht zur Zuordnung).
+            selectedVin = teslaTokenStore.readSelectedVin()?.let { vin -> "…${vin.takeLast(4)}" },
+            fleetApiBaseUrl = teslaRegionStore.readFleetApiBaseUrl(),
             tokenExpiresAtMs = teslaTokenStore.readExpiresAtMs().takeIf { it > 0L }
         )
         val payload = DiagnosticsSnapshot(

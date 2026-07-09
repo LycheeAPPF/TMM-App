@@ -16,12 +16,6 @@ val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) FileInputStream(keystorePropertiesFile).use { load(it) }
 }
 
-// Secrets aus local.properties (gitignored) — nie in Source-Code oder SCM committen.
-val localProperties = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) FileInputStream(f).use { load(it) }
-}
-
 // Fail-fast: ein signiertes Release darf NIE versehentlich unsigniert entstehen.
 // Greift nur, wenn ein Release-Packaging-Task explizit angefordert wurde
 // (Konfigurationszeit-Check → configuration-cache-kompatibel).
@@ -44,18 +38,14 @@ android {
         applicationId = "io.github.lycheeappf.tmm"
         minSdk = 33
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.7.1"
+        versionCode = 9
+        versionName = "0.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
-        // Tesla Fleet API client_secret — kommt aus local.properties (gitignored).
-        buildConfigField(
-            "String",
-            "TESLA_CLIENT_SECRET",
-            "\"${localProperties.getProperty("tesla.clientSecret", "")}\""
-        )
+        // Tesla-Fleet-API-Credentials sind vollständig nutzer-bereitgestellt
+        // (Keystore-verschlüsselt zur Laufzeit) — es wird NICHTS einkompiliert.
 
         // i18n: unterstützte Sprachen. Default-Resources (values/) sind Englisch,
         // values-de/ liefert die deutsche Übersetzung. Begrenzt zugleich die

@@ -30,6 +30,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * Standort-Berechtigungsstufe als Tri-State. WHILE_IN_USE reicht nur für den
+ * manuellen Test im Vordergrund — der eigentliche Grok-Turn läuft im Hintergrund
+ * und braucht ALWAYS („Immer erlauben", nur über die App-Einstellungen erteilbar).
+ */
+enum class LocationPermissionLevel { NONE, WHILE_IN_USE, ALWAYS }
+
 data class AssistantUiState(
     val apiKeyIsSet: Boolean = false,
     val apiKeyDraft: String = "",
@@ -52,7 +59,8 @@ data class AssistantUiState(
     val triggerInFlight: Boolean = false,
     val keyTestRunning: Boolean = false,
     val keyTestResult: KeyTestOutcome? = null,
-    val hasLocationPermission: Boolean = false,
+    val locationContextEnabled: Boolean = false,
+    val locationPermission: LocationPermissionLevel = LocationPermissionLevel.NONE,
     val lastFeedback: String? = null,
     val isSystemPromptCustomized: Boolean = false
 )
@@ -100,7 +108,8 @@ class AssistantViewModel @Inject constructor(
                     xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
                     voiceAliasName = prefs.voiceAliasName(),
-                    hasLocationPermission = permissionGate.hasLocationAccess(),
+                    locationContextEnabled = prefs.locationContextEnabled(),
+                    locationPermission = locationPermissionLevel(),
                     isSystemPromptCustomized = prefs.isSystemPromptCustomized()
                 )
             }
@@ -231,11 +240,15 @@ class AssistantViewModel @Inject constructor(
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
 
     fun setSystemPrompt(value: String) =
-        edit("system_prompt", { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
+        edit(EDIT_KEY_SYSTEM_PROMPT, { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
             prefs.setSystemPrompt(value)
         }
 
     fun resetSystemPromptToDefault() {
+        // Ein noch ausstehender (debounced) Persist-Job des Prompt-Editors würde den
+        // Reset sonst nach Ablauf der 350 ms wieder mit dem alten Text überschreiben —
+        // erst abbrechen, dann zurücksetzen.
+        persistJobs[EDIT_KEY_SYSTEM_PROMPT]?.cancel()
         viewModelScope.launch(ioDispatcher) {
             prefs.resetSystemPromptToDefault()
             val defaultPrompt = prefs.systemPromptRaw()
@@ -297,6 +310,19 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
+    fun setLocationContextEnabled(enabled: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.setLocationContextEnabled(enabled)
+            _uiState.update { it.copy(locationContextEnabled = enabled) }
+        }
+    }
+
+    private fun locationPermissionLevel(): LocationPermissionLevel = when {
+        !permissionGate.hasLocationAccess() -> LocationPermissionLevel.NONE
+        permissionGate.hasBackgroundLocationAccess() -> LocationPermissionLevel.ALWAYS
+        else -> LocationPermissionLevel.WHILE_IN_USE
+    }
+
     fun triggerAssistant() {
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(triggerInFlight = true) }
@@ -346,6 +372,9 @@ class AssistantViewModel @Inject constructor(
 
     companion object {
         private const val PERSIST_DEBOUNCE_MS = 350L
+
+        /** persistJobs-Key des System-Prompt-Editors ([setSystemPrompt]/[resetSystemPromptToDefault]). */
+        private const val EDIT_KEY_SYSTEM_PROMPT = "system_prompt"
 
         /**
          * Vorgefertigte Namen für den Sprach-Ansprech-Kontakt. Zweiteilige Namen

@@ -2,20 +2,31 @@ package io.github.lycheeappf.tmm.platform.tesla.api
 
 import android.util.Log
 import io.github.lycheeappf.tmm.core.util.LogBuffer
+import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Typisierte Fleet-API-Fehler. Die Exception-`message` ist NUR für Logcat/Debugging
+ * (englisch, PII-frei) — die nutzer­gerichtete, lokalisierte Meldung liefert
+ * [userMessage] (EN+DE via `Context.localizedString`).
+ */
 sealed class TeslaCommandError(message: String?) : Exception(message) {
-    class Unauthorized : TeslaCommandError("Tesla-Auth abgelaufen — bitte erneut einloggen")
-    class VehicleNotFound : TeslaCommandError("Fahrzeug nicht gefunden oder offline")
-    class CommandRejected(reason: String?) : TeslaCommandError("Befehl abgelehnt: $reason")
+    /** Keine Nutzer-Credentials hinterlegt — Fleet-Features sind nicht eingerichtet. */
+    class MissingCredentials : TeslaCommandError("Tesla API credentials missing")
+    class Unauthorized : TeslaCommandError("Tesla auth expired")
+    class VehicleNotFound : TeslaCommandError("vehicle not found or offline")
+    class CommandRejected(val reason: String?) : TeslaCommandError("command rejected: $reason")
     class Network(cause: Throwable) : TeslaCommandError(cause.message)
-    class Unknown(code: Int, body: String?) : TeslaCommandError("HTTP $code: $body")
+    /** Kein Region-Endpunkt hat den Account akzeptiert (EU+NA jeweils 412). */
+    class RegionDiscoveryFailed : TeslaCommandError("no matching Fleet API endpoint (EU+NA probed)")
+    class Unknown(val code: Int, val body: String?) : TeslaCommandError("HTTP $code")
 }
 
 @Singleton
@@ -23,6 +34,7 @@ class TeslaVehicleCommandClient @Inject constructor(
     private val api: TeslaFleetApi,
     private val authManager: TeslaAuthManager,
     private val tokenStore: TeslaTokenStore,
+    private val regionStore: TeslaRegionStore,
     private val logBuffer: LogBuffer
 ) {
     /**
@@ -32,20 +44,20 @@ class TeslaVehicleCommandClient @Inject constructor(
     suspend fun listVehicles(): List<VehicleInfo> {
         authManager.refreshIfNeeded()
         val token = requireToken()
-        val cached = tokenStore.readFleetApiBaseUrl()
+        val cached = regionStore.readFleetApiBaseUrl()
         if (cached != null) {
             val resp = api.vehicles("${cached}api/1/vehicles", "Bearer $token")
             if (resp.isSuccessful) return resp.body()?.response ?: emptyList()
             if (resp.code() != 412) mapError(resp.code(), resp.errorBody()?.string())
             // Gecachte Region passt nicht mehr → neu entdecken
-            tokenStore.writeFleetApiBaseUrl(null)
+            regionStore.writeFleetApiBaseUrl(null)
         }
         // Region-Discovery via vehicles-Probe
         for (base in TeslaOAuthConfig.REGION_CANDIDATES) {
             val resp = api.vehicles("${base}api/1/vehicles", "Bearer $token")
             when {
                 resp.isSuccessful -> {
-                    tokenStore.writeFleetApiBaseUrl(base)
+                    regionStore.writeFleetApiBaseUrl(base)
                     return resp.body()?.response ?: emptyList()
                 }
                 resp.code() == 401 || resp.code() == 403 -> throw TeslaCommandError.Unauthorized()
@@ -53,9 +65,8 @@ class TeslaVehicleCommandClient @Inject constructor(
                 else -> Log.w(TAG, "HTTP ${resp.code()} from $base")
             }
         }
-        val msg = "Region-Discovery: kein passender Fleet-API-Endpunkt (EU+NA probiert)"
-        logBuffer.error(TAG, msg)
-        throw TeslaCommandError.Unknown(412, "Kein passender Fleet-API-Endpunkt (EU+NA). Bitte Tesla-App-Registrierung prüfen.")
+        logBuffer.error(TAG, "region discovery failed: no matching Fleet API endpoint (EU+NA probed)")
+        throw TeslaCommandError.RegionDiscoveryFailed()
     }
 
     /** Sendet ein Text-Navigationsziel an das Fahrzeug, weckt es vorher auf falls nötig. */
@@ -69,8 +80,9 @@ class TeslaVehicleCommandClient @Inject constructor(
         sendWithWakeUpRetry(vin, "navigation_request") {
             api.navigationRequest("${base}api/1/vehicles/$vin/command/navigation_request", "Bearer ${requireToken()}", body)
         }
-        logBuffer.info(TAG, "navigation_request OK")
-        Log.i(TAG, "navigation_request OK (vin=$vin, address=$address)")
+        // NIE Ziel/VIN loggen — nur Metadaten (siehe CLAUDE.md PII-Regel).
+        logBuffer.info(TAG, "navigation_request OK (address len=${address.length})")
+        Log.i(TAG, "navigation_request OK (address len=${address.length})")
     }
 
     /** Sendet GPS-Koordinaten als Navigationsziel, weckt das Fahrzeug vorher auf falls nötig. */
@@ -80,8 +92,9 @@ class TeslaVehicleCommandClient @Inject constructor(
         sendWithWakeUpRetry(vin, "navigation_gps_request") {
             api.navigationGps("${base}api/1/vehicles/$vin/command/navigation_gps_request", "Bearer ${requireToken()}", body)
         }
+        // NIE Koordinaten/VIN loggen — nur Metadaten (siehe CLAUDE.md PII-Regel).
         logBuffer.info(TAG, "navigation_gps_request OK")
-        Log.i(TAG, "navigation_gps_request OK (vin=$vin, lat=$lat, lon=$lon)")
+        Log.i(TAG, "navigation_gps_request OK")
     }
 
     /**
@@ -95,21 +108,22 @@ class TeslaVehicleCommandClient @Inject constructor(
     ) {
         var resp = call()
         if (!resp.isSuccessful && resp.code() in listOf(404, 408)) {
-            val body = resp.errorBody()?.string()
-            Log.w(TAG, "$endpoint offline (${resp.code()}): $body — waking up vehicle")
-            logBuffer.warn(TAG, "$endpoint: HTTP ${resp.code()} — Fahrzeug schläft, wake_up wird gesendet")
+            // Error-Body NIE loggen (könnte Request-Daten spiegeln) — nur Metadaten.
+            val bodyLen = resp.errorBody()?.string()?.length ?: 0
+            Log.w(TAG, "$endpoint offline (HTTP ${resp.code()}, body len=$bodyLen) — waking up vehicle")
+            logBuffer.warn(TAG, "$endpoint: HTTP ${resp.code()} — vehicle asleep, sending wake_up")
             wakeUpByVin(vin)
             delay(15_000L)
             resp = call()
         }
         val errorBody = if (!resp.isSuccessful) resp.errorBody()?.string() else null
         if (!resp.isSuccessful) {
-            logBuffer.error(TAG, "$endpoint fehlgeschlagen: HTTP ${resp.code()} — ${errorBody?.take(200)}")
-            mapErrorWithBody(resp.code(), errorBody)
+            logBuffer.error(TAG, "$endpoint failed: HTTP ${resp.code()} (body len=${errorBody?.length ?: 0})")
+            mapError(resp.code(), errorBody)
         }
         resp.body()?.response?.let { result ->
             if (!result.result) {
-                logBuffer.error(TAG, "$endpoint abgelehnt: ${result.reason}")
+                logBuffer.error(TAG, "$endpoint rejected (reason len=${result.reason?.length ?: 0})")
                 throw TeslaCommandError.CommandRejected(result.reason)
             }
         }
@@ -117,12 +131,12 @@ class TeslaVehicleCommandClient @Inject constructor(
 
     /** Weckt das Fahrzeug über seine numerische ID (bevorzugt) oder sucht via Fahrzeugliste. */
     private suspend fun wakeUpByVin(vin: String) {
-        val base = tokenStore.readFleetApiBaseUrl() ?: return
+        val base = regionStore.readFleetApiBaseUrl() ?: return
         val vehicleId = tokenStore.readSelectedVehicleId()
             ?: listVehicles().firstOrNull { it.vin == vin }?.id
             ?: run {
                 Log.w(TAG, "wakeUp: vehicle ID not found")
-                logBuffer.warn(TAG, "wake_up: Fahrzeug-ID nicht gefunden")
+                logBuffer.warn(TAG, "wake_up: vehicle ID not found")
                 return
             }
         val resp = api.wakeUp("${base}api/1/vehicles/$vehicleId/wake_up", "Bearer ${requireToken()}")
@@ -134,7 +148,7 @@ class TeslaVehicleCommandClient @Inject constructor(
     // ---- Internals ----------------------------------------------------------
 
     private suspend fun ensureRegion(): String {
-        tokenStore.readFleetApiBaseUrl()?.let { return it }
+        regionStore.readFleetApiBaseUrl()?.let { return it }
         authManager.refreshIfNeeded()
         val token = requireToken()
 
@@ -146,7 +160,7 @@ class TeslaVehicleCommandClient @Inject constructor(
             when {
                 resp.isSuccessful -> {
                     Log.i(TAG, "Region discovered via vehicles: $base")
-                    tokenStore.writeFleetApiBaseUrl(base)
+                    regionStore.writeFleetApiBaseUrl(base)
                     return base
                 }
                 resp.code() == 401 || resp.code() == 403 -> throw TeslaCommandError.Unauthorized()
@@ -158,15 +172,14 @@ class TeslaVehicleCommandClient @Inject constructor(
                 }
             }
         }
-        logBuffer.error(TAG, "ensureRegion: kein passender Endpunkt (EU+NA), alle 412")
-        throw TeslaCommandError.Unknown(
-            412,
-            "Kein passender Fleet-API-Endpunkt gefunden (EU+NA probiert). " +
-                "Bitte App-Registrierung auf developer.tesla.com prüfen."
-        )
+        logBuffer.error(TAG, "ensureRegion: no matching endpoint (EU+NA), all 412")
+        throw TeslaCommandError.RegionDiscoveryFailed()
     }
 
     private suspend fun requireToken(): String {
+        // Turn-/Tool-Zeit-Re-Check: der Tesla-Auto-Reply-Pfad umgeht die UI-Gates,
+        // daher wird das Credentials-Gate bei JEDEM Fleet-Call erneut geprüft.
+        if (!authManager.hasCredentials()) throw TeslaCommandError.MissingCredentials()
         authManager.refreshIfNeeded()
         return authManager.readAccessToken() ?: throw TeslaCommandError.Unauthorized()
     }
@@ -177,16 +190,12 @@ class TeslaVehicleCommandClient @Inject constructor(
         else -> throw TeslaCommandError.Unknown(code, body?.take(200))
     }
 
-    /** Wie [mapError], aber gibt bei 404 den Body mit aus (hilft bei der Fehlerdiagnose). */
-    private fun mapErrorWithBody(code: Int, body: String?): Nothing = when (code) {
-        401, 403 -> throw TeslaCommandError.Unauthorized()
-        404 -> throw TeslaCommandError.Unknown(404, "Fahrzeug nicht gefunden/offline: ${body?.take(150)}")
-        else -> throw TeslaCommandError.Unknown(code, body?.take(200))
-    }
-
-    /** Ruft /api/1/users/region auf allen bekannten Endpunkten auf und gibt die Rohantworten zurück. */
-    suspend fun regionDiagnosticInfo(): String {
-        val token = authManager.readAccessToken() ?: return "Kein Access-Token vorhanden"
+    /**
+     * Ruft /api/1/users/region auf allen bekannten Endpunkten auf und gibt die
+     * Rohantworten zurück; null, wenn kein Access-Token vorliegt (Caller lokalisiert).
+     */
+    suspend fun regionDiagnosticInfo(): String? {
+        val token = authManager.readAccessToken() ?: return null
         return buildString {
             for (base in TeslaOAuthConfig.REGION_CANDIDATES) {
                 val url = "${base}api/1/users/region"
@@ -197,6 +206,9 @@ class TeslaVehicleCommandClient @Inject constructor(
                     val body = if (resp.isSuccessful) resp.body().toString()
                     else resp.errorBody()?.string()?.take(500)
                     append(body).append("\n\n")
+                } catch (e: CancellationException) {
+                    // NIE schlucken — sonst wird ein Abbruch als Diagnose-Text ausgegeben.
+                    throw e
                 } catch (e: Exception) {
                     append("Exception: ${e.message?.take(200)}\n\n")
                 }

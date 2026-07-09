@@ -4,13 +4,19 @@
     <string name="assistant_intro">Deine Diktate aus dem Tesla gehen an Grok (xAI). Die Antwort liest dein Tesla vor. Der Gesprächskontext für Grok bleibt nur kurz im Speicher. Deine Diktate werden zusätzlich lokal auf dem Gerät protokolliert (für Diagnose und erneute Zustellung) und verlassen es nur Richtung xAI.</string>
 
     <string name="assistant_consent_title">Einwilligung</string>
-    <string name="assistant_consent_desc">Vor dem ersten Start zwingend — bestätigt, dass Diktate an xAI gehen.</string>
+    <string name="assistant_consent_desc">Vor dem ersten Start zwingend — bestätigt, dass Diktate (und bei aktivierter Standort-Übermittlung deine GPS-Position) an xAI gehen.</string>
     <string name="assistant_consent_granted">Eingewilligt — Start freigegeben.</string>
     <string name="assistant_consent_not_granted">Noch nicht eingewilligt — Start blockiert.</string>
 
-    <string name="assistant_location_title">Standortzugriff</string>
-    <string name="assistant_location_desc">Lässt Grok standortbezogene Fragen beantworten ("bestes Restaurant in der Nähe"). Die GPS-Koordinaten werden mit jeder xAI-Anfrage übermittelt — gleiche Vertrauensgrenze wie das Diktat.</string>
+    <string name="assistant_location_title">Standort mit Grok teilen</string>
+    <string name="assistant_location_desc">Lässt Grok standortbezogene Fragen beantworten (\"bestes Restaurant in der Nähe\"). Wenn aktiviert, werden die GPS-Koordinaten mit jeder xAI-Anfrage übermittelt — gleiche Vertrauensgrenze wie das Diktat. Standardmäßig aus.</string>
     <string name="assistant_location_action">Berechtigung erteilen</string>
+    <string name="assistant_location_on">Standort-Übermittlung an.</string>
+    <string name="assistant_location_off">Standort-Übermittlung aus.</string>
+    <string name="assistant_location_on_no_permission">An — aber die Standort-Berechtigung fehlt.</string>
+    <string name="assistant_location_background_title">Fürs Auto: \"Immer erlauben\" nötig</string>
+    <string name="assistant_location_background_desc">Grok-Antworten laufen während der Fahrt im Hintergrund — Android liefert den Standort dann nur, wenn der Zugriff auf \"Immer erlauben\" steht. Wähle das in den App-Einstellungen unter Berechtigungen &gt; Standort.</string>
+    <string name="assistant_location_background_action">App-Einstellungen öffnen</string>
 
     <string name="assistant_apikey_title">xAI-API-Key</string>
     <string name="assistant_apikey_desc">Wird verschlüsselt auf dem Gerät gespeichert und nicht ins Backup übernommen.</string>
