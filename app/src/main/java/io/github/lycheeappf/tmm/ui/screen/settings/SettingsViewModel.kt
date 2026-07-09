@@ -68,6 +68,12 @@ data class SettingsUiState(
     val sendingDiagnostics: Boolean = false,
     /** Tesla Fleet API Auth-Status. */
     val teslaAuthState: TeslaAuthState = TeslaAuthState.Loading,
+    /** Nutzer-eigene Tesla-App-Credentials (developer.tesla.com) hinterlegt? */
+    val teslaCredentialsSet: Boolean = false,
+    /** Eingabe-Entwürfe für die Tesla-Credentials — nie persistiert, nur bis „Speichern". */
+    val teslaClientIdDraft: String = "",
+    val teslaClientSecretDraft: String = "",
+    val teslaCredentialsSaving: Boolean = false,
     /** Fahrzeuge des eingeloggten Tesla-Accounts (geladen nach Login). */
     val teslaVehicles: List<VehicleInfo> = emptyList(),
     val teslaVehiclesLoading: Boolean = false,
@@ -81,6 +87,9 @@ sealed class SettingsEvent {
     data class Share(val file: java.io.File) : SettingsEvent()
     data object ExportFailed : SettingsEvent()
     data class OpenTeslaAuthUrl(val url: String) : SettingsEvent()
+
+    /** Kurzes Text-Feedback (Toast) — bereits lokalisiert im ViewModel aufgelöst. */
+    data class Feedback(val message: String) : SettingsEvent()
 }
 
 @HiltViewModel
@@ -178,7 +187,8 @@ class SettingsViewModel @Inject constructor(
                     teslaDeviceMissing = deviceMissing,
                     preflightStatus = store.preflightResult(),
                     developerMode = store.isDeveloperMode(),
-                    languageTag = appLocaleManager.currentTag()
+                    languageTag = appLocaleManager.currentTag(),
+                    teslaCredentialsSet = teslaAuthManager.hasCredentials()
                 )
             }
         }
@@ -322,6 +332,67 @@ class SettingsViewModel @Inject constructor(
 
     // ---- Tesla Fleet API ----------------------------------------------------
 
+    fun setTeslaClientIdDraft(value: String) =
+        _uiState.update { it.copy(teslaClientIdDraft = value) }
+
+    fun setTeslaClientSecretDraft(value: String) =
+        _uiState.update { it.copy(teslaClientSecretDraft = value) }
+
+    /**
+     * Persistiert die nutzer-eigenen Tesla-App-Credentials (verschlüsselt, via
+     * [TeslaAuthManager.setCredentials] — re-initialisiert auch den Auth-State,
+     * sodass der Connect-Button erscheint). Spiegel des xAI-Key-Speicherns:
+     * Validierungsfehler des Stores (leer/CR-LF) landen als Feedback-Toast.
+     */
+    fun saveTeslaCredentials() {
+        val clientId = _uiState.value.teslaClientIdDraft.trim()
+        val clientSecret = _uiState.value.teslaClientSecretDraft.trim()
+        if (clientId.isEmpty() || clientSecret.isEmpty()) return
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update { it.copy(teslaCredentialsSaving = true) }
+            val feedback = try {
+                teslaAuthManager.setCredentials(clientId, clientSecret)
+                _uiState.update {
+                    it.copy(
+                        teslaClientIdDraft = "",
+                        teslaClientSecretDraft = "",
+                        teslaCredentialsSet = true
+                    )
+                }
+                context.localizedString(R.string.tesla_credentials_feedback_saved)
+            } catch (_: IllegalArgumentException) {
+                // KeystoreTeslaCredentialsStore validiert auf leer/Zeilenumbrüche.
+                context.localizedString(R.string.tesla_credentials_feedback_invalid)
+            }
+            _uiState.update { it.copy(teslaCredentialsSaving = false) }
+            _events.send(SettingsEvent.Feedback(feedback))
+        }
+    }
+
+    /**
+     * Entfernt Credentials UND alle davon abhängigen Artefakte (Tokens, Region)
+     * über [TeslaAuthManager.clearCredentials] → Auth-State wird
+     * [TeslaAuthState.MissingCredentials], alle Fleet-Features sind gegated.
+     */
+    fun clearTeslaCredentials() {
+        viewModelScope.launch(ioDispatcher) {
+            teslaAuthManager.clearCredentials()
+            _uiState.update {
+                it.copy(
+                    teslaCredentialsSet = false,
+                    teslaVehicles = emptyList(),
+                    teslaVehiclesError = null,
+                    teslaRegionDiagnostic = null
+                )
+            }
+            _events.send(
+                SettingsEvent.Feedback(
+                    context.localizedString(R.string.tesla_credentials_feedback_removed)
+                )
+            )
+        }
+    }
+
     fun startTeslaLogin() {
         viewModelScope.launch {
             // null = keine Credentials hinterlegt; der Manager hat den State
@@ -346,7 +417,10 @@ class SettingsViewModel @Inject constructor(
             val result = withContext(ioDispatcher) {
                 coRunCatching { teslaCommandClient.listVehicles() }
             }
-            val diagnostic = if (result.isFailure) {
+            // Region-Diagnose ist eine Dev-Oberfläche (wie Channels/Diagnostics):
+            // nur im Developer-Mode überhaupt erheben — normale Nutzer sehen die
+            // lokalisierte Fehlermeldung, keine rohen Endpoint-Probes.
+            val diagnostic = if (result.isFailure && _uiState.value.developerMode) {
                 withContext(ioDispatcher) {
                     // null = kein Token / Diagnose selbst gescheitert → lokalisierter Hinweis.
                     coRunCatching { teslaCommandClient.regionDiagnosticInfo() }.getOrNull()

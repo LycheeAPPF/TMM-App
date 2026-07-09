@@ -111,12 +111,31 @@
     <string name="tesla_api_status_connected">Connected</string>
     <string name="tesla_api_status_not_connected">Not connected</string>
     <string name="tesla_api_status_loading">Loading…</string>
-    <string name="tesla_api_vehicle_label">Vehicle</string>
+    <string name="tesla_api_vehicle_selected">Vehicle: %1$s</string>
+    <string name="tesla_api_load_vehicles">Load vehicles</string>
     <string name="tesla_api_no_vehicle">No vehicle selected</string>
     <string name="tesla_api_token_expires">Token expires: %1$s</string>
     <string name="tesla_api_error_prefix">Error: %1$s</string>
     <string name="tesla_api_missing_credentials">No Tesla API credentials stored. Create your own app at developer.tesla.com and add its Client ID and Client Secret in the app settings to enable vehicle features.</string>
     <string name="tesla_api_diagnostic_failed">Region diagnostics failed</string>
+
+    <!-- Tesla API credentials (user-provided app registration) -->
+    <string name="tesla_credentials_title">Tesla API credentials</string>
+    <string name="tesla_credentials_desc">Create your own app at developer.tesla.com and enter its Client ID and Client Secret here. Stored encrypted on the device and not included in backups.</string>
+    <string name="tesla_credentials_status_set">Credentials stored</string>
+    <string name="tesla_credentials_status_none">No credentials</string>
+    <string name="tesla_credentials_client_id_label">Client ID</string>
+    <string name="tesla_credentials_client_secret_label">Client Secret</string>
+    <string name="tesla_credentials_show">Show value</string>
+    <string name="tesla_credentials_hide">Hide value</string>
+    <string name="tesla_credentials_save">Save</string>
+    <string name="tesla_credentials_remove">Remove</string>
+    <string name="tesla_credentials_remove_hint">Removing the credentials also disconnects the vehicle.</string>
+    <string name="tesla_credentials_redirect_help">Register exactly this redirect URI in your app registration at developer.tesla.com:</string>
+    <string name="tesla_credentials_copy_redirect">Copy redirect URI</string>
+    <string name="tesla_credentials_feedback_saved">Tesla API credentials saved</string>
+    <string name="tesla_credentials_feedback_removed">Tesla API credentials removed</string>
+    <string name="tesla_credentials_feedback_invalid">Invalid input: Client ID and Client Secret must not be empty or contain line breaks</string>
 
     <!-- Tesla Fleet API errors (spoken via Grok and shown in settings) -->
     <string name="tesla_error_missing_credentials">Tesla API credentials are missing — please add them in the app settings</string>

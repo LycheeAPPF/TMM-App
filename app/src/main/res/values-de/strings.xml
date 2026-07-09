@@ -109,12 +109,31 @@
     <string name="tesla_api_status_connected">Verbunden</string>
     <string name="tesla_api_status_not_connected">Nicht verbunden</string>
     <string name="tesla_api_status_loading">Lädt…</string>
-    <string name="tesla_api_vehicle_label">Fahrzeug</string>
+    <string name="tesla_api_vehicle_selected">Fahrzeug: %1$s</string>
+    <string name="tesla_api_load_vehicles">Fahrzeuge laden</string>
     <string name="tesla_api_no_vehicle">Kein Fahrzeug gewählt</string>
     <string name="tesla_api_token_expires">Token läuft ab: %1$s</string>
     <string name="tesla_api_error_prefix">Fehler: %1$s</string>
     <string name="tesla_api_missing_credentials">Keine Tesla-API-Zugangsdaten hinterlegt. Erstelle eine eigene App auf developer.tesla.com und hinterlege deren Client-ID und Client-Secret in den App-Einstellungen, um Fahrzeug-Funktionen zu aktivieren.</string>
     <string name="tesla_api_diagnostic_failed">Region-Diagnose fehlgeschlagen</string>
+
+    <!-- Tesla API credentials (user-provided app registration) -->
+    <string name="tesla_credentials_title">Tesla-API-Zugangsdaten</string>
+    <string name="tesla_credentials_desc">Erstelle eine eigene App auf developer.tesla.com und trage hier deren Client-ID und Client-Secret ein. Wird verschlüsselt auf dem Gerät gespeichert und ist von Backups ausgenommen.</string>
+    <string name="tesla_credentials_status_set">Zugangsdaten hinterlegt</string>
+    <string name="tesla_credentials_status_none">Keine Zugangsdaten</string>
+    <string name="tesla_credentials_client_id_label">Client-ID</string>
+    <string name="tesla_credentials_client_secret_label">Client-Secret</string>
+    <string name="tesla_credentials_show">Wert anzeigen</string>
+    <string name="tesla_credentials_hide">Wert verbergen</string>
+    <string name="tesla_credentials_save">Speichern</string>
+    <string name="tesla_credentials_remove">Entfernen</string>
+    <string name="tesla_credentials_remove_hint">Beim Entfernen der Zugangsdaten wird auch die Fahrzeugverbindung getrennt.</string>
+    <string name="tesla_credentials_redirect_help">Hinterlege exakt diese Redirect-URI in deiner App-Registrierung auf developer.tesla.com:</string>
+    <string name="tesla_credentials_copy_redirect">Redirect-URI kopieren</string>
+    <string name="tesla_credentials_feedback_saved">Tesla-API-Zugangsdaten gespeichert</string>
+    <string name="tesla_credentials_feedback_removed">Tesla-API-Zugangsdaten entfernt</string>
+    <string name="tesla_credentials_feedback_invalid">Ungültige Eingabe: Client-ID und Client-Secret dürfen nicht leer sein oder Zeilenumbrüche enthalten</string>
 
     <!-- Tesla Fleet API errors (spoken via Grok and shown in settings) -->
     <string name="tesla_error_missing_credentials">Tesla-API-Zugangsdaten fehlen — bitte in den App-Einstellungen hinterlegen</string>
