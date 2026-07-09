@@ -31,6 +31,10 @@ enum class MfsDestination(val route: String, @StringRes val labelRes: Int) {
 /** Arg-Key der SMS-Thread-Route (eine echte Nav-Argument-Route). */
 const val ARG_THREAD_ID = "threadId"
 
+/** Arg-Keys der optionalen Query-Argumente der SMS-Compose-Route. */
+const val ARG_RECIPIENT = "recipient"
+const val ARG_BODY = "body"
+
 /** Konkrete Route in einen SMS-Thread mit gegebener `thread_id`. */
 fun smsThreadRoute(threadId: Long): String = "sms_thread/$threadId"
 
@@ -39,9 +43,9 @@ fun smsComposeRoute(recipient: String? = null, body: String? = null): String = b
     append(MfsDestination.SmsCompose.route)
     val params = listOfNotNull(
         recipient?.takeIf { it.isNotBlank() }
-            ?.let { "recipient=${android.net.Uri.encode(it)}" },
+            ?.let { "$ARG_RECIPIENT=${android.net.Uri.encode(it)}" },
         body?.takeIf { it.isNotBlank() }
-            ?.let { "body=${android.net.Uri.encode(it)}" }
+            ?.let { "$ARG_BODY=${android.net.Uri.encode(it)}" }
     )
     if (params.isNotEmpty()) append("?${params.joinToString("&")}")
 }

@@ -88,12 +88,12 @@ fun MfsNavHost(
             SmsThreadScreen(onBack = { navController.popBackStack() })
         }
         composable(
-            route = "${MfsDestination.SmsCompose.route}?recipient={recipient}&body={body}",
+            route = "${MfsDestination.SmsCompose.route}?$ARG_RECIPIENT={$ARG_RECIPIENT}&$ARG_BODY={$ARG_BODY}",
             arguments = listOf(
-                navArgument("recipient") {
+                navArgument(ARG_RECIPIENT) {
                     type = NavType.StringType; nullable = true; defaultValue = null
                 },
-                navArgument("body") {
+                navArgument(ARG_BODY) {
                     type = NavType.StringType; nullable = true; defaultValue = null
                 }
             )
