@@ -3,6 +3,7 @@ package io.github.lycheeappf.tmm.data.store
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.platform.location.LocationFix
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -141,6 +142,67 @@ class AssistantPreferencesStoreTest {
             .contains("live on the web")
         assertThat(store.systemPrompt(webSearch = false, xSearch = false))
             .contains("real time")
+    }
+
+    @Test
+    fun `location context defaults off and persists`() = runTest {
+        assertThat(store.locationContextEnabled()).isFalse()
+
+        store.setLocationContextEnabled(true)
+        assertThat(store.locationContextEnabled()).isTrue()
+        store.setLocationContextEnabled(false)
+        assertThat(store.locationContextEnabled()).isFalse()
+    }
+
+    @Test
+    fun `german location clause uses US decimal dots and O for east`() = runTest {
+        store.setSystemPrompt("Basis.")
+        // Default-Locale bewusst auf GERMANY drehen: würde locationClause die
+        // Default-Locale statt Locale.US formatieren, käme "48,1373" heraus.
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.GERMANY)
+        try {
+            val prompt = store.systemPrompt(
+                webSearch = false,
+                xSearch = false,
+                location = LocationFix(latitude = 48.137254, longitude = 11.575382, accuracyInMeters = 12.7f)
+            )
+            assertThat(prompt).contains("48.1373° N, 11.5754° O")
+            assertThat(prompt).contains("ca. 12 m")
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun `english location clause uses S and E for southern-east coordinates`() = runTest {
+        locale = Locale.ENGLISH
+        store.setSystemPrompt("Base.")
+        val prompt = store.systemPrompt(
+            webSearch = false,
+            xSearch = false,
+            location = LocationFix(latitude = -33.868819, longitude = 151.209295, accuracyInMeters = 25.9f)
+        )
+        assertThat(prompt).contains("33.8688° S, 151.2093° E")
+        assertThat(prompt).contains("about 25 m")
+    }
+
+    @Test
+    fun `location clause truncates to four decimals and marks western longitude`() = runTest {
+        store.setSystemPrompt("Basis.")
+        val prompt = store.systemPrompt(
+            webSearch = false,
+            xSearch = false,
+            location = LocationFix(latitude = 40.71277761, longitude = -74.00601528, accuracyInMeters = 8.2f)
+        )
+        assertThat(prompt).contains("40.7128° N, 74.0060° W")
+    }
+
+    @Test
+    fun `without a fix the system prompt carries no location clause`() = runTest {
+        store.setSystemPrompt("Basis.")
+        val prompt = store.systemPrompt(webSearch = false, xSearch = false, location = null)
+        assertThat(prompt).doesNotContain("GPS-Position")
     }
 
     @Test

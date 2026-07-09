@@ -75,7 +75,10 @@ class LlmTurnRunner @Inject constructor(
             // sonst "du kannst suchen" sagen, ohne die Tools mitzuschicken — oder umgekehrt).
             val webSearch = prefs.webSearchEnabled()
             val xSearch = prefs.xSearchEnabled()
-            val location = locationProvider.lastKnownLocation()
+            // Standort nur bei aktivem Opt-in ÜBERHAUPT abfragen; die Permission
+            // prüft der Provider selbst (fehlend/stale → null, Turn läuft ohne
+            // Standort-Klausel weiter).
+            val location = if (prefs.locationContextEnabled()) locationProvider.lastKnownLocation() else null
             val req = LlmRequest(
                 model = model,
                 systemPrompt = prefs.systemPrompt(webSearch, xSearch, location),
