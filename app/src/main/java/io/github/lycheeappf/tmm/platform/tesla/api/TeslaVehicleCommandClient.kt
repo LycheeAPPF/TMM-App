@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.platform.tesla.api
 
 import android.util.Log
+import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
@@ -35,7 +36,8 @@ class TeslaVehicleCommandClient @Inject constructor(
     private val authManager: TeslaAuthManager,
     private val tokenStore: TeslaTokenStore,
     private val regionStore: TeslaRegionStore,
-    private val logBuffer: LogBuffer
+    private val logBuffer: LogBuffer,
+    private val clock: Clock
 ) {
     /**
      * Listet alle Fahrzeuge des Nutzers.
@@ -74,7 +76,7 @@ class TeslaVehicleCommandClient @Inject constructor(
         val base = ensureRegion()
         val body = NavigationRequestBody(
             locale = Locale.getDefault().toLanguageTag(),
-            timestampMs = System.currentTimeMillis(),
+            timestampMs = clock.now(),
             value = NavigationValue(text = address, extraText = address)
         )
         sendWithWakeUpRetry(vin, "navigation_request") {

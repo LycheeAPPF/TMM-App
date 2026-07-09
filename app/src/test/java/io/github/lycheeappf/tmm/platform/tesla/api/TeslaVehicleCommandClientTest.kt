@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.platform.tesla.api
 
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.core.util.LogFileStore
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
@@ -89,7 +90,9 @@ class TeslaVehicleCommandClientTest {
             LogFileStore(File(tmp.root, "diagnostics"), UnconfinedTestDispatcher()),
             UnconfinedTestDispatcher()
         )
-        client = TeslaVehicleCommandClient(api, authManager, tokenStore, regionStore, logBuffer)
+        client = TeslaVehicleCommandClient(
+            api, authManager, tokenStore, regionStore, logBuffer, Clock { FIXED_NOW }
+        )
     }
 
     @After fun teardown() {
@@ -202,6 +205,16 @@ class TeslaVehicleCommandClientTest {
         client.navigate(VIN, ADDRESS)
 
         assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test fun `navigation request body carries the injected clock timestamp`() = runTest {
+        regionStore.baseUrl = euBase
+        server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
+
+        client.navigate(VIN, ADDRESS)
+
+        val body = server.takeRequest().body.readUtf8()
+        assertThat(body).contains("\"timestamp_ms\":$FIXED_NOW")
     }
 
     // ---- Fehler-Mapping ------------------------------------------------------
@@ -332,5 +345,6 @@ class TeslaVehicleCommandClientTest {
         private const val VIN = "5YJ3E1EA7KF317000"
         private const val VEHICLE_ID = 4711L
         private const val ADDRESS = "Musterstraße 42, 10999 Berlin"
+        private const val FIXED_NOW = 1_720_000_000_000L
     }
 }
