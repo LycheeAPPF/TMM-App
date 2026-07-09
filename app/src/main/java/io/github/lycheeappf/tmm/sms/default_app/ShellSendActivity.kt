@@ -16,17 +16,16 @@ class ShellSendActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val original = intent
-        val recipient = original?.data?.let { data ->
-            when (data.scheme) {
-                "sms", "smsto", "mms", "mmsto" -> data.schemeSpecificPart
-                else -> null
-            }
-        }
-        val body = original?.getStringExtra("sms_body")
+        // RFC-5724-Parsing über die pure Funktion (rohe URI, NICHT schemeSpecificPart —
+        // sonst landet `?body=…` im Empfänger). Body-Query hat Vorrang, dann die
+        // klassischen Intent-Extras.
+        val parsed = SmsUriParser.parse(original?.dataString)
+        val body = parsed.body
+            ?: original?.getStringExtra("sms_body")
             ?: original?.getStringExtra(Intent.EXTRA_TEXT)
 
         startActivity(
-            MainActivity.composeIntent(this, recipient, body)
+            MainActivity.composeIntent(this, parsed.recipient, body)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         )
         finish()
