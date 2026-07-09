@@ -273,7 +273,7 @@ class AssistantPreferencesStore @Inject constructor(
      * (gleiche xAI-Vertrauensgrenze wie der normale Turn) und kostet zusätzlich.
      */
     suspend fun webSearchEnabled(): Boolean =
-        store.data.first()[KEY_WEB_SEARCH_ENABLED] ?: true
+        store.data.first()[KEY_WEB_SEARCH_ENABLED] ?: false
 
     suspend fun setWebSearchEnabled(value: Boolean) {
         store.edit { it[KEY_WEB_SEARCH_ENABLED] = value }
