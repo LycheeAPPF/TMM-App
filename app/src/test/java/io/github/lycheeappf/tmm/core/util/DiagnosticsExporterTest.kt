@@ -100,4 +100,15 @@ class DiagnosticsExporterTest {
         assertThat(content).contains("teslaApi")
         assertThat(content).contains("\"authenticated\": false")
     }
+
+    @Test fun `export masks the VIN to its last 4 chars`() = runTest {
+        coEvery { teslaTokenStore.readSelectedVin() } returns "5YJ3E7EB1KF000123"
+        every { mappingDao.observeByChannel(any(), any()) } returns flowOf(emptyList())
+        every { replyHistoryDao.observeRecent(any()) } returns flowOf(emptyList())
+
+        val content = exporter().exportToCache().readText()
+
+        assertThat(content).doesNotContain("5YJ3E7EB1KF000123")
+        assertThat(content).contains("…0123")
+    }
 }

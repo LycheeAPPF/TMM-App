@@ -52,7 +52,8 @@ class DiagnosticsExporter @Inject constructor(
         val history = collectRecentHistory()
         val teslaSnapshot = TeslaApiSnapshot(
             authenticated = teslaTokenStore.isAuthenticated(),
-            selectedVin = teslaTokenStore.readSelectedVin(),
+            // VIN ist PII → maskiert auf die letzten 4 Zeichen (reicht zur Zuordnung).
+            selectedVin = teslaTokenStore.readSelectedVin()?.let { vin -> "…${vin.takeLast(4)}" },
             fleetApiBaseUrl = teslaRegionStore.readFleetApiBaseUrl(),
             tokenExpiresAtMs = teslaTokenStore.readExpiresAtMs().takeIf { it > 0L }
         )
