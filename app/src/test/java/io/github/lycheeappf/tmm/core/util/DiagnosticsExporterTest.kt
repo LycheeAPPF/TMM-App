@@ -11,6 +11,7 @@ import io.github.lycheeappf.tmm.data.db.PayloadJson
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryDao
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryEntity
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.mockk.coEvery
@@ -37,12 +38,17 @@ class DiagnosticsExporterTest {
     private val teslaTokenStore = mockk<TeslaTokenStore> {
         coEvery { isAuthenticated() } returns false
         coEvery { readSelectedVin() } returns null
-        coEvery { readFleetApiBaseUrl() } returns null
         coEvery { readExpiresAtMs() } returns 0L
+    }
+    private val teslaRegionStore = mockk<TeslaRegionStore> {
+        coEvery { readFleetApiBaseUrl() } returns null
     }
 
     private fun exporter() =
-        DiagnosticsExporter(context, mappingDao, replyHistoryDao, logFileStore, settingsStore, teslaTokenStore)
+        DiagnosticsExporter(
+            context, mappingDao, replyHistoryDao, logFileStore, settingsStore,
+            teslaTokenStore, teslaRegionStore
+        )
 
     @Test fun `export redacts contact names, conversation key and reply text`() = runTest {
         val payloadJson = PayloadJson.encode(

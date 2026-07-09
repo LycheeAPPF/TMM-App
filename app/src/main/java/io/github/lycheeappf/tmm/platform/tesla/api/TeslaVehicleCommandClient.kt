@@ -2,6 +2,7 @@ package io.github.lycheeappf.tmm.platform.tesla.api
 
 import android.util.Log
 import io.github.lycheeappf.tmm.core.util.LogBuffer
+import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
@@ -23,6 +24,7 @@ class TeslaVehicleCommandClient @Inject constructor(
     private val api: TeslaFleetApi,
     private val authManager: TeslaAuthManager,
     private val tokenStore: TeslaTokenStore,
+    private val regionStore: TeslaRegionStore,
     private val logBuffer: LogBuffer
 ) {
     /**
@@ -32,20 +34,20 @@ class TeslaVehicleCommandClient @Inject constructor(
     suspend fun listVehicles(): List<VehicleInfo> {
         authManager.refreshIfNeeded()
         val token = requireToken()
-        val cached = tokenStore.readFleetApiBaseUrl()
+        val cached = regionStore.readFleetApiBaseUrl()
         if (cached != null) {
             val resp = api.vehicles("${cached}api/1/vehicles", "Bearer $token")
             if (resp.isSuccessful) return resp.body()?.response ?: emptyList()
             if (resp.code() != 412) mapError(resp.code(), resp.errorBody()?.string())
             // Gecachte Region passt nicht mehr → neu entdecken
-            tokenStore.writeFleetApiBaseUrl(null)
+            regionStore.writeFleetApiBaseUrl(null)
         }
         // Region-Discovery via vehicles-Probe
         for (base in TeslaOAuthConfig.REGION_CANDIDATES) {
             val resp = api.vehicles("${base}api/1/vehicles", "Bearer $token")
             when {
                 resp.isSuccessful -> {
-                    tokenStore.writeFleetApiBaseUrl(base)
+                    regionStore.writeFleetApiBaseUrl(base)
                     return resp.body()?.response ?: emptyList()
                 }
                 resp.code() == 401 || resp.code() == 403 -> throw TeslaCommandError.Unauthorized()
@@ -117,7 +119,7 @@ class TeslaVehicleCommandClient @Inject constructor(
 
     /** Weckt das Fahrzeug über seine numerische ID (bevorzugt) oder sucht via Fahrzeugliste. */
     private suspend fun wakeUpByVin(vin: String) {
-        val base = tokenStore.readFleetApiBaseUrl() ?: return
+        val base = regionStore.readFleetApiBaseUrl() ?: return
         val vehicleId = tokenStore.readSelectedVehicleId()
             ?: listVehicles().firstOrNull { it.vin == vin }?.id
             ?: run {
@@ -134,7 +136,7 @@ class TeslaVehicleCommandClient @Inject constructor(
     // ---- Internals ----------------------------------------------------------
 
     private suspend fun ensureRegion(): String {
-        tokenStore.readFleetApiBaseUrl()?.let { return it }
+        regionStore.readFleetApiBaseUrl()?.let { return it }
         authManager.refreshIfNeeded()
         val token = requireToken()
 
@@ -146,7 +148,7 @@ class TeslaVehicleCommandClient @Inject constructor(
             when {
                 resp.isSuccessful -> {
                     Log.i(TAG, "Region discovered via vehicles: $base")
-                    tokenStore.writeFleetApiBaseUrl(base)
+                    regionStore.writeFleetApiBaseUrl(base)
                     return base
                 }
                 resp.code() == 401 || resp.code() == 403 -> throw TeslaCommandError.Unauthorized()
