@@ -206,6 +206,26 @@ class AssistantPreferencesStoreTest {
     }
 
     @Test
+    fun `stored legacy4 silent-success default system-prompt migrates to the new default`() = runTest {
+        // Der Vorgänger-Default wies Grok an, bei erfolgreicher Navigation zu schweigen —
+        // eine leere Antwort wird aber als Fehler vorgelesen. Unverändert gespeicherte
+        // Nutzer flippen auf den neuen „bestätige kurz mit Ziel"-Default.
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY4_DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
+    fun `stored legacy4 EN default system-prompt migrates to the new EN default`() = runTest {
+        locale = Locale.ENGLISH
+        store.setSystemPrompt(AssistantPreferencesStore.LEGACY4_DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.systemPromptRaw())
+            .isEqualTo(AssistantPreferencesStore.DEFAULT_SYSTEM_PROMPT_EN)
+        assertThat(store.isSystemPromptCustomized()).isFalse()
+    }
+
+    @Test
     fun `stored legacy default system-prompt migrates to the new default`() = runTest {
         store.setSystemPrompt(AssistantPreferencesStore.LEGACY_DEFAULT_SYSTEM_PROMPT)
         // Wird als Seed erkannt → liefert den NEUEN (umformulierten) Default, nicht den Legacy-Text.

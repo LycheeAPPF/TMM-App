@@ -42,6 +42,7 @@
     <!-- Grok assistant: spoken (TTS) status & error messages -->
     <string name="llm_inactive">Der Assistent ist nicht aktiv. Bitte Einwilligung und API-Key in der App bestätigen.</string>
     <string name="llm_empty_response">Grok hat keine Antwort gesendet.</string>
+    <string name="llm_tool_success_fallback">Erledigt — die Anfrage wurde ausgeführt.</string>
     <string name="llm_conversation_expired">Entschuldige — die Konversation ist abgelaufen.</string>
     <string name="llm_error_wrapper">Entschuldige, ich kann das gerade nicht beantworten — %1$s</string>
     <string name="llm_ratelimit_per_min">Zu viele Anfragen — bitte einen Moment warten.</string>

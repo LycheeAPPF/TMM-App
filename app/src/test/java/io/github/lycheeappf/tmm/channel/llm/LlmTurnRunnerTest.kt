@@ -1,11 +1,16 @@
 package io.github.lycheeappf.tmm.channel.llm
 
+import android.content.Context
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProvider
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
+import io.github.lycheeappf.tmm.channel.llm.provider.ToolCall
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.platform.location.LocationFix
@@ -13,15 +18,19 @@ import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.coVerify
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
 class LlmTurnRunnerTest {
 
+    private val context: Context = mockk()
     private val store = LlmConversationStore(mockk(relaxed = true) {
         coEvery { contextTtlSeconds() } returns 120
     }) { 1_000L }
@@ -38,6 +47,10 @@ class LlmTurnRunnerTest {
     private lateinit var runner: LlmTurnRunner
 
     @Before fun setup() {
+        // localizedString ist eine Top-Level-Extension (LocaleExt) — auf der JVM ohne
+        // Robolectric via mockkStatic stubben, statt einen echten Context zu brauchen.
+        mockkStatic("io.github.lycheeappf.tmm.core.locale.LocaleExtKt")
+        every { context.localizedString(R.string.llm_tool_success_fallback) } returns FALLBACK_TEXT
         coEvery { prefs.model() } returns "grok-4.3"
         coEvery { prefs.systemPrompt(any(), any(), isNull()) } returns "Sys"
         coEvery { prefs.maxTokens() } returns 256
@@ -51,8 +64,12 @@ class LlmTurnRunnerTest {
         // wirft sonst MockKException ("missing answer").
         coEvery { limiter.refund(any()) } returns Unit
         runner = LlmTurnRunner(
-            store, provider, prefs, limiter, formatter, toolRegistry, locationProvider, logBuffer
+            context, store, provider, prefs, limiter, formatter, toolRegistry, locationProvider, logBuffer
         ) { 1_000L }
+    }
+
+    @After fun tearDown() {
+        unmockkStatic("io.github.lycheeappf.tmm.core.locale.LocaleExtKt")
     }
 
     @Test fun `success appends user and assistant turns`() = runTest {
@@ -189,6 +206,46 @@ class LlmTurnRunnerTest {
         coVerify { limiter.refund(7L) }
     }
 
+    @Test fun `blank reply after successful tool call falls back to a localized confirmation`() = runTest {
+        coEvery { toolRegistry.invoke("tesla_navigate", any()) } returns
+            ToolInvocationResult.Success("""{"status":"ok","destination":"Alexanderplatz"}""")
+        coEvery { provider.complete(any()) } returnsMany listOf(
+            LlmResponse(
+                content = null,
+                toolCalls = listOf(ToolCall("c1", "tesla_navigate", """{"address":"Alexanderplatz"}""")),
+                finishReason = "tool_calls", usage = null, responseId = "r1"
+            ),
+            LlmResponse(content = "", toolCalls = emptyList(), finishReason = "stop", usage = null, responseId = "r2")
+        )
+
+        val result = runner.run(7L, "Navigier mich zum Alexanderplatz")
+
+        assertThat(result).isInstanceOf(LlmTurnRunner.TurnResult.Success::class.java)
+        assertThat((result as LlmTurnRunner.TurnResult.Success).assistantText).isEqualTo(FALLBACK_TEXT)
+        // Fallback zählt als normaler Erfolg: History wird persistiert, kein Refund.
+        assertThat(store.snapshot(store.sessionFor(7L))).hasSize(2)
+        coVerify(exactly = 0) { limiter.refund(any()) }
+    }
+
+    @Test fun `blank reply after failed tool call stays on the empty-response error path`() = runTest {
+        coEvery { toolRegistry.invoke("tesla_navigate", any()) } returns
+            ToolInvocationResult.Failure("no vehicle configured")
+        coEvery { provider.complete(any()) } returnsMany listOf(
+            LlmResponse(
+                content = null,
+                toolCalls = listOf(ToolCall("c1", "tesla_navigate", "{}")),
+                finishReason = "tool_calls", usage = null, responseId = "r1"
+            ),
+            LlmResponse(content = "", toolCalls = emptyList(), finishReason = "stop", usage = null, responseId = "r2")
+        )
+
+        val result = runner.run(7L, "Navigier mich")
+
+        assertThat(result).isEqualTo(LlmTurnRunner.TurnResult.EmptyResponse)
+        assertThat(store.snapshot(store.sessionFor(7L))).isEmpty()
+        coVerify { limiter.refund(7L) }
+    }
+
     @Test fun `second turn includes previous turns in history`() = runTest {
         coEvery { provider.complete(any()) } returnsMany listOf(
             LlmResponse("Antwort 1", emptyList(), "stop", null, "r1"),
@@ -204,5 +261,9 @@ class LlmTurnRunnerTest {
         assertThat(captured.captured.history[0].content).isEqualTo("Frage 1")
         assertThat(captured.captured.history[1].content).isEqualTo("Antwort 1")
         assertThat(captured.captured.userMessage).isEqualTo("Frage 2")
+    }
+
+    private companion object {
+        const val FALLBACK_TEXT = "Erledigt — die Anfrage wurde ausgeführt."
     }
 }

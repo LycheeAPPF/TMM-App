@@ -1,5 +1,8 @@
 package io.github.lycheeappf.tmm.channel.llm
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProvider
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
@@ -7,10 +10,12 @@ import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmTurn
 import io.github.lycheeappf.tmm.channel.llm.provider.TokenUsage
 import io.github.lycheeappf.tmm.channel.llm.provider.ToolResult
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.channel.llm.tools.toOutputString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
@@ -37,6 +42,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class LlmTurnRunner @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val store: LlmConversationStore,
     private val provider: LlmProvider,
     private val prefs: AssistantPreferencesStore,
@@ -119,12 +125,14 @@ class LlmTurnRunner @Inject constructor(
             // Tool-Execution-Loop: Grok hat function_calls geliefert → ausführen,
             // Ergebnisse zurückschicken, bis eine Text-Antwort kommt oder das Limit erreicht ist.
             var toolIterations = 0
+            var anyToolSucceeded = false
             while (currentResponse.toolCalls.isNotEmpty() && toolIterations < MAX_TOOL_ITERATIONS) {
                 val results = currentResponse.toolCalls.map { call ->
                     val args = runCatching {
                         Json.parseToJsonElement(call.argumentsJson).jsonObject
                     }.getOrDefault(kotlinx.serialization.json.buildJsonObject {})
                     val out = toolRegistry.invoke(call.name, args)
+                    if (out is ToolInvocationResult.Success) anyToolSucceeded = true
                     logBuffer.info(TAG, "Tool '${call.name}' → ${out::class.simpleName}")
                     ToolResult(callId = call.id, output = out.toOutputString())
                 }
@@ -148,11 +156,23 @@ class LlmTurnRunner @Inject constructor(
             }
             val response: LlmResponse = currentResponse
 
-            val cleaned = formatter.format(response.content.orEmpty())
+            var cleaned = formatter.format(response.content.orEmpty())
             if (cleaned.isBlank()) {
-                logBuffer.warn(TAG, "Empty response from provider (resp=${response.responseId})")
-                rateLimiter.refund(mappingId)
-                return@withLock TurnResult.EmptyResponse
+                if (anyToolSucceeded) {
+                    // Belt-and-braces zu C1: bleibt das Modell nach einem erfolgreichen
+                    // Tool-Call stumm, wird eine lokalisierte Kurz-Bestätigung vorgelesen
+                    // statt des Fehlerpfads. Jede Tool-Aktion (z.B. Navigation) wird so
+                    // hörbar angekündigt — auch bei stiller Prompt-Injection.
+                    logBuffer.info(
+                        TAG,
+                        "Blank reply after successful tool call — injecting localized confirmation"
+                    )
+                    cleaned = context.localizedString(R.string.llm_tool_success_fallback)
+                } else {
+                    logBuffer.warn(TAG, "Empty response from provider (resp=${response.responseId})")
+                    rateLimiter.refund(mappingId)
+                    return@withLock TurnResult.EmptyResponse
+                }
             }
 
             // Persist nur jetzt — bei Provider-Fehler oder Empty bleibt history sauber.
