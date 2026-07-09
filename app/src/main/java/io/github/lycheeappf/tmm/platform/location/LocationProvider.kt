@@ -6,8 +6,9 @@ package io.github.lycheeappf.tmm.platform.location
 interface LocationProvider {
 
     /**
-     * Returns the last known GPS fix from the OS cache, or null if location
-     * permission is not granted or no cached fix is available.
+     * Returns the freshest fix from the OS cache across all enabled providers, or
+     * null if location permission is not granted, no cached fix is available, or
+     * the newest fix is too old to be presented as "current".
      */
     fun lastKnownLocation(): LocationFix?
 }
