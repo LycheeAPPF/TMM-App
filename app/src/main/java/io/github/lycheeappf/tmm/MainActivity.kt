@@ -49,11 +49,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // OAuth-Callback auch bei Kaltstart verarbeiten: der Manager tauscht den
-        // Code eager in einem application-scoped Coroutine ein — es muss kein
-        // ViewModel/Screen leben, die UI beobachtet nur den Auth-State-Flow.
-        intent?.data?.let { teslaAuthManager.handleCallback(it) }
-        handleSmsIntent(intent)
+        // Launch-Intent NUR beim echten Erststart verarbeiten: bei einer Recreation
+        // (Rotation, Prozess-Restore — savedInstanceState != null) liefert getIntent()
+        // denselben, bereits konsumierten Intent erneut. Ein Replay würde den
+        // OAuth-Callback ein zweites Mal einlösen (State-Mismatch → transienter
+        // Error-State) bzw. SMS-Deep-Links doppelt navigieren.
+        if (savedInstanceState == null) {
+            handleLaunchIntent(intent)
+        }
         setContent {
             MfsTheme {
                 MfsApp()
@@ -63,21 +66,40 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Neuen Intent als aktuellen setzen, damit eine spätere Recreation nicht
+        // wieder den alten Launch-Intent sieht — dann einmalig verarbeiten.
+        setIntent(intent)
+        handleLaunchIntent(intent)
+    }
+
+    /**
+     * Verarbeitet einen Launch-/New-Intent genau EINMAL — sowohl den Tesla-OAuth-
+     * Callback (`intent.data`) als auch die SMS-Deep-Link-Extras. Konsumierte
+     * One-Shot-Semantik auf UI-Seite über das post/consume-Muster des [RootViewModel].
+     */
+    private fun handleLaunchIntent(intent: Intent?) {
+        if (intent == null) return
         // Tesla-OAuth-Redirect: io.github.lycheeappf.tmm://tesla/callback?code=...&state=...
+        // Der Manager tauscht den Code eager in einem application-scoped Coroutine ein —
+        // es muss kein ViewModel/Screen leben, die UI beobachtet nur den Auth-State-Flow.
         intent.data?.let { teslaAuthManager.handleCallback(it) }
         handleSmsIntent(intent)
     }
 
-    private fun handleSmsIntent(intent: Intent?) {
+    private fun handleSmsIntent(intent: Intent) {
         when {
-            intent?.hasExtra(EXTRA_THREAD_ID) == true -> {
+            intent.hasExtra(EXTRA_THREAD_ID) -> {
                 val threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
                 rootViewModel.postThreadRequest(threadId)
             }
-            intent?.hasExtra(EXTRA_COMPOSE_RECIPIENT) == true -> {
+            intent.hasExtra(EXTRA_COMPOSE_RECIPIENT) -> {
+                // Exportierte Activity: Extras sind nicht vertrauenswürdig — Länge hart
+                // kappen und strikt als Plain-Text behandeln (nur Textfeld-Vorbelegung).
                 rootViewModel.postComposeRequest(
-                    recipient = intent.getStringExtra(EXTRA_COMPOSE_RECIPIENT) ?: "",
-                    body = intent.getStringExtra(EXTRA_COMPOSE_BODY) ?: ""
+                    recipient = intent.getStringExtra(EXTRA_COMPOSE_RECIPIENT)
+                        .orEmpty().take(MAX_EXTRA_LENGTH),
+                    body = intent.getStringExtra(EXTRA_COMPOSE_BODY)
+                        .orEmpty().take(MAX_EXTRA_LENGTH)
                 )
             }
         }
@@ -87,6 +109,9 @@ class MainActivity : ComponentActivity() {
         private const val EXTRA_COMPOSE_RECIPIENT = "compose_recipient"
         private const val EXTRA_COMPOSE_BODY = "compose_body"
         const val EXTRA_THREAD_ID = "sms_thread_id"
+
+        /** Obergrenze für nicht vertrauenswürdige String-Extras der exportierten Activity. */
+        private const val MAX_EXTRA_LENGTH = 2000
 
         fun composeIntent(context: Context, recipient: String?, body: String?): Intent =
             Intent(context, MainActivity::class.java).apply {
