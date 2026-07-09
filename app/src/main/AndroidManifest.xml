@@ -40,6 +40,12 @@
          wird kein Standort gesendet; die übrige Funktionalität ist unberührt. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- ACCESS_BACKGROUND_LOCATION: der Grok-Turn läuft ohne UI im Hintergrund
+         (Tesla-Reply über den OutboundSmsObserver) — nur mit "Immer erlauben"
+         liefert getLastKnownLocation dann Koordinaten. Ab API 30 nicht im
+         Runtime-Dialog grantbar; der AssistantScreen führt dafür in die
+         App-Einstellungen. Optional wie die Vordergrund-Permissions. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-feature
         android:name="android.hardware.location.gps"
         android:required="false" />

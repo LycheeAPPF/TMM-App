@@ -30,6 +30,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * Standort-Berechtigungsstufe als Tri-State. WHILE_IN_USE reicht nur für den
+ * manuellen Test im Vordergrund — der eigentliche Grok-Turn läuft im Hintergrund
+ * und braucht ALWAYS („Immer erlauben", nur über die App-Einstellungen erteilbar).
+ */
+enum class LocationPermissionLevel { NONE, WHILE_IN_USE, ALWAYS }
+
 data class AssistantUiState(
     val apiKeyIsSet: Boolean = false,
     val apiKeyDraft: String = "",
@@ -52,7 +59,8 @@ data class AssistantUiState(
     val triggerInFlight: Boolean = false,
     val keyTestRunning: Boolean = false,
     val keyTestResult: KeyTestOutcome? = null,
-    val hasLocationPermission: Boolean = false,
+    val locationContextEnabled: Boolean = false,
+    val locationPermission: LocationPermissionLevel = LocationPermissionLevel.NONE,
     val lastFeedback: String? = null
 )
 
@@ -99,7 +107,8 @@ class AssistantViewModel @Inject constructor(
                     xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
                     voiceAliasName = prefs.voiceAliasName(),
-                    hasLocationPermission = permissionGate.hasLocationAccess()
+                    locationContextEnabled = prefs.locationContextEnabled(),
+                    locationPermission = locationPermissionLevel()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
@@ -283,6 +292,19 @@ class AssistantViewModel @Inject constructor(
             prefs.setXSearchEnabled(enabled)
             _uiState.update { it.copy(xSearchEnabled = enabled) }
         }
+    }
+
+    fun setLocationContextEnabled(enabled: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.setLocationContextEnabled(enabled)
+            _uiState.update { it.copy(locationContextEnabled = enabled) }
+        }
+    }
+
+    private fun locationPermissionLevel(): LocationPermissionLevel = when {
+        !permissionGate.hasLocationAccess() -> LocationPermissionLevel.NONE
+        permissionGate.hasBackgroundLocationAccess() -> LocationPermissionLevel.ALWAYS
+        else -> LocationPermissionLevel.WHILE_IN_USE
     }
 
     fun triggerAssistant() {
