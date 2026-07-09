@@ -144,6 +144,22 @@ class AssistantViewModelTest {
     }
 
     @Test
+    fun `resetSystemPromptToDefault cancels a pending debounced prompt persist`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        // Tippen startet den 350-ms-Debounce-Job; der Reset direkt danach muss ihn
+        // abbrechen — sonst überschreibt der verspätete Persist den Reset wieder.
+        vm.setSystemPrompt("mein eigener Prompt")
+        vm.resetSystemPromptToDefault()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { prefs.setSystemPrompt(any()) }
+        coVerify { prefs.resetSystemPromptToDefault() }
+        assertThat(vm.uiState.value.isSystemPromptCustomized).isFalse()
+    }
+
+    @Test
     fun `location permission level NONE without any location grant`() = runTest(dispatcher) {
         every { permissionGate.hasLocationAccess() } returns false
 

@@ -240,11 +240,15 @@ class AssistantViewModel @Inject constructor(
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
 
     fun setSystemPrompt(value: String) =
-        edit("system_prompt", { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
+        edit(EDIT_KEY_SYSTEM_PROMPT, { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
             prefs.setSystemPrompt(value)
         }
 
     fun resetSystemPromptToDefault() {
+        // Ein noch ausstehender (debounced) Persist-Job des Prompt-Editors würde den
+        // Reset sonst nach Ablauf der 350 ms wieder mit dem alten Text überschreiben —
+        // erst abbrechen, dann zurücksetzen.
+        persistJobs[EDIT_KEY_SYSTEM_PROMPT]?.cancel()
         viewModelScope.launch(ioDispatcher) {
             prefs.resetSystemPromptToDefault()
             val defaultPrompt = prefs.systemPromptRaw()
@@ -368,6 +372,9 @@ class AssistantViewModel @Inject constructor(
 
     companion object {
         private const val PERSIST_DEBOUNCE_MS = 350L
+
+        /** persistJobs-Key des System-Prompt-Editors ([setSystemPrompt]/[resetSystemPromptToDefault]). */
+        private const val EDIT_KEY_SYSTEM_PROMPT = "system_prompt"
 
         /**
          * Vorgefertigte Namen für den Sprach-Ansprech-Kontakt. Zweiteilige Namen
