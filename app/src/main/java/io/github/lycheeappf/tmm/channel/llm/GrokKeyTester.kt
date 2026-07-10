@@ -52,24 +52,28 @@ class GrokKeyTester @Inject constructor(
             // laufenden Retrofit-Suspend-Call mit.
             withTimeoutOrNull(TIMEOUT_MS) { provider.complete(request) }
         } catch (e: LlmProviderError) {
-            return e.toOutcome()
+            return e.toKeyTestOutcome()
         }
         return if (response == null) KeyTestOutcome.TIMEOUT else KeyTestOutcome.VALID
-    }
-
-    private fun LlmProviderError.toOutcome(): KeyTestOutcome = when (this) {
-        is LlmProviderError.Auth -> KeyTestOutcome.AUTH_ERROR
-        is LlmProviderError.MissingKey -> KeyTestOutcome.MISSING_KEY
-        is LlmProviderError.NoNetwork -> KeyTestOutcome.NO_NETWORK
-        is LlmProviderError.RateLimit -> KeyTestOutcome.RATE_LIMITED
-        is LlmProviderError.Network ->
-            if (cause is SocketTimeoutException) KeyTestOutcome.TIMEOUT else KeyTestOutcome.NO_NETWORK
-        is LlmProviderError.Server -> KeyTestOutcome.SERVER_ERROR
-        is LlmProviderError.Parse -> KeyTestOutcome.SERVER_ERROR
     }
 
     companion object {
         /** Bounded-Timeout für den Ping (vom Unit-Test referenzierbar → `internal`). */
         internal const val TIMEOUT_MS = 20_000L
     }
+}
+
+/**
+ * Mappt einen [LlmProviderError] auf das UI-Vokabular des Key-Tests. Geteilt von
+ * [GrokKeyTester] und [GrokSelfTester] — eine Quelle, kein Duplikat.
+ */
+internal fun LlmProviderError.toKeyTestOutcome(): KeyTestOutcome = when (this) {
+    is LlmProviderError.Auth -> KeyTestOutcome.AUTH_ERROR
+    is LlmProviderError.MissingKey -> KeyTestOutcome.MISSING_KEY
+    is LlmProviderError.NoNetwork -> KeyTestOutcome.NO_NETWORK
+    is LlmProviderError.RateLimit -> KeyTestOutcome.RATE_LIMITED
+    is LlmProviderError.Network ->
+        if (cause is SocketTimeoutException) KeyTestOutcome.TIMEOUT else KeyTestOutcome.NO_NETWORK
+    is LlmProviderError.Server -> KeyTestOutcome.SERVER_ERROR
+    is LlmProviderError.Parse -> KeyTestOutcome.SERVER_ERROR
 }
