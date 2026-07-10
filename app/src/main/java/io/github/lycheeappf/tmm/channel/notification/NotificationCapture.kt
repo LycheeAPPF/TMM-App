@@ -1,5 +1,6 @@
 package io.github.lycheeappf.tmm.channel.notification
 
+import android.app.Notification
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import io.github.lycheeappf.tmm.core.model.ChannelId
@@ -82,6 +83,13 @@ class NotificationCapture @Inject constructor(
 
     private suspend fun captureInternal(sbn: StatusBarNotification) {
         if (!whitelist.allow(sbn.packageName)) return
+
+        // Group-Summary-Notifications (z.B. WhatsApps Sammel-Notification bei ≥2 aktiven
+        // Chats) tragen die MessagingStyle der neuesten Konversation, aber KEINE
+        // Reply-Action. Ohne Filter würde (a) ihr Summary-Text als fake Inbound-SMS
+        // injiziert und (b) via allocateOrReuse der notificationKey eines guten
+        // Mappings mit dem action-losen Summary-Key überschrieben → Reply = NO_ACTION.
+        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
         val msg = messagingStyleExtractor.extract(sbn) ?: return
         if (msg.body.isBlank()) return
