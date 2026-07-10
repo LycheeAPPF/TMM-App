@@ -247,19 +247,24 @@ class AssistantViewModel @Inject constructor(
 
     /**
      * Startet den mehrstufigen Grok-Selbsttest ([GrokSelfTester]) und zeichnet die
-     * Stufen-Events live in den State. Methoden-Guard zusätzlich zu den UI-`enabled`-
-     * Flags (Buttons können durch State-Latenz doppelt feuern); Key-Test/Save/Remove
-     * sind währenddessen gesperrt (Race-Guard, wie bisher Key-Test ↔ Save/Remove).
+     * Stufen-Events live in den State. Der Guard claimt den Lauf ATOMAR/SYNCHRON via
+     * `_uiState.update`, BEVOR überhaupt eine Coroutine gestartet wird (Buttons können
+     * durch State-Latenz doppelt feuern — ein Guard, der erst innerhalb der
+     * `launch`-Coroutine `running=true` setzt, würde zwei schnelle Taps beide durchlassen).
+     * Key-Test/Save/Remove sind währenddessen gesperrt (Race-Guard, wie bisher
+     * Key-Test ↔ Save/Remove).
      */
     fun runSelfTest() {
-        val current = _uiState.value
-        if (current.selfTest.running || current.keyTestRunning || current.saving) return
-        val destination = current.selfTest.destination.trim()
-        if (destination.isEmpty()) return
-        viewModelScope.launch(ioDispatcher) {
-            _uiState.update {
-                it.copy(
-                    selfTest = it.selfTest.copy(
+        var claimed = false
+        _uiState.update { cur ->
+            val blocked = cur.selfTest.running || cur.keyTestRunning || cur.saving ||
+                cur.selfTest.destination.isBlank()
+            claimed = !blocked
+            if (blocked) {
+                cur
+            } else {
+                cur.copy(
+                    selfTest = cur.selfTest.copy(
                         running = true,
                         key = StageCell(),
                         position = StageCell(),
@@ -269,6 +274,10 @@ class AssistantViewModel @Inject constructor(
                     )
                 )
             }
+        }
+        if (!claimed) return
+        val destination = _uiState.value.selfTest.destination.trim()
+        viewModelScope.launch(ioDispatcher) {
             try {
                 selfTester.run(destination).collect { event ->
                     _uiState.update { it.copy(selfTest = it.selfTest.applyEvent(event)) }

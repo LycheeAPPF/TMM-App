@@ -280,7 +280,6 @@ class AssistantViewModelTest {
         advanceUntilIdle()
 
         vm.runSelfTest()
-        advanceUntilIdle()
         vm.runSelfTest()
         advanceUntilIdle()
 
