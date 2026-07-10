@@ -49,7 +49,14 @@ class MessagingStyleExtractor @Inject constructor() {
 
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
         if (style != null && style.messages.isNotEmpty()) {
-            val last = style.messages.last()
+            // Echo-Fix: nach einem RemoteInput-Reply re-postet der Messenger die
+            // Notification mit der EIGENEN Antwort als neuester Message. Konvention
+            // (androidx): person == null ⇒ vom Geräte-User; manche Apps setzen
+            // stattdessen eine Person, die style.user entspricht. Beide Fälle
+            // überspringen — sonst wird die eigene Antwort als neue Inbound-SMS
+            // injiziert und im Auto vorgelesen.
+            val last = style.messages.lastOrNull { !isSelfAuthored(it, style.user) }
+                ?: return null
             val senderName = last.person?.name?.toString()
                 ?: style.user.name?.toString()
                 ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
@@ -99,6 +106,26 @@ class MessagingStyleExtractor @Inject constructor() {
                 senderName = title.ifEmpty { text.take(32) }
             )
         )
+    }
+
+    /**
+     * true, wenn die Message vom Geräte-User selbst stammt. `person == null` ist
+     * die dokumentierte androidx-Konvention für Self-Messages; als Fallback
+     * matchen wir die Person gegen style.user — bevorzugt über den stabilen
+     * key, sonst über den Namen (nur wenn BEIDE keys fehlen, sonst wäre ein
+     * Kontakt, der zufällig wie der User heißt, fälschlich "self").
+     */
+    private fun isSelfAuthored(
+        message: NotificationCompat.MessagingStyle.Message,
+        user: androidx.core.app.Person
+    ): Boolean {
+        val person = message.person ?: return true
+        val personKey = person.key
+        val userKey = user.key
+        if (personKey != null && userKey != null) return personKey == userKey
+        if (personKey != null || userKey != null) return false
+        val personName = person.name?.toString() ?: return false
+        return personName == user.name?.toString()
     }
 
     /**
