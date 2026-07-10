@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.channel.llm.provider.grok
 
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.channel.llm.provider.FINISH_REASON_INCOMPLETE
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmTurn
@@ -324,5 +325,43 @@ class GrokProviderTest {
         assertThat(tool["description"]?.jsonPrimitive?.content).isEqualTo("Startet die Navigation im Fahrzeug")
         // parameters wird als strukturiertes JSON-Objekt gesendet (kein String-Encoding)
         assertThat(tool["parameters"]).isEqualTo(schema.parametersJson)
+    }
+
+    // ---- Truncation-Sichtbarkeit + tool_choice ----
+
+    @Test fun `incomplete reasoning-only response maps to finishReason incomplete with no tool calls`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"id":"resp_i","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"reasoning"}]}"""
+            )
+        )
+        val response = provider.complete(sampleRequest())
+        assertThat(response.finishReason).isEqualTo(FINISH_REASON_INCOMPLETE)
+        assertThat(response.toolCalls).isEmpty()
+        assertThat(response.content).isNull()
+    }
+
+    @Test fun `completed response keeps message-item finish reason`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"id":"r","status":"completed","output":[{"type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok"}]}]}"""
+            )
+        )
+        val response = provider.complete(sampleRequest())
+        assertThat(response.finishReason).isEqualTo("completed")
+    }
+
+    @Test fun `tool_choice is sent only when tools are present`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val schema = ToolSchema(
+            name = "t", description = "d",
+            parametersJson = buildJsonObject { put("type", "object") }
+        )
+        provider.complete(sampleRequest().copy(tools = listOf(schema), toolChoice = "required"))
+        assertThat(server.takeRequest().body.readUtf8()).contains("\"tool_choice\":\"required\"")
+        // Ohne Tools wäre tool_choice ein API-Fehler — Feld muss wegfallen.
+        provider.complete(sampleRequest().copy(toolChoice = "required"))
+        assertThat(server.takeRequest().body.readUtf8()).doesNotContain("tool_choice")
     }
 }

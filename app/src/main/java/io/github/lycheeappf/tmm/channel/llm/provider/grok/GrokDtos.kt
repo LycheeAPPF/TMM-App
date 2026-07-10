@@ -29,6 +29,10 @@ data class ResponsesRequest(
     val store: Boolean = false,
     val stream: Boolean = false,
     val tools: List<ResponsesTool>? = null,
+    // String-Form der Responses API: weggelassen = Server-Default "auto",
+    // "required" = Modell MUSS mindestens ein Tool callen. Die Objekt-Form für
+    // eine benannte Funktion ist für xAI /v1/responses unverifiziert — nicht nutzen.
+    @SerialName("tool_choice") val toolChoice: String? = null,
     // Steuert optionale Response-Bestandteile. Bei aktivem server-seitigem
     // web_search/x_search setzen wir `["no_inline_citations"]`, damit Grok keine
     // `[[1]](url)`-Zitatmarker in den Text webt (die das Tesla-TTS vorlesen würde).
@@ -66,9 +70,20 @@ data class ResponsesTool(
 data class ResponsesResponse(
     val id: String? = null,
     val model: String? = null,
+    // "completed" | "in_progress" | "incomplete". Bei "incomplete" (Reasoning hat
+    // `max_output_tokens` aufgebraucht) kann `output` NUR reasoning-Items enthalten —
+    // kein message-, kein function_call-Item. Ohne dieses Feld ist der Fall von
+    // „Modell hat nichts gesagt und nichts gecallt" nicht unterscheidbar.
+    val status: String? = null,
+    @SerialName("incomplete_details") val incompleteDetails: ResponsesIncompleteDetails? = null,
     val output: List<ResponsesOutputItem> = emptyList(),
     val usage: ResponsesUsage? = null,
     @SerialName("output_text") val outputText: String? = null
+)
+
+@Serializable
+data class ResponsesIncompleteDetails(
+    val reason: String? = null // z. B. "max_output_tokens"
 )
 
 @Serializable
@@ -93,7 +108,13 @@ data class ResponsesUsage(
     @SerialName("input_tokens") val inputTokens: Int? = null,
     @SerialName("output_tokens") val outputTokens: Int? = null,
     @SerialName("total_tokens") val totalTokens: Int? = null,
-    @SerialName("cached_tokens") val cachedTokens: Int? = null
+    @SerialName("cached_tokens") val cachedTokens: Int? = null,
+    @SerialName("output_tokens_details") val outputTokensDetails: ResponsesOutputTokensDetails? = null
+)
+
+@Serializable
+data class ResponsesOutputTokensDetails(
+    @SerialName("reasoning_tokens") val reasoningTokens: Int? = null
 )
 
 @Serializable

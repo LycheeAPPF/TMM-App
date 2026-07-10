@@ -152,4 +152,35 @@ class GrokDtosTest {
         val text = json.encodeToString(ResponsesRequest.serializer(), req)
         assertThat(text).doesNotContain("temperature")
     }
+
+    @Test fun `request serializes tool_choice when set`() {
+        val req = ResponsesRequest(
+            model = "grok-4.3",
+            input = listOf(ResponsesInputItem(role = "user", content = "Hi")),
+            toolChoice = "required"
+        )
+        val text = json.encodeToString(ResponsesRequest.serializer(), req)
+        assertThat(text).contains("\"tool_choice\":\"required\"")
+    }
+
+    @Test fun `request without tool_choice omits the field`() {
+        val req = ResponsesRequest(
+            model = "grok-4.3",
+            input = listOf(ResponsesInputItem(role = "user", content = "Hi"))
+        )
+        val text = json.encodeToString(ResponsesRequest.serializer(), req)
+        assertThat(text).doesNotContain("tool_choice")
+    }
+
+    @Test fun `response parses top-level status and incomplete_details and reasoning token usage`() {
+        val raw = """
+            {"id":"resp_i","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},
+             "output":[{"type":"reasoning"}],
+             "usage":{"input_tokens":900,"output_tokens":512,"output_tokens_details":{"reasoning_tokens":512}}}
+        """.trimIndent()
+        val r = json.decodeFromString(ResponsesResponse.serializer(), raw)
+        assertThat(r.status).isEqualTo("incomplete")
+        assertThat(r.incompleteDetails?.reason).isEqualTo("max_output_tokens")
+        assertThat(r.usage?.outputTokensDetails?.reasoningTokens).isEqualTo(512)
+    }
 }

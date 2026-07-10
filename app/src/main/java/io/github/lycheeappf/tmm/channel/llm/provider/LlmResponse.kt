@@ -1,6 +1,14 @@
 package io.github.lycheeappf.tmm.channel.llm.provider
 
 /**
+ * Provider-agnostischer `finishReason`-Wert: die Antwort wurde vom Token-Budget
+ * abgeschnitten (`max_output_tokens` — bei Reasoning-Modellen inkl. Denk-Tokens),
+ * bevor Text/Tool-Call fertig emittiert waren. Vertrag zwischen Provider-Mapping
+ * und Auswertern (GrokSelfTester).
+ */
+const val FINISH_REASON_INCOMPLETE = "incomplete"
+
+/**
  * Provider-agnostische Antwort. [content] kann null sein, wenn der Provider
  * ausschließlich tool_calls produziert hat (= keine Inline-Antwort).
  */

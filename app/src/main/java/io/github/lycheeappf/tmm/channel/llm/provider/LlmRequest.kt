@@ -31,6 +31,14 @@ data class LlmRequest(
     val temperature: Float,
     val webSearch: Boolean = false,
     val xSearch: Boolean = false,
+    /**
+     * Responses-API `tool_choice` in string-Form: null = Feld weggelassen
+     * (Server-Default "auto"), "required" = Modell muss mindestens ein Tool callen.
+     * Vom Selbsttest für den ERSTEN Call gesetzt; der ToolCallExecutor setzt es auf
+     * Folge-Requests zurück (sonst würde jede Folge-Response erneut einen Call
+     * erzwingen, bis MAX_TOOL_ITERATIONS reißt). Produktion sendet null.
+     */
+    val toolChoice: String? = null,
     val inFlightToolCalls: List<ToolCall> = emptyList(),
     val inFlightToolResults: List<ToolResult> = emptyList()
 )
