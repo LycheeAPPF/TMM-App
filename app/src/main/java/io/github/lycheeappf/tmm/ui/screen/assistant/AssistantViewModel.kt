@@ -293,8 +293,11 @@ class AssistantViewModel @Inject constructor(
                         )
                     )
                 }
+            } finally {
+                // Immer aufräumen — auch bei rethrowter Cancellation darf running
+                // nicht hängen bleiben (würde Selbsttest + Key-Buttons dauerhaft sperren).
+                _uiState.update { it.copy(selfTest = it.selfTest.copy(running = false, currentStage = null)) }
             }
-            _uiState.update { it.copy(selfTest = it.selfTest.copy(running = false, currentStage = null)) }
         }
     }
 

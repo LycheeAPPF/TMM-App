@@ -320,4 +320,22 @@ class AssistantViewModelTest {
         assertThat(vm.uiState.value.selfTest.destination).isEqualTo("Brandenburger Tor, Berlin")
         assertThat(vm.uiState.value.selfTest.key.value).isEqualTo(KeyTestOutcome.VALID)
     }
+
+    @Test
+    fun `flow failure marks e2e unknown and always clears running`() = runTest(dispatcher) {
+        every { selfTester.run(any<String>()) } returns flow {
+            emit(SelfTestEvent.StageRunning(SelfTestStage.KEY))
+            throw IllegalStateException("boom")
+        }
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.runSelfTest()
+        advanceUntilIdle()
+
+        val selfTest = vm.uiState.value.selfTest
+        assertThat(selfTest.running).isFalse()
+        assertThat(selfTest.currentStage).isNull()
+        assertThat(selfTest.e2e.value).isEqualTo(E2eResult.ProviderFailed(KeyTestOutcome.UNKNOWN))
+    }
 }
