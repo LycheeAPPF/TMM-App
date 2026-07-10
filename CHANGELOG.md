@@ -4,6 +4,29 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc1] — 2026-07-10
+
+Release candidate for 1.0. Fixes the field-reported WhatsApp bridge failures
+(root-cause analysis in `issue-reports/analyse-report-2026-07-10.md`).
+
+### Fixed
+- **1:1 replies no longer fail with "Reply not delivered".** WhatsApp's group-summary
+  notification (which has no reply action) was captured like a message and overwrote the
+  mapping's notification pointer; it is now filtered out, and an action-less update can
+  no longer overwrite a replyable mapping payload.
+- **Your own replies are no longer read back as new messages.** The messenger's
+  notification re-post containing your just-sent reply is recognized (self-authored
+  message skip + short-lived sent-reply ledger) and dropped instead of injected.
+- **The quick-reply fallback notification now opens TMM's own compose screen** prefilled
+  with recipient and text, instead of Google Messages (which only showed its
+  "set default SMS app" prompt while TMM holds the SMS role).
+- **Diagnostics log spam:** stale real-SMS rows are no longer re-logged on every
+  SMS-provider change, and the reply-rebuilder log no longer claims "found-action"
+  before actually checking for a reply action.
+
+### Added
+- **Links in SMS messages are now tappable** in the app's conversation view.
+
 ## [0.7.1] — 2026-06-24
 
 Robustness pass on the v0.7.0 Bluetooth/budget features, from a multi-agent review.
