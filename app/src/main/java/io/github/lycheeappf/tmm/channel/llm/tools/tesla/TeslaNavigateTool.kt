@@ -40,7 +40,8 @@ class TeslaNavigateTool @Inject constructor(
     override val schema = ToolSchema(
         name = "tesla_navigate",
         description = "Sends a navigation destination to the driver's Tesla vehicle via the Fleet API. " +
-            "Call this when the driver asks to navigate somewhere, find a route, or go to a place. " +
+            "Call this when the driver asks to navigate somewhere, find a route, or go to a place, " +
+            "or when you are explicitly instructed to call this tool (for example an app integration check). " +
             "Always pass a specific, concrete address or place name — never a vague query. " +
             "For vague destinations (e.g. 'nearest pharmacy', 'Italian restaurant nearby'): " +
             "use web search first to find the actual address near the driver, " +

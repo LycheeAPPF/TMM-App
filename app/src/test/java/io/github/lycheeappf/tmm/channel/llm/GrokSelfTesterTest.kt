@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.channel.llm
 
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.channel.llm.provider.FINISH_REASON_INCOMPLETE
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProvider
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
@@ -232,5 +233,35 @@ class GrokSelfTesterTest {
         assertThat(req.model).isEqualTo("grok-4.3")
         assertThat(req.userMessage).contains("Alexanderplatz, Berlin")
         assertThat(req.userMessage).contains("tesla_navigate")
+        assertThat(req.toolChoice).isEqualTo(GrokSelfTester.TOOL_CHOICE_REQUIRED)
+    }
+
+    @Test fun `incomplete response without tool call maps to Truncated`() = runTest {
+        // Reasoning hat das Budget aufgebraucht: kein Text, kein Call, finishReason incomplete.
+        coEvery { provider.complete(any()) } returns LlmResponse(
+            content = null, toolCalls = emptyList(),
+            finishReason = FINISH_REASON_INCOMPLETE, usage = null, responseId = "r3"
+        )
+
+        val result = runToList().e2e()
+
+        assertThat(result).isEqualTo(E2eResult.Truncated)
+    }
+
+    @Test fun `incomplete follow-up after successful tool call still reports Completed`() = runTest {
+        coEvery { toolRegistry.invoke("tesla_navigate", any()) } returns
+            ToolInvocationResult.Success("""{"status":"ok","destination":"Alexanderplatz, Berlin"}""")
+        coEvery { provider.complete(any()) } returnsMany listOf(
+            navToolResponse(),
+            LlmResponse(
+                content = null, toolCalls = emptyList(),
+                finishReason = FINISH_REASON_INCOMPLETE, usage = null, responseId = "r4"
+            )
+        )
+
+        val result = runToList().e2e() as E2eResult.Completed
+
+        assertThat(result.nav).isEqualTo(NavCheck.CalledOk("Alexanderplatz, Berlin"))
+        assertThat(result.answer).isEmpty()
     }
 }

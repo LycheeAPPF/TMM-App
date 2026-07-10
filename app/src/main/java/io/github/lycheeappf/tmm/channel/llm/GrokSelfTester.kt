@@ -1,5 +1,6 @@
 package io.github.lycheeappf.tmm.channel.llm
 
+import io.github.lycheeappf.tmm.channel.llm.provider.FINISH_REASON_INCOMPLETE
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProvider
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
@@ -107,18 +108,29 @@ class GrokSelfTester @Inject constructor(
             maxTokens = E2E_MAX_TOKENS,
             temperature = 0f,
             webSearch = false,
-            xSearch = false
+            xSearch = false,
+            // Erzwungener erster Tool-Call: der Selbsttest misst „funktioniert die
+            // Pipeline", nicht „entscheidet sich das Modell". Der ToolCallExecutor
+            // setzt das Feld auf Folge-Requests zurück.
+            toolChoice = TOOL_CHOICE_REQUIRED
         )
         return try {
             withTimeoutOrNull(E2E_TIMEOUT_MS) {
                 val initialResponse = provider.complete(request)
                 val loop = toolCallExecutor.run(request, initialResponse) { provider.complete(it) }
-                val answer = loop.finalResponse.content.orEmpty()
-                E2eResult.Completed(
-                    nav = SelfTestEvaluation.navCheck(destination, loop.steps),
-                    echo = SelfTestEvaluation.positionEcho(fix, systemPrompt.isBlank(), answer),
-                    answer = answer
-                )
+                val navCalled = loop.steps.any { it.call.name == SelfTestEvaluation.NAV_TOOL_NAME }
+                if (!navCalled && loop.finalResponse.finishReason == FINISH_REASON_INCOMPLETE) {
+                    // Reasoning hat max_output_tokens aufgebraucht, bevor das Tool dran
+                    // war — eigener Befund statt fälschlich „nicht aufgerufen".
+                    E2eResult.Truncated
+                } else {
+                    val answer = loop.finalResponse.content.orEmpty()
+                    E2eResult.Completed(
+                        nav = SelfTestEvaluation.navCheck(destination, loop.steps),
+                        echo = SelfTestEvaluation.positionEcho(fix, systemPrompt.isBlank(), answer),
+                        answer = answer
+                    )
+                }
             } ?: E2eResult.Timeout
         } catch (e: LlmProviderError) {
             E2eResult.ProviderFailed(e.toKeyTestOutcome())
@@ -135,15 +147,29 @@ class GrokSelfTester @Inject constructor(
         /** Hartes Gesamt-Cap des E2E-Turns — der Fleet-Pfad kann Wake-up + 15 s Delay + Retry enthalten. */
         internal const val E2E_TIMEOUT_MS = 120_000L
 
-        /** Fest statt User-Setting: ein zu kleines User-maxTokens würde das Koordinaten-Echo abschneiden. */
-        internal const val E2E_MAX_TOKENS = 512
+        /**
+         * Fest statt User-Setting. 4096 statt 512: grok-4.x sind Reasoning-Modelle,
+         * deren Denk-Tokens gegen `max_output_tokens` zählen — 512 war oft schon vom
+         * Reasoning aufgebraucht, bevor der function_call emittiert war (Response
+         * kam als status=incomplete ohne Call zurück).
+         */
+        internal const val E2E_MAX_TOKENS = 4096
 
-        /** Model-facing, bewusst englisch (wie Tool-Descriptions). */
+        /** Responses-API string-Form: das Modell MUSS im ersten Call ein Tool rufen. */
+        internal const val TOOL_CHOICE_REQUIRED = "required"
+
+        /**
+         * Model-facing, bewusst englisch (wie die Tool-Descriptions). Als Fahrer-
+         * Navigationsanfrage geframt, damit die Trigger-Klauseln von Tool-Description
+         * und System-Prompt („when the driver asks to navigate…") greifen, statt mit
+         * einem „automated self-test"-Framing zu kollidieren (das las sich für das
+         * Modell wie eine Injection und unterdrückte den Call intermittierend).
+         */
         internal fun testPrompt(destination: String): String =
-            "This is an automated integration self-test of the app. Do exactly two things: " +
-                "(1) Call the tesla_navigate tool with the destination '$destination' passed exactly " +
-                "as written — do not reformat it and do not search the web. " +
-                "(2) After the tool call, reply with one short line: if your context contains the " +
-                "user's GPS position, repeat its coordinates; otherwise write exactly NO POSITION."
+            "Navigate to '$destination'. To do this, call the tesla_navigate tool now, passing " +
+                "the destination exactly as written above — do not reformat it and do not search the web. " +
+                "Only after the tool has returned, reply with one short line: if your context contains " +
+                "the user's GPS position, repeat its coordinates; otherwise write exactly NO POSITION. " +
+                "(The driver started this navigation check from the app's settings screen.)"
     }
 }
