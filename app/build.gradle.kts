@@ -189,8 +189,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp.mockwebserver)
-    testImplementation(platform(libs.androidx.compose.bom))
-    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testDebugImplementation(platform(libs.androidx.compose.bom))
+    testDebugImplementation(libs.androidx.compose.ui.test.junit4)
 
     androidTestImplementation(libs.androidx.junit.ext)
     androidTestImplementation(libs.androidx.espresso.core)
