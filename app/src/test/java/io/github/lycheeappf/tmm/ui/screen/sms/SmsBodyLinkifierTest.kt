@@ -51,4 +51,23 @@ class SmsBodyLinkifierTest {
         assertThat(body.substring(range.start, range.end)).isEqualTo("https://example.com")
         assertThat(annotated.text).isEqualTo(body)
     }
+
+    @Test
+    fun `scheme-less match with embedded url in query still gets https prefix`() {
+        // Regression: Patterns.WEB_URL liefert hier EINEN zusammenhängenden Treffer
+        // "example.com/redirect?u=http://evil.com" — der enthält "://", beginnt aber
+        // nicht mit einem Scheme. Ein reiner contains-Check ließe die URI scheme-los
+        // und damit für ACTION_VIEW tot.
+        assertThat(urls("Track: example.com/redirect?u=http://evil.com bye"))
+            .containsExactly("https://example.com/redirect?u=http://evil.com")
+    }
+
+    @Test
+    fun `annotation range covers exactly the scheme-less url text`() {
+        val body = "vorne example.com hinten"
+        val annotated = linkifySmsBody(body, style)
+        val range = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertThat(body.substring(range.start, range.end)).isEqualTo("example.com")
+        assertThat(annotated.text).isEqualTo(body)
+    }
 }
