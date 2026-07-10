@@ -37,6 +37,36 @@
     <string name="assistant_keytest_missing_key">Kein Key gespeichert</string>
     <string name="assistant_keytest_error">Test fehlgeschlagen</string>
 
+    <string name="assistant_selftest_title">Grok-Selbsttest</string>
+    <string name="assistant_selftest_desc">Testet die ganze Kette, ohne im Auto zu sitzen: API-Key, GPS-Position, Tesla-Konto und ein echter Grok-Turn, der ein Navigationsziel über die Fleet API an deinen Tesla schickt. Das Auto erhält das Ziel wirklich, und der Lauf kostet eine xAI-Anfrage.</string>
+    <string name="assistant_selftest_destination_label">Testziel</string>
+    <string name="assistant_selftest_start">Selbsttest starten</string>
+    <string name="assistant_selftest_running">läuft…</string>
+    <string name="assistant_selftest_skipped">übersprungen</string>
+    <string name="assistant_selftest_stage_key">1 · API-Key</string>
+    <string name="assistant_selftest_stage_position">2 · GPS-Position</string>
+    <string name="assistant_selftest_stage_tesla">3 · Tesla-Konto</string>
+    <string name="assistant_selftest_stage_nav">4 · Navigation via Grok</string>
+    <string name="assistant_selftest_stage_echo">Position kommt bei Grok an</string>
+    <string name="assistant_selftest_position_ok">Frischer Fix vorhanden</string>
+    <string name="assistant_selftest_position_foreground_only">Fix vorhanden — im Auto ist \"Immer erlauben\" nötig</string>
+    <string name="assistant_selftest_position_disabled">Standort-Übermittlung ist aus</string>
+    <string name="assistant_selftest_position_no_permission">Standort-Berechtigung fehlt</string>
+    <string name="assistant_selftest_position_no_fix">Kein frischer Fix (max. 15 min alt)</string>
+    <string name="assistant_selftest_position_detail">%1$s (±%2$d m)</string>
+    <string name="assistant_selftest_tesla_ok">Konto verbunden, Fahrzeug gewählt</string>
+    <string name="assistant_selftest_tesla_no_credentials">Kein Tesla-Konto verbunden</string>
+    <string name="assistant_selftest_tesla_no_vehicle">Kein Fahrzeug gewählt</string>
+    <string name="assistant_selftest_nav_ok">Ziel ans Auto gesendet</string>
+    <string name="assistant_selftest_nav_failed">Navigation fehlgeschlagen</string>
+    <string name="assistant_selftest_nav_wrong_address">Falsches Ziel gesendet</string>
+    <string name="assistant_selftest_nav_not_called">Grok hat das Navigations-Tool nicht aufgerufen</string>
+    <string name="assistant_selftest_consent_missing">Einwilligung fehlt — oben aktivieren</string>
+    <string name="assistant_selftest_echo_matched">Grok kennt die Position</string>
+    <string name="assistant_selftest_echo_not_found">Position nicht in der Antwort gefunden</string>
+    <string name="assistant_selftest_echo_no_clause">System-Prompt ist leer — die Positions-Klausel wird nie angehängt</string>
+    <string name="assistant_selftest_answer_label">Groks Antwort: %1$s</string>
+
     <string name="assistant_websearch_title">Internetzugriff erlauben (Web-Suche)</string>
     <string name="assistant_websearch_desc">Lässt Grok für aktuelle Fragen (Wetter, News, Preise) live im Web nachschlagen — über xAI. Deine diktierte Frage geht dann an xAIs Such-Subsystem — gleiche xAI-Vertrauensgrenze wie eine normale Antwort. Kosten können sich summieren: xAI berechnet Tokens plus jede erfolgreiche Suche, und eine Frage kann mehrere Suchen auslösen. Standardmäßig aus.</string>
     <string name="assistant_websearch_on">Web-Suche an.</string>

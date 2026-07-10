@@ -42,7 +42,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.channel.llm.E2eResult
 import io.github.lycheeappf.tmm.channel.llm.KeyTestOutcome
+import io.github.lycheeappf.tmm.channel.llm.NavCheck
+import io.github.lycheeappf.tmm.channel.llm.PositionEcho
+import io.github.lycheeappf.tmm.channel.llm.PositionLocalResult
+import io.github.lycheeappf.tmm.channel.llm.SelfTestStage
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
@@ -221,12 +226,12 @@ fun AssistantScreen(
                     PrimaryActionButton(
                         text = stringResource(R.string.assistant_apikey_save),
                         onClick = { viewModel.saveApiKey() },
-                        enabled = state.apiKeyDraft.isNotBlank() && !state.keyTestRunning,
+                        enabled = state.apiKeyDraft.isNotBlank() && !state.keyTestRunning && !state.selfTest.running,
                         loading = state.saving
                     )
                     TextButton(
                         onClick = { viewModel.clearApiKey() },
-                        enabled = state.apiKeyIsSet && !state.saving && !state.keyTestRunning
+                        enabled = state.apiKeyIsSet && !state.saving && !state.keyTestRunning && !state.selfTest.running
                     ) { Text(stringResource(R.string.assistant_apikey_remove)) }
                 }
                 // Lokaler Key-Test (ohne Tesla/Bluetooth): nur Key nötig, kein Consent.
@@ -238,12 +243,73 @@ fun AssistantScreen(
                     PrimaryActionButton(
                         text = stringResource(R.string.assistant_apikey_test),
                         onClick = { viewModel.testApiKey() },
-                        enabled = state.apiKeyIsSet && !state.saving,
+                        enabled = state.apiKeyIsSet && !state.saving && !state.selfTest.running,
                         loading = state.keyTestRunning
                     )
                     state.keyTestResult?.let {
                         val (label, status) = keyTestResultUi(it)
                         StatusPill(text = label, status = status)
+                    }
+                }
+            }
+
+            // ---- Grok-Selbsttest ----
+            SettingCard(
+                title = stringResource(R.string.assistant_selftest_title),
+                description = stringResource(R.string.assistant_selftest_desc)
+            ) {
+                OutlinedTextField(
+                    value = state.selfTest.destination,
+                    onValueChange = viewModel::setSelfTestDestination,
+                    label = { Text(stringResource(R.string.assistant_selftest_destination_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                PrimaryActionButton(
+                    text = stringResource(R.string.assistant_selftest_start),
+                    onClick = { viewModel.runSelfTest() },
+                    enabled = state.apiKeyIsSet && state.selfTest.destination.isNotBlank() &&
+                        !state.saving && !state.keyTestRunning,
+                    loading = state.selfTest.running
+                )
+                SelfTestStageRow(
+                    label = stringResource(R.string.assistant_selftest_stage_key),
+                    running = state.selfTest.currentStage == SelfTestStage.KEY,
+                    skipped = state.selfTest.key.skipped,
+                    ui = state.selfTest.key.value?.let { keyTestResultUi(it) to null }
+                )
+                SelfTestStageRow(
+                    label = stringResource(R.string.assistant_selftest_stage_position),
+                    running = state.selfTest.currentStage == SelfTestStage.POSITION,
+                    skipped = state.selfTest.position.skipped,
+                    ui = state.selfTest.position.value?.let { positionResultUi(it) }
+                )
+                SelfTestStageRow(
+                    label = stringResource(R.string.assistant_selftest_stage_tesla),
+                    running = state.selfTest.currentStage == SelfTestStage.TESLA_LOCAL,
+                    skipped = state.selfTest.teslaLocal.skipped,
+                    ui = state.selfTest.teslaLocal.value?.let { teslaLocalUi(it) }
+                )
+                SelfTestStageRow(
+                    label = stringResource(R.string.assistant_selftest_stage_nav),
+                    running = state.selfTest.currentStage == SelfTestStage.E2E,
+                    skipped = state.selfTest.e2e.skipped,
+                    ui = state.selfTest.e2e.value?.let { navResultUi(it) }
+                )
+                val completed = state.selfTest.e2e.value as? E2eResult.Completed
+                if (completed != null) {
+                    SelfTestStageRow(
+                        label = stringResource(R.string.assistant_selftest_stage_echo),
+                        running = false,
+                        skipped = false,
+                        ui = echoResultUi(completed.echo)
+                    )
+                    if (completed.answer.isNotBlank()) {
+                        Text(
+                            stringResource(R.string.assistant_selftest_answer_label, completed.answer),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -512,4 +578,113 @@ private fun keyTestResultUi(outcome: KeyTestOutcome): Pair<String, MfsStatus> = 
     KeyTestOutcome.SERVER_ERROR -> stringResource(R.string.assistant_keytest_server) to MfsStatus.Error
     KeyTestOutcome.MISSING_KEY -> stringResource(R.string.assistant_keytest_missing_key) to MfsStatus.Warning
     KeyTestOutcome.UNKNOWN -> stringResource(R.string.assistant_keytest_error) to MfsStatus.Error
+}
+
+/**
+ * Status-Zeile einer Selbsttest-Stufe: Label + Pill (läuft… / übersprungen / Ergebnis)
+ * + optionaler Detailtext. `ui` = (Pill-Label+Status) zu Detail — null solange die
+ * Stufe noch kein Ergebnis hat.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SelfTestStageRow(
+    label: String,
+    running: Boolean,
+    skipped: Boolean,
+    ui: Pair<Pair<String, MfsStatus>, String?>?
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(MfsSpacing.xs)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(MfsSpacing.sm),
+            itemVerticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            when {
+                running -> StatusPill(
+                    text = stringResource(R.string.assistant_selftest_running),
+                    status = MfsStatus.Info
+                )
+                skipped -> StatusPill(
+                    text = stringResource(R.string.assistant_selftest_skipped),
+                    status = MfsStatus.Neutral
+                )
+                ui != null -> StatusPill(text = ui.first.first, status = ui.first.second)
+            }
+        }
+        ui?.second?.let { detail ->
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun positionResultUi(result: PositionLocalResult): Pair<Pair<String, MfsStatus>, String?> =
+    when (result) {
+        PositionLocalResult.Disabled ->
+            (stringResource(R.string.assistant_selftest_position_disabled) to MfsStatus.Warning) to null
+        PositionLocalResult.NoPermission ->
+            (stringResource(R.string.assistant_selftest_position_no_permission) to MfsStatus.Warning) to null
+        PositionLocalResult.NoFix ->
+            (stringResource(R.string.assistant_selftest_position_no_fix) to MfsStatus.Warning) to null
+        is PositionLocalResult.Ok -> {
+            // Koordinaten sind Nutzdaten für die Sichtkontrolle — Locale.US wie die Prompt-Klausel.
+            val coords = String.format(
+                java.util.Locale.US, "%.4f, %.4f", result.fix.latitude, result.fix.longitude
+            )
+            val detail = stringResource(
+                R.string.assistant_selftest_position_detail, coords, result.fix.accuracyInMeters.toInt()
+            )
+            if (result.backgroundGranted) {
+                (stringResource(R.string.assistant_selftest_position_ok) to MfsStatus.Success) to detail
+            } else {
+                (stringResource(R.string.assistant_selftest_position_foreground_only) to MfsStatus.Warning) to detail
+            }
+        }
+    }
+
+@Composable
+private fun teslaLocalUi(state: Pair<Boolean, Boolean>): Pair<Pair<String, MfsStatus>, String?> {
+    val (credentialsSet, vinSelected) = state
+    return when {
+        !credentialsSet ->
+            (stringResource(R.string.assistant_selftest_tesla_no_credentials) to MfsStatus.Warning) to null
+        !vinSelected ->
+            (stringResource(R.string.assistant_selftest_tesla_no_vehicle) to MfsStatus.Warning) to null
+        else -> (stringResource(R.string.assistant_selftest_tesla_ok) to MfsStatus.Success) to null
+    }
+}
+
+@Composable
+private fun navResultUi(result: E2eResult): Pair<Pair<String, MfsStatus>, String?> = when (result) {
+    is E2eResult.Completed -> when (val nav = result.nav) {
+        is NavCheck.CalledOk ->
+            (stringResource(R.string.assistant_selftest_nav_ok) to MfsStatus.Success) to nav.sent
+        is NavCheck.CalledFailed ->
+            (stringResource(R.string.assistant_selftest_nav_failed) to MfsStatus.Error) to nav.error
+        is NavCheck.WrongAddress ->
+            (stringResource(R.string.assistant_selftest_nav_wrong_address) to MfsStatus.Error) to nav.sent
+        NavCheck.NotCalled ->
+            (stringResource(R.string.assistant_selftest_nav_not_called) to MfsStatus.Warning) to null
+    }
+    E2eResult.ConsentMissing ->
+        (stringResource(R.string.assistant_selftest_consent_missing) to MfsStatus.Error) to null
+    E2eResult.Timeout ->
+        (stringResource(R.string.assistant_keytest_timeout) to MfsStatus.Warning) to null
+    is E2eResult.ProviderFailed -> keyTestResultUi(result.outcome) to null
+}
+
+@Composable
+private fun echoResultUi(echo: PositionEcho): Pair<Pair<String, MfsStatus>, String?> = when (echo) {
+    PositionEcho.MATCHED ->
+        (stringResource(R.string.assistant_selftest_echo_matched) to MfsStatus.Success) to null
+    PositionEcho.NOT_FOUND ->
+        (stringResource(R.string.assistant_selftest_echo_not_found) to MfsStatus.Warning) to null
+    PositionEcho.NO_CLAUSE ->
+        (stringResource(R.string.assistant_selftest_echo_no_clause) to MfsStatus.Warning) to null
+    PositionEcho.SKIPPED ->
+        (stringResource(R.string.assistant_selftest_skipped) to MfsStatus.Neutral) to null
 }
