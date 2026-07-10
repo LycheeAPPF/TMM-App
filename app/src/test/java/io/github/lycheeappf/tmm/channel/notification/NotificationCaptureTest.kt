@@ -46,6 +46,7 @@ class NotificationCaptureTest {
     private val bluetooth = mockk<BluetoothConnectionChecker>(relaxed = true)
     private val settingsStore = mockk<SettingsStore>(relaxed = true)
     private val logBuffer = mockk<LogBuffer>(relaxed = true)
+    private val sentReplyLedger = mockk<SentReplyLedger>()
 
     private lateinit var capture: NotificationCapture
 
@@ -61,7 +62,7 @@ class NotificationCaptureTest {
     fun setUp() {
         capture = NotificationCapture(
             whitelist, extractor, actionResolver, actionCache, mappingRepository,
-            smsWriter, sendBudget, roleManager, bluetooth, settingsStore, logBuffer
+            smsWriter, sendBudget, roleManager, bluetooth, settingsStore, logBuffer, sentReplyLedger
         )
         coEvery { whitelist.allow(any()) } returns true
         every { extractor.extract(any()) } returns extracted
@@ -69,6 +70,7 @@ class NotificationCaptureTest {
         coEvery { bluetooth.isTeslaConnected() } returns true
         coEvery { sendBudget.checkAndIncrement() } returns true
         coEvery { settingsStore.mappingTtlHours() } returns 24
+        every { sentReplyLedger.isRecentReply(any(), any()) } returns false
         coEvery { mappingRepository.allocateOrReuse(any(), any(), any(), any()) } returns ChannelMapping(
             mappingId = 42L,
             channel = ChannelId.NOTIFICATION,
@@ -109,5 +111,15 @@ class NotificationCaptureTest {
 
         coVerify(exactly = 1) { mappingRepository.allocateOrReuse(any(), any(), any(), any()) }
         coVerify(exactly = 1) { smsWriter.injectIncoming("+88800000042", "Hallo!", 1_000L, "Anna") }
+    }
+
+    @Test
+    fun `body matching a recent own reply is dropped before mapping and budget`() = runTest {
+        every { sentReplyLedger.isRecentReply("com.whatsapp", "Hallo!") } returns true
+
+        capture.onPosted(sbnWith(0))
+
+        coVerify(exactly = 0) { mappingRepository.allocateOrReuse(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { sendBudget.checkAndIncrement() }
     }
 }

@@ -29,12 +29,15 @@ import javax.inject.Singleton
  * 2. Body-Extraktion (MessagingStyle / Title-Fallback)
  * 3. **Dedup**: gleicher (conversationKey, bodyHash) wie vorher → skip
  *    (Messenger posten oft mehrere Update-Events für dieselbe Nachricht)
- * 4. roleManager.isDefault()
- * 5. **Bluetooth**: gewählter Tesla verbunden? (sonst droppen — vor dem Budget,
+ * 4. **Echo-Guard**: Body gleicht einem kürzlich via [NotificationReplyExecutor]
+ *    gesendeten eigenen Reply → skip (Belt-and-Suspenders zum Self-Skip im
+ *    [MessagingStyleExtractor], siehe [SentReplyLedger])
+ * 5. roleManager.isDefault()
+ * 6. **Bluetooth**: gewählter Tesla verbunden? (sonst droppen — vor dem Budget,
  *    damit „nicht im Auto" das Tageslimit nicht verbraucht). Fail-open ohne Auswahl.
- * 6. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
- * 7. Mapping allocate/reuse + ActionCache + injectIncoming
- * 8. Bei Insert-Fehler: SendBudget.rollback() ← reservierten Slot wieder freigeben
+ * 7. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
+ * 8. Mapping allocate/reuse + ActionCache + injectIncoming
+ * 9. Bei Insert-Fehler: SendBudget.rollback() ← reservierten Slot wieder freigeben
  */
 @Singleton
 class NotificationCapture @Inject constructor(
@@ -48,7 +51,8 @@ class NotificationCapture @Inject constructor(
     private val roleManager: DefaultSmsRoleManager,
     private val bluetoothConnectionChecker: BluetoothConnectionChecker,
     private val settingsStore: SettingsStore,
-    private val logBuffer: LogBuffer
+    private val logBuffer: LogBuffer,
+    private val sentReplyLedger: SentReplyLedger
 ) {
 
     private val captureMutex = Mutex()
@@ -99,6 +103,14 @@ class NotificationCapture @Inject constructor(
         // für dieselbe eingehende Nachricht (z.B. nach 'delivered'-Update).
         val previousBody = lastBodies[msg.conversationKey]
         if (previousBody == msg.body) return
+
+        // Echo-Guard (Belt-and-Suspenders zum Self-Skip im Extractor): Body
+        // gleicht einem soeben via RemoteInput gesendeten eigenen Reply → das
+        // ist der Notification-Re-Post des Messengers, keine neue Nachricht.
+        if (sentReplyLedger.isRecentReply(sbn.packageName, msg.body)) {
+            logBuffer.info(TAG, "Echo drop ${sbn.key} (own reply re-post, ${msg.body.length} chars)")
+            return
+        }
 
         if (!roleManager.isDefault()) {
             Log.w(TAG, "Skipping capture: app is not default SMS app — inject would silent-fail")

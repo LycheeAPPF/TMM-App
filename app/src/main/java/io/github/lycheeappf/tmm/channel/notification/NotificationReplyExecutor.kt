@@ -28,7 +28,8 @@ class NotificationReplyExecutor @Inject constructor(
     private val actionCache: ActionCache,
     private val rebuilder: PendingIntentRebuilder,
     private val fallbackNotifier: FallbackNotifier,
-    private val logBuffer: LogBuffer
+    private val logBuffer: LogBuffer,
+    private val sentReplyLedger: SentReplyLedger
 ) {
 
     suspend fun reply(
@@ -74,6 +75,10 @@ class NotificationReplyExecutor @Inject constructor(
             resolved.actionIntent.send(context, 0, intent)
             Log.i(TAG, "Reply sent via RemoteInput (notif=${payload.notificationKey}, mapping=$mappingId)")
             logBuffer.info(TAG, "reply SUCCESS notif=${payload.notificationKey} mapping=$mappingId via $via")
+            // Echo-Guard: der Messenger wird seine Notification gleich mit genau
+            // diesem Text als neuester Message re-posten. Capture-Seite droppt
+            // Re-Captures mit diesem Body für kurze Zeit.
+            sentReplyLedger.record(payload.sourcePackage, text)
             ReplyResult.Success
         } catch (e: PendingIntent.CanceledException) {
             Log.w(TAG, "PendingIntent canceled for ${payload.notificationKey}", e)
