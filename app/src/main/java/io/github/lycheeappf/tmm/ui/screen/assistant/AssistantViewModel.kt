@@ -9,9 +9,14 @@ import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
+import io.github.lycheeappf.tmm.channel.llm.E2eResult
 import io.github.lycheeappf.tmm.channel.llm.GrokKeyTester
+import io.github.lycheeappf.tmm.channel.llm.GrokSelfTester
 import io.github.lycheeappf.tmm.channel.llm.KeyTestOutcome
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
+import io.github.lycheeappf.tmm.channel.llm.PositionLocalResult
+import io.github.lycheeappf.tmm.channel.llm.SelfTestEvent
+import io.github.lycheeappf.tmm.channel.llm.SelfTestStage
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.locale.localizedString
@@ -36,6 +41,24 @@ import javax.inject.Inject
  * und braucht ALWAYS („Immer erlauben", nur über die App-Einstellungen erteilbar).
  */
 enum class LocationPermissionLevel { NONE, WHILE_IN_USE, ALWAYS }
+
+/** Ergebnis-Zelle einer Selbsttest-Stufe: „übersprungen", „noch nicht gelaufen" (value=null) und „Ergebnis da" sind unterscheidbar. */
+data class StageCell<T>(val value: T? = null, val skipped: Boolean = false)
+
+data class SelfTestUiState(
+    val running: Boolean = false,
+    val destination: String = DEFAULT_DESTINATION,
+    val key: StageCell<KeyTestOutcome> = StageCell(),
+    val position: StageCell<PositionLocalResult> = StageCell(),
+    /** (credentialsSet, vinSelected) — rein lokale Tesla-Info-Stufe. */
+    val teslaLocal: StageCell<Pair<Boolean, Boolean>> = StageCell(),
+    val e2e: StageCell<E2eResult> = StageCell(),
+    val currentStage: SelfTestStage? = null
+) {
+    companion object {
+        const val DEFAULT_DESTINATION = "Alexanderplatz, Berlin"
+    }
+}
 
 data class AssistantUiState(
     val apiKeyIsSet: Boolean = false,
@@ -62,7 +85,8 @@ data class AssistantUiState(
     val locationContextEnabled: Boolean = false,
     val locationPermission: LocationPermissionLevel = LocationPermissionLevel.NONE,
     val lastFeedback: String? = null,
-    val isSystemPromptCustomized: Boolean = false
+    val isSystemPromptCustomized: Boolean = false,
+    val selfTest: SelfTestUiState = SelfTestUiState()
 )
 
 @HiltViewModel
@@ -71,6 +95,7 @@ class AssistantViewModel @Inject constructor(
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
     private val keyTester: GrokKeyTester,
+    private val selfTester: GrokSelfTester,
     private val coordinator: AssistantTriggerCoordinator,
     private val contactProvisioner: AssistantContactProvisioner,
     private val teslaContactResync: TeslaContactResync,
@@ -119,8 +144,12 @@ class AssistantViewModel @Inject constructor(
             // (API-Key gesetzt?, Consent) trotzdem übernehmen.
             val persisting = persistJobs.values.any { it.isActive }
             _uiState.update { cur ->
+                // Selbsttest-State ist rein transient (kein Platten-Backing) —
+                // IMMER aus dem aktuellen State übernehmen, sonst wipet jedes
+                // Resume Destination/Ergebnisse/running.
+                val base = snapshot.copy(selfTest = cur.selfTest)
                 if (persisting) {
-                    snapshot.copy(
+                    base.copy(
                         driverName = cur.driverName,
                         systemPrompt = cur.systemPrompt,
                         welcomeMessage = cur.welcomeMessage,
@@ -132,7 +161,7 @@ class AssistantViewModel @Inject constructor(
                         rateLimitPerHour = cur.rateLimitPerHour
                     )
                 } else {
-                    snapshot
+                    base
                 }
             }
         }
@@ -143,6 +172,7 @@ class AssistantViewModel @Inject constructor(
     fun saveApiKey() {
         val value = _uiState.value.apiKeyDraft.trim()
         if (value.isEmpty()) return
+        if (_uiState.value.selfTest.running) return
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(saving = true) }
             val (apiKeyIsSet, feedback) = try {
@@ -177,6 +207,7 @@ class AssistantViewModel @Inject constructor(
     }
 
     fun clearApiKey() {
+        if (_uiState.value.selfTest.running) return
         viewModelScope.launch(ioDispatcher) {
             apiKeyStore.clear()
             // Key weg → Grok-Auto-Kontakt entfernen.
@@ -201,11 +232,75 @@ class AssistantViewModel @Inject constructor(
      * sich also während eines laufenden Tests nicht ändern.
      */
     fun testApiKey() {
+        if (_uiState.value.selfTest.running) return
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(keyTestRunning = true, keyTestResult = null) }
             val outcome = coRunCatching { keyTester.run() }
                 .getOrDefault(KeyTestOutcome.UNKNOWN)
             _uiState.update { it.copy(keyTestRunning = false, keyTestResult = outcome) }
+        }
+    }
+
+    /** Reines UI-State-Update — Destination wird bewusst nicht persistiert. */
+    fun setSelfTestDestination(value: String) =
+        _uiState.update { it.copy(selfTest = it.selfTest.copy(destination = value)) }
+
+    /**
+     * Startet den mehrstufigen Grok-Selbsttest ([GrokSelfTester]) und zeichnet die
+     * Stufen-Events live in den State. Methoden-Guard zusätzlich zu den UI-`enabled`-
+     * Flags (Buttons können durch State-Latenz doppelt feuern); Key-Test/Save/Remove
+     * sind währenddessen gesperrt (Race-Guard, wie bisher Key-Test ↔ Save/Remove).
+     */
+    fun runSelfTest() {
+        val current = _uiState.value
+        if (current.selfTest.running || current.keyTestRunning || current.saving) return
+        val destination = current.selfTest.destination.trim()
+        if (destination.isEmpty()) return
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update {
+                it.copy(
+                    selfTest = it.selfTest.copy(
+                        running = true,
+                        key = StageCell(),
+                        position = StageCell(),
+                        teslaLocal = StageCell(),
+                        e2e = StageCell(),
+                        currentStage = null
+                    )
+                )
+            }
+            try {
+                selfTester.run(destination).collect { event ->
+                    _uiState.update { it.copy(selfTest = it.selfTest.applyEvent(event)) }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // GrokSelfTester fängt erwartbare Fehler selbst — das hier ist der
+                // Belt-and-braces-Pfad für Unerwartetes im Flow/Collect.
+                _uiState.update {
+                    it.copy(
+                        selfTest = it.selfTest.copy(
+                            e2e = StageCell(E2eResult.ProviderFailed(KeyTestOutcome.UNKNOWN))
+                        )
+                    )
+                }
+            }
+            _uiState.update { it.copy(selfTest = it.selfTest.copy(running = false, currentStage = null)) }
+        }
+    }
+
+    private fun SelfTestUiState.applyEvent(event: SelfTestEvent): SelfTestUiState = when (event) {
+        is SelfTestEvent.StageRunning -> copy(currentStage = event.stage)
+        is SelfTestEvent.KeyResult -> copy(key = StageCell(event.outcome), currentStage = null)
+        is SelfTestEvent.PositionResult -> copy(position = StageCell(event.result), currentStage = null)
+        is SelfTestEvent.TeslaLocalResult ->
+            copy(teslaLocal = StageCell(event.credentialsSet to event.vinSelected), currentStage = null)
+        is SelfTestEvent.E2eDone -> copy(e2e = StageCell(event.result), currentStage = null)
+        is SelfTestEvent.StageSkipped -> when (event.stage) {
+            SelfTestStage.POSITION -> copy(position = StageCell(skipped = true))
+            SelfTestStage.TESLA_LOCAL -> copy(teslaLocal = StageCell(skipped = true))
+            SelfTestStage.E2E -> copy(e2e = StageCell(skipped = true))
+            SelfTestStage.KEY -> this
         }
     }
 
