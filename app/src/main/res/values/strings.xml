@@ -97,9 +97,9 @@
     <string name="mms_received_text">This app does not support MMS</string>
     <string name="mms_received_big">An MMS was received but cannot be displayed because \'Tesla Messages Manager\' as the default SMS app does not handle MMS. Set Google Messages as the default temporarily if you want to see the MMS.</string>
     <string name="quickreply_failed_title">Quick reply not delivered</string>
-    <string name="quickreply_failed_text_to">Wanted to send to %1$s — tap to open in Google Messages</string>
-    <string name="quickreply_failed_text_generic">Tap to open the SMS in Google Messages</string>
-    <string name="quickreply_failed_big">The system tried to send a quick-reply SMS via this app (e.g. from the call UI). This app does not send SMS — please open Google Messages and send the text manually.\n\n%1$s</string>
+    <string name="quickreply_failed_text_to">Wanted to send to %1$s — tap to review and send</string>
+    <string name="quickreply_failed_text_generic">Tap to review and send the SMS</string>
+    <string name="quickreply_failed_big">The system tried to send a quick-reply SMS via this app (e.g. from the call UI). Tap to review the text and send it yourself.\n\n%1$s</string>
     <string name="shell_not_full_client_toast">Tesla Messages Manager is not a full SMS client. Install Google Messages to send real SMS.</string>
 
     <!-- Tesla Fleet API settings -->
