@@ -29,4 +29,24 @@ class SentReplyLedgerTest {
         assertThat(ledger.isRecentReply("com.whatsapp", "andere Nachricht")).isFalse()
         assertThat(ledger.isRecentReply("org.telegram.messenger", "meine Antwort")).isFalse()
     }
+
+    @Test
+    fun `hash-colliding different body is not treated as recent reply`() {
+        // "Aa" und "BB" haben denselben Java String.hashCode() (2112). Ein
+        // Hash-Keying würde hier eine LEGITIME eingehende Nachricht droppen —
+        // gleiche Begründung wie beim lastBodies-Dedup in NotificationCapture.
+        assertThat("Aa".hashCode()).isEqualTo("BB".hashCode())
+
+        ledger.record("com.whatsapp", "Aa")
+        assertThat(ledger.isRecentReply("com.whatsapp", "BB")).isFalse()
+    }
+
+    @Test
+    fun `oldest entry is evicted once max size is exceeded`() {
+        ledger.record("com.whatsapp", "reply-0")
+        repeat(50) { i -> ledger.record("com.whatsapp", "reply-${i + 1}") }
+
+        assertThat(ledger.isRecentReply("com.whatsapp", "reply-0")).isFalse()
+        assertThat(ledger.isRecentReply("com.whatsapp", "reply-50")).isTrue()
+    }
 }
