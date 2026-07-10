@@ -53,7 +53,11 @@ class ToolCallExecutor @Inject constructor(
             }
             currentReq = currentReq.copy(
                 inFlightToolCalls = currentReq.inFlightToolCalls + currentResponse.toolCalls,
-                inFlightToolResults = currentReq.inFlightToolResults + results
+                inFlightToolResults = currentReq.inFlightToolResults + results,
+                // Ein erzwungener erster Call (tool_choice="required") darf nicht auf
+                // Folge-Requests kleben — sonst MUSS das Modell nach jedem Tool-Result
+                // erneut callen, bis MAX_TOOL_ITERATIONS reißt und nie Text kommt.
+                toolChoice = null
             )
             currentResponse = complete(currentReq)
             toolIterations++

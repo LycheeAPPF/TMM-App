@@ -157,4 +157,17 @@ class ToolCallExecutorTest {
         assertThat(followUps[1].inFlightToolCalls.map { it.id }).containsExactly("c1", "c2").inOrder()
         assertThat(followUps[1].inFlightToolResults.map { it.callId }).containsExactly("c1", "c2").inOrder()
     }
+
+    @Test fun `forced tool_choice is cleared on follow-up requests`() = runTest {
+        coEvery { toolRegistry.invoke(any(), any()) } returns ToolInvocationResult.Success("{}")
+        val followUps = mutableListOf<LlmRequest>()
+        val initial = response(toolCalls = listOf(ToolCall("c1", "t", "{}")))
+
+        executor.run(request().copy(toolChoice = "required"), initial) { req ->
+            followUps += req
+            response(content = "done")
+        }
+
+        assertThat(followUps.single().toolChoice).isNull()
+    }
 }
