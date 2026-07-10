@@ -1,5 +1,6 @@
 package io.github.lycheeappf.tmm.ui.screen.sms
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +30,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -153,10 +158,13 @@ private fun ReplyBar(
 }
 
 @Composable
-private fun MessageBubble(message: SmsMessage) {
+internal fun MessageBubble(message: SmsMessage) {
     val incoming = message.isIncoming
     val failed = message.direction == SmsDirection.FAILED
     val outboxPending = message.direction == SmsDirection.OUTBOX
+
+    val clipboard = LocalClipboardManager.current
+    val haptics = LocalHapticFeedback.current
 
     val container = when {
         failed -> MaterialTheme.colorScheme.errorContainer
@@ -177,7 +185,23 @@ private fun MessageBubble(message: SmsMessage) {
             // typische Chat-Layout (eingehend links, ausgehend rechts).
             modifier = Modifier.align(if (incoming) Alignment.CenterStart else Alignment.CenterEnd)
         ) {
-            Column(modifier = Modifier.padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)) {
+            Column(
+                modifier = Modifier
+                    // Auf der inneren Column (nicht auf der Surface), damit der
+                    // Ripple über dem Bubble-Hintergrund liegt und von der
+                    // Surface-Shape geclippt wird.
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClickLabel = stringResource(R.string.sms_thread_copy_action),
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            // Kein eigener Snackbar/Toast: ab Android 13 (minSdk 33)
+                            // zeigt das System selbst ein Kopier-Overlay.
+                            clipboard.setText(AnnotatedString(message.body))
+                        }
+                    )
+                    .padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)
+            ) {
                 Text(
                     message.body,
                     style = MaterialTheme.typography.bodyMedium,
