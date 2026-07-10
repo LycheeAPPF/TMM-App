@@ -8,6 +8,7 @@ import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.provider.ToolCall
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolCallExecutor
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.locale.localizedString
@@ -66,7 +67,8 @@ class LlmTurnRunnerTest {
         // wirft sonst MockKException ("missing answer").
         coEvery { limiter.refund(any()) } returns Unit
         runner = LlmTurnRunner(
-            context, store, provider, prefs, limiter, formatter, toolRegistry, locationProvider, logBuffer
+            context, store, provider, prefs, limiter, formatter, toolRegistry,
+            ToolCallExecutor(toolRegistry, logBuffer), locationProvider, logBuffer
         ) { 1_000L }
     }
 

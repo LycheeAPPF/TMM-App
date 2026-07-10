@@ -9,12 +9,9 @@ import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmTurn
 import io.github.lycheeappf.tmm.channel.llm.provider.TokenUsage
-import io.github.lycheeappf.tmm.channel.llm.provider.ToolResult
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolCallExecutor
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
-import io.github.lycheeappf.tmm.channel.llm.tools.toOutputString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
@@ -49,6 +46,7 @@ class LlmTurnRunner @Inject constructor(
     private val rateLimiter: LlmRateLimiter,
     private val formatter: LlmResponseFormatter,
     private val toolRegistry: ToolRegistry,
+    private val toolCallExecutor: ToolCallExecutor,
     private val locationProvider: LocationProvider,
     private val logBuffer: LogBuffer,
     private val clock: Clock
@@ -101,8 +99,7 @@ class LlmTurnRunner @Inject constructor(
                 webSearch = webSearch,
                 xSearch = xSearch
             )
-            var currentReq = req
-            var currentResponse = try {
+            val initialResponse = try {
                 provider.complete(req)
             } catch (e: LlmProviderError) {
                 // Nur Typ-Name loggen — Provider-Error-Messages können Body-Fragmente
@@ -122,39 +119,21 @@ class LlmTurnRunner @Inject constructor(
                 return@withLock TurnResult.ProviderFailed(LlmProviderError.Network(e))
             }
 
-            // Tool-Execution-Loop: Grok hat function_calls geliefert → ausführen,
-            // Ergebnisse zurückschicken, bis eine Text-Antwort kommt oder das Limit erreicht ist.
-            var toolIterations = 0
-            var anyToolSucceeded = false
-            while (currentResponse.toolCalls.isNotEmpty() && toolIterations < MAX_TOOL_ITERATIONS) {
-                val results = currentResponse.toolCalls.map { call ->
-                    val args = runCatching {
-                        Json.parseToJsonElement(call.argumentsJson).jsonObject
-                    }.getOrDefault(kotlinx.serialization.json.buildJsonObject {})
-                    val out = toolRegistry.invoke(call.name, args)
-                    if (out is ToolInvocationResult.Success) anyToolSucceeded = true
-                    logBuffer.info(TAG, "Tool '${call.name}' → ${out::class.simpleName}")
-                    ToolResult(callId = call.id, output = out.toOutputString())
-                }
-                currentReq = currentReq.copy(
-                    inFlightToolCalls = currentReq.inFlightToolCalls + currentResponse.toolCalls,
-                    inFlightToolResults = currentReq.inFlightToolResults + results
-                )
-                currentResponse = try {
-                    provider.complete(currentReq)
-                } catch (e: LlmProviderError) {
-                    logBuffer.warn(TAG, "Provider error in tool loop: ${e::class.simpleName}")
-                    rateLimiter.refund(mappingId)
-                    return@withLock TurnResult.ProviderFailed(e)
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    logBuffer.error(TAG, "Unexpected exception in tool loop: ${e::class.simpleName}")
-                    rateLimiter.refund(mappingId)
-                    return@withLock TurnResult.ProviderFailed(LlmProviderError.Network(e))
-                }
-                toolIterations++
+            // Tool-Execution-Loop (geteilt mit dem Grok-Selbsttest, siehe ToolCallExecutor).
+            val loop = try {
+                toolCallExecutor.run(req, initialResponse) { provider.complete(it) }
+            } catch (e: LlmProviderError) {
+                logBuffer.warn(TAG, "Provider error in tool loop: ${e::class.simpleName}")
+                rateLimiter.refund(mappingId)
+                return@withLock TurnResult.ProviderFailed(e)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                logBuffer.error(TAG, "Unexpected exception in tool loop: ${e::class.simpleName}")
+                rateLimiter.refund(mappingId)
+                return@withLock TurnResult.ProviderFailed(LlmProviderError.Network(e))
             }
-            val response: LlmResponse = currentResponse
+            val response: LlmResponse = loop.finalResponse
+            val anyToolSucceeded = loop.steps.any { it.result is ToolInvocationResult.Success }
 
             var cleaned = formatter.format(response.content.orEmpty())
             if (cleaned.isBlank()) {
@@ -189,6 +168,5 @@ class LlmTurnRunner @Inject constructor(
 
     companion object {
         private const val TAG = "LlmTurnRunner"
-        private const val MAX_TOOL_ITERATIONS = 3
     }
 }
