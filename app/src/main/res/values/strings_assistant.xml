@@ -61,6 +61,7 @@
     <string name="assistant_selftest_nav_failed">Navigation failed</string>
     <string name="assistant_selftest_nav_wrong_address">Wrong destination sent</string>
     <string name="assistant_selftest_nav_not_called">Grok did not call the navigation tool</string>
+    <string name="assistant_selftest_nav_truncated">Reply hit the token limit before the tool call — run the test again</string>
     <string name="assistant_selftest_consent_missing">Consent missing — enable it at the top</string>
     <string name="assistant_selftest_echo_matched">Grok knows the position</string>
     <string name="assistant_selftest_echo_not_found">Position not found in the reply</string>

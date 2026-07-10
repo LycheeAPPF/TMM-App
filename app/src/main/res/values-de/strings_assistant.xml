@@ -61,6 +61,7 @@
     <string name="assistant_selftest_nav_failed">Navigation fehlgeschlagen</string>
     <string name="assistant_selftest_nav_wrong_address">Falsches Ziel gesendet</string>
     <string name="assistant_selftest_nav_not_called">Grok hat das Navigations-Tool nicht aufgerufen</string>
+    <string name="assistant_selftest_nav_truncated">Antwort am Token-Limit abgeschnitten, bevor das Tool aufgerufen wurde — Test erneut starten</string>
     <string name="assistant_selftest_consent_missing">Einwilligung fehlt — oben aktivieren</string>
     <string name="assistant_selftest_echo_matched">Grok kennt die Position</string>
     <string name="assistant_selftest_echo_not_found">Position nicht in der Antwort gefunden</string>

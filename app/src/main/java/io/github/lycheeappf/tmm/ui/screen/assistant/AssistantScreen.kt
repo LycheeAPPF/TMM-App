@@ -674,6 +674,8 @@ private fun navResultUi(result: E2eResult): Pair<Pair<String, MfsStatus>, String
         (stringResource(R.string.assistant_selftest_consent_missing) to MfsStatus.Error) to null
     E2eResult.Timeout ->
         (stringResource(R.string.assistant_keytest_timeout) to MfsStatus.Warning) to null
+    E2eResult.Truncated ->
+        (stringResource(R.string.assistant_selftest_nav_truncated) to MfsStatus.Warning) to null
     is E2eResult.ProviderFailed -> keyTestResultUi(result.outcome) to null
 }
 

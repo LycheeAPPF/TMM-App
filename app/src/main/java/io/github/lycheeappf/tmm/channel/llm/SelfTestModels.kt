@@ -52,4 +52,12 @@ sealed class E2eResult {
     /** Privacy-Consent fehlt — es ist KEIN xAI-Call erfolgt. */
     data object ConsentMissing : E2eResult()
     data object Timeout : E2eResult()
+
+    /**
+     * Der Turn kam mit `finishReason=incomplete` OHNE Nav-Call zurück: das Token-
+     * Budget wurde vom Reasoning aufgebraucht, bevor das Tool dran war — KEIN
+     * Modell-„Nein" und kein Pipeline-Defekt. (Truncation NACH erfolgreichem
+     * Call bleibt Completed; sichtbar über leere Antwort/Echo-Zeile.)
+     */
+    data object Truncated : E2eResult()
 }
