@@ -35,6 +35,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +46,12 @@ import io.github.lycheeappf.tmm.domain.sms.SmsDirection
 import io.github.lycheeappf.tmm.domain.sms.SmsMessage
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
+
+// Konstant über alle Bubbles: Unterstreichung statt eigener Farbe, damit Links
+// auf allen drei Bubble-Containern (surfaceVariant/primaryContainer/errorContainer)
+// lesbar bleiben. Top-level statt lokal in MessageBubble, damit remember() den
+// AnnotatedString nicht bei jeder Recomposition neu aufbaut (siehe unten).
+private val linkStyle = SpanStyle(textDecoration = TextDecoration.Underline, fontWeight = FontWeight.Bold)
 
 @Composable
 fun SmsThreadScreen(
@@ -202,8 +211,12 @@ internal fun MessageBubble(message: SmsMessage) {
                     )
                     .padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)
             ) {
+                // Links im Body tappbar machen (LinkAnnotation.Url → Default-UriHandler).
+                // Unterstreichung statt eigener Farbe: bleibt auf allen drei
+                // Bubble-Containern (surfaceVariant/primaryContainer/errorContainer) lesbar.
+                val body = remember(message.body) { linkifySmsBody(message.body, linkStyle) }
                 Text(
-                    message.body,
+                    body,
                     style = MaterialTheme.typography.bodyMedium,
                     color = onContainer
                 )
