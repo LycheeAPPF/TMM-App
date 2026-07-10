@@ -431,4 +431,114 @@ class MappingRepositoryImplTest {
         assertThat(expirySlot.captured).isEqualTo(Long.MAX_VALUE)
         assertThat(mapping.expiresAt).isEqualTo(Long.MAX_VALUE)
     }
+
+    @Test
+    fun `allocateOrReuse keeps replyable payload when new capture is action-less`() = runTest {
+        val now = System.currentTimeMillis()
+        val replyableJson = PayloadJson.encode(testPayload) // remoteInputResultKey = "input"
+        val existing = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.NOTIFICATION.code,
+            fakeAddress = "+88800000007",
+            conversationKey = "com.whatsapp::anna",
+            payloadJson = replyableJson,
+            createdAt = now - 60_000,
+            expiresAt = now + 60_000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
+        } returns existing
+        val writtenJson = slot<String>()
+        coEvery { dao.refreshOnReuse(any(), any(), payloadJson = capture(writtenJson), any(), any(), any()) } just Runs
+
+        val summaryPayload = ChannelPayload.Notification(
+            sourcePackage = "com.whatsapp",
+            notificationKey = "0|com.whatsapp|1|null|10467",
+            remoteInputResultKey = null,
+            conversationLabel = "WhatsApp",
+            senderDisplayName = "WhatsApp"
+        )
+        val mapping = repository.allocateOrReuse(
+            channel = ChannelId.NOTIFICATION,
+            conversationKey = "com.whatsapp::anna",
+            payload = summaryPayload,
+            ttlMillis = 24L * 60 * 60 * 1000
+        )
+
+        assertThat(writtenJson.captured).isEqualTo(replyableJson)
+        val kept = mapping.payload as ChannelPayload.Notification
+        assertThat(kept.notificationKey).isEqualTo("key-1")
+        assertThat(kept.remoteInputResultKey).isEqualTo("input")
+    }
+
+    @Test
+    fun `allocateOrReuse overwrites payload when new capture is replyable`() = runTest {
+        val now = System.currentTimeMillis()
+        val existing = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.NOTIFICATION.code,
+            fakeAddress = "+88800000007",
+            conversationKey = "com.whatsapp::anna",
+            payloadJson = PayloadJson.encode(testPayload),
+            createdAt = now - 60_000,
+            expiresAt = now + 60_000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
+        } returns existing
+        val writtenJson = slot<String>()
+        coEvery { dao.refreshOnReuse(any(), any(), payloadJson = capture(writtenJson), any(), any(), any()) } just Runs
+
+        val freshPayload = testPayload.copy(notificationKey = "key-2")
+        val mapping = repository.allocateOrReuse(
+            channel = ChannelId.NOTIFICATION,
+            conversationKey = "com.whatsapp::anna",
+            payload = freshPayload,
+            ttlMillis = 24L * 60 * 60 * 1000
+        )
+
+        assertThat(writtenJson.captured).isEqualTo(PayloadJson.encode(freshPayload))
+        assertThat((mapping.payload as ChannelPayload.Notification).notificationKey).isEqualTo("key-2")
+    }
+
+    @Test
+    fun `allocateOrReuse overwrites action-less payload with action-less payload`() = runTest {
+        // Kein Sticky-Fall: bestehendes Payload ist selbst nicht replyable →
+        // neuestes Update gewinnt (frischerer notificationKey hilft dem Rebuilder).
+        val now = System.currentTimeMillis()
+        val actionless = testPayload.copy(remoteInputResultKey = null)
+        val existing = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.NOTIFICATION.code,
+            fakeAddress = "+88800000007",
+            conversationKey = "com.whatsapp::anna",
+            payloadJson = PayloadJson.encode(actionless),
+            createdAt = now - 60_000,
+            expiresAt = now + 60_000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = false
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
+        } returns existing
+        val writtenJson = slot<String>()
+        coEvery { dao.refreshOnReuse(any(), any(), payloadJson = capture(writtenJson), any(), any(), any()) } just Runs
+
+        val newer = actionless.copy(notificationKey = "key-3")
+        repository.allocateOrReuse(
+            channel = ChannelId.NOTIFICATION,
+            conversationKey = "com.whatsapp::anna",
+            payload = newer,
+            ttlMillis = 24L * 60 * 60 * 1000
+        )
+
+        assertThat(writtenJson.captured).isEqualTo(PayloadJson.encode(newer))
+    }
 }
