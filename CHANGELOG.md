@@ -14,10 +14,9 @@ Second release candidate: two field reports from rc1 testing.
   the number without contacts permission or without a match).
 
 ### Changed
-- **Long-pressing a message bubble now opens a menu** with "Copy message" and
-  "Select text". "Select text" shows the message in a dialog where any part of it
-  (e.g. a 2FA code) can be selected and copied — previously long-press always copied
-  the entire message.
+- **Long-pressing a message bubble now starts text selection** — select any part of a
+  message (e.g. a 2FA code) directly in the bubble and copy it via the system toolbar;
+  previously long-press always copied the entire message.
 
 ## [1.0.0-rc1] — 2026-07-10
 

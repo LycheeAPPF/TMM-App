@@ -15,10 +15,6 @@
     <string name="sms_thread_empty">Keine Nachrichten.</string>
     <string name="sms_thread_reply_hint">Nachricht…</string>
     <string name="sms_thread_send_action">Senden</string>
-    <string name="sms_thread_copy_action">Nachricht kopieren</string>
-    <string name="sms_thread_bubble_actions">Nachrichtenoptionen</string>
-    <string name="sms_thread_select_action">Text auswählen</string>
-    <string name="sms_thread_select_close">Schließen</string>
     <string name="sms_thread_meta_failed">fehlgeschlagen</string>
     <string name="sms_thread_meta_sending">wird gesendet…</string>
 
