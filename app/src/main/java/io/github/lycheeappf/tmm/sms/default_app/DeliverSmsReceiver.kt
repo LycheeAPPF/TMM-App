@@ -104,7 +104,10 @@ class DeliverSmsReceiver : BroadcastReceiver() {
                 context.applicationContext,
                 DeliverSmsReceiverEntryPoint::class.java
             ).contactNameResolver().resolve(address)
-        }.getOrNull()
+        }.getOrElse {
+            Log.w(TAG, "Sender name resolution failed", it)
+            null
+        }
 
     @VisibleForTesting
     internal fun postIncomingSmsNotification(
