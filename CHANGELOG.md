@@ -4,6 +4,21 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc2] — 2026-07-11
+
+Second release candidate: two field reports from rc1 testing.
+
+### Fixed
+- **Incoming-SMS notifications now show the contact's name** instead of the raw phone
+  number, using the same contact lookup as the in-app conversation list (falls back to
+  the number without contacts permission or without a match).
+
+### Changed
+- **Long-pressing a message bubble now opens a menu** with "Copy message" and
+  "Select text". "Select text" shows the message in a dialog where any part of it
+  (e.g. a 2FA code) can be selected and copied — previously long-press always copied
+  the entire message.
+
 ## [1.0.0-rc1] — 2026-07-10
 
 Release candidate for 1.0. Fixes the field-reported WhatsApp bridge failures
