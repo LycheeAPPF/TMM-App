@@ -16,6 +16,9 @@
     <string name="sms_thread_reply_hint">Message…</string>
     <string name="sms_thread_send_action">Send</string>
     <string name="sms_thread_copy_action">Copy message</string>
+    <string name="sms_thread_bubble_actions">Message options</string>
+    <string name="sms_thread_select_action">Select text</string>
+    <string name="sms_thread_select_close">Close</string>
     <string name="sms_thread_meta_failed">failed</string>
     <string name="sms_thread_meta_sending">sending…</string>
 

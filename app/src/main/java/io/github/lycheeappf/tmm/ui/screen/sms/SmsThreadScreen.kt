@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,10 +28,13 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -175,6 +182,9 @@ internal fun MessageBubble(message: SmsMessage) {
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
 
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showSelectDialog by remember { mutableStateOf(false) }
+
     val container = when {
         failed -> MaterialTheme.colorScheme.errorContainer
         incoming -> MaterialTheme.colorScheme.surfaceVariant
@@ -187,54 +197,91 @@ internal fun MessageBubble(message: SmsMessage) {
     }
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            color = container,
-            shape = MaterialTheme.shapes.large,
-            // Surface umschließt seinen Inhalt; Start/End-Ausrichtung erzeugt das
-            // typische Chat-Layout (eingehend links, ausgehend rechts).
-            modifier = Modifier.align(if (incoming) Alignment.CenterStart else Alignment.CenterEnd)
-        ) {
-            Column(
-                modifier = Modifier
-                    // Auf der inneren Column (nicht auf der Surface), damit der
-                    // Ripple über dem Bubble-Hintergrund liegt und von der
-                    // Surface-Shape geclippt wird.
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClickLabel = stringResource(R.string.sms_thread_copy_action),
-                        onLongClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            // Kein eigener Snackbar/Toast: ab Android 13 (minSdk 33)
-                            // zeigt das System selbst ein Kopier-Overlay.
-                            clipboard.setText(AnnotatedString(message.body))
-                        }
+        // Anker-Box: das DropdownMenu positioniert sich relativ zur Bubble,
+        // nicht zur vollen Zeile; Start/End-Ausrichtung erzeugt das typische
+        // Chat-Layout (eingehend links, ausgehend rechts).
+        Box(modifier = Modifier.align(if (incoming) Alignment.CenterStart else Alignment.CenterEnd)) {
+            Surface(color = container, shape = MaterialTheme.shapes.large) {
+                Column(
+                    modifier = Modifier
+                        // Auf der inneren Column (nicht auf der Surface), damit der
+                        // Ripple über dem Bubble-Hintergrund liegt und von der
+                        // Surface-Shape geclippt wird.
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClickLabel = stringResource(R.string.sms_thread_bubble_actions),
+                            onLongClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                menuExpanded = true
+                            }
+                        )
+                        .padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)
+                ) {
+                    // Links im Body tappbar machen (LinkAnnotation.Url → Default-UriHandler).
+                    // Unterstreichung statt eigener Farbe: bleibt auf allen drei
+                    // Bubble-Containern (surfaceVariant/primaryContainer/errorContainer) lesbar.
+                    val body = remember(message.body) { linkifySmsBody(message.body, linkStyle) }
+                    Text(
+                        body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onContainer
                     )
-                    .padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)
-            ) {
-                // Links im Body tappbar machen (LinkAnnotation.Url → Default-UriHandler).
-                // Unterstreichung statt eigener Farbe: bleibt auf allen drei
-                // Bubble-Containern (surfaceVariant/primaryContainer/errorContainer) lesbar.
-                val body = remember(message.body) { linkifySmsBody(message.body, linkStyle) }
-                Text(
-                    body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = onContainer
-                )
-                val failedLabel = stringResource(R.string.sms_thread_meta_failed)
-                val sendingLabel = stringResource(R.string.sms_thread_meta_sending)
-                val meta = buildString {
-                    append(SmsFormat.clockTime(message.date))
-                    when {
-                        failed -> append(" · $failedLabel")
-                        outboxPending -> append(" · $sendingLabel")
+                    val failedLabel = stringResource(R.string.sms_thread_meta_failed)
+                    val sendingLabel = stringResource(R.string.sms_thread_meta_sending)
+                    val meta = buildString {
+                        append(SmsFormat.clockTime(message.date))
+                        when {
+                            failed -> append(" · $failedLabel")
+                            outboxPending -> append(" · $sendingLabel")
+                        }
                     }
+                    Text(
+                        meta,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onContainer
+                    )
                 }
-                Text(
-                    meta,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onContainer
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sms_thread_copy_action)) },
+                    onClick = {
+                        menuExpanded = false
+                        // Kein eigener Snackbar/Toast: ab Android 13 (minSdk 33)
+                        // zeigt das System selbst ein Kopier-Overlay.
+                        clipboard.setText(AnnotatedString(message.body))
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sms_thread_select_action)) },
+                    onClick = {
+                        menuExpanded = false
+                        showSelectDialog = true
+                    }
                 )
             }
         }
+    }
+
+    if (showSelectDialog) {
+        AlertDialog(
+            onDismissRequest = { showSelectDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showSelectDialog = false }) {
+                    Text(stringResource(R.string.sms_thread_select_close))
+                }
+            },
+            // Roher Body ohne Link-Spans: im Selektions-Dialog geht es ums
+            // Markieren von Teiltext (z. B. ein 2FA-Code), nicht ums Öffnen
+            // von Links; das System-Selektionsmenü übernimmt das Kopieren.
+            text = {
+                SelectionContainer {
+                    Text(message.body, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        )
     }
 }
