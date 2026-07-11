@@ -2,6 +2,7 @@ package io.github.lycheeappf.tmm.sms.default_app
 
 import android.Manifest
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -34,7 +35,7 @@ class DeliverSmsReceiverTest {
         shadowOf(context.getSystemService(NotificationManager::class.java)).allNotifications
 
     @Test fun `notification tap target is the MainActivity thread deep-link with the delivered threadId`() {
-        receiver.postIncomingSmsNotification(context, "+4917012345", "hello", threadId = 42L)
+        receiver.postIncomingSmsNotification(context, "+4917012345", senderName = null, body = "hello", threadId = 42L)
 
         val posted = postedNotifications()
         assertThat(posted).hasSize(1)
@@ -44,7 +45,7 @@ class DeliverSmsReceiverTest {
     }
 
     @Test fun `unresolved threadId is propagated so the UI can fall back to the conversation list`() {
-        receiver.postIncomingSmsNotification(context, "+4917012345", "hello", threadId = -1L)
+        receiver.postIncomingSmsNotification(context, "+4917012345", senderName = null, body = "hello", threadId = -1L)
 
         val posted = postedNotifications()
         assertThat(posted).hasSize(1)
@@ -53,7 +54,7 @@ class DeliverSmsReceiverTest {
     }
 
     @Test fun `notification uses the fallback channel`() {
-        receiver.postIncomingSmsNotification(context, "+4917012345", "hello", threadId = 1L)
+        receiver.postIncomingSmsNotification(context, "+4917012345", senderName = null, body = "hello", threadId = 1L)
 
         assertThat(postedNotifications().first().channelId)
             .isEqualTo(MfsApplication.CHANNEL_FALLBACK)
@@ -62,9 +63,30 @@ class DeliverSmsReceiverTest {
     @Test fun `missing POST_NOTIFICATIONS permission skips the notification`() {
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
 
-        receiver.postIncomingSmsNotification(context, "+4917012345", "hello", threadId = 42L)
+        receiver.postIncomingSmsNotification(context, "+4917012345", senderName = null, body = "hello", threadId = 42L)
 
         assertThat(postedNotifications()).isEmpty()
+    }
+
+    @Test fun `notification title shows the resolved sender name instead of the raw number`() {
+        receiver.postIncomingSmsNotification(
+            context, "+4917012345", senderName = "Anna Schmidt", body = "hello", threadId = 42L
+        )
+
+        val title = postedNotifications().first()
+            .extras.getCharSequence(Notification.EXTRA_TITLE).toString()
+        assertThat(title).contains("Anna Schmidt")
+        assertThat(title).doesNotContain("+4917012345")
+    }
+
+    @Test fun `notification title falls back to the raw number when no name resolves`() {
+        receiver.postIncomingSmsNotification(
+            context, "+4917012345", senderName = null, body = "hello", threadId = 42L
+        )
+
+        val title = postedNotifications().first()
+            .extras.getCharSequence(Notification.EXTRA_TITLE).toString()
+        assertThat(title).contains("+4917012345")
     }
 
     @Test fun `threadIntent contract carries target activity and thread id extra`() {

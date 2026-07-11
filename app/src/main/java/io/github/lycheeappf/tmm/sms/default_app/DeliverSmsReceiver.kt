@@ -15,10 +15,15 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import io.github.lycheeappf.tmm.MainActivity
 import io.github.lycheeappf.tmm.MfsApplication
 import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.locale.localizedString
+import io.github.lycheeappf.tmm.sms.read.ContactNameResolver
 
 /**
  * Empfängt echte eingehende SMS, wenn unsere App Default-SMS-App ist.
@@ -84,13 +89,28 @@ class DeliverSmsReceiver : BroadcastReceiver() {
         }
 
         Log.d(TAG, "Inserted real SMS from $address (${body.length} chars), uri=$insertedUri, threadId=$threadId")
-        postIncomingSmsNotification(context, address, body, threadId)
+        postIncomingSmsNotification(context, address, resolveSenderName(context, address), body, threadId)
     }
+
+    /**
+     * PhoneLookup über den bestehenden [ContactNameResolver] (derselbe wie in der
+     * In-App-SMS-UI). Zugriff per Hilt-EntryPoint, weil dieser Receiver bewusst
+     * ein plain BroadcastReceiver ohne @AndroidEntryPoint ist. runCatching: eine
+     * fehlgeschlagene Namensauflösung darf nie die Notification verhindern.
+     */
+    private fun resolveSenderName(context: Context, address: String): String? =
+        runCatching {
+            EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                DeliverSmsReceiverEntryPoint::class.java
+            ).contactNameResolver().resolve(address)
+        }.getOrNull()
 
     @VisibleForTesting
     internal fun postIncomingSmsNotification(
         context: Context,
         address: String,
+        senderName: String?,
         body: String,
         threadId: Long
     ) {
@@ -115,7 +135,7 @@ class DeliverSmsReceiver : BroadcastReceiver() {
 
         val notif = NotificationCompat.Builder(context, MfsApplication.CHANNEL_FALLBACK)
             .setSmallIcon(android.R.drawable.sym_action_email)
-            .setContentTitle(context.localizedString(R.string.sms_incoming_title, address))
+            .setContentTitle(context.localizedString(R.string.sms_incoming_title, senderName ?: address))
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pi)
@@ -136,4 +156,10 @@ class DeliverSmsReceiver : BroadcastReceiver() {
         private const val TAG = "DeliverSmsReceiver"
         private const val NOTIF_ID_BASE = 3000
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface DeliverSmsReceiverEntryPoint {
+    fun contactNameResolver(): ContactNameResolver
 }
