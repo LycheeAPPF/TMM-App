@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.AlertDialog
@@ -278,8 +280,12 @@ internal fun MessageBubble(message: SmsMessage) {
             // Markieren von Teiltext (z. B. ein 2FA-Code), nicht ums Öffnen
             // von Links; das System-Selektionsmenü übernimmt das Kopieren.
             text = {
-                SelectionContainer {
-                    Text(message.body, style = MaterialTheme.typography.bodyMedium)
+                // AlertDialog scrollt seinen text-Slot nicht selbst: lange (Multipart-)
+                // Bodies wären sonst abgeschnitten und ihr Ende nicht selektierbar.
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    SelectionContainer {
+                        Text(message.body, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         )
