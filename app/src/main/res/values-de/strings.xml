@@ -42,6 +42,7 @@
     <!-- Grok assistant: spoken (TTS) status & error messages -->
     <string name="llm_inactive">Der Assistent ist nicht aktiv. Bitte Einwilligung und API-Key in der App bestätigen.</string>
     <string name="llm_empty_response">Grok hat keine Antwort gesendet.</string>
+    <string name="llm_tool_success_fallback">Erledigt — die Anfrage wurde ausgeführt.</string>
     <string name="llm_conversation_expired">Entschuldige — die Konversation ist abgelaufen.</string>
     <string name="llm_error_wrapper">Entschuldige, ich kann das gerade nicht beantworten — %1$s</string>
     <string name="llm_ratelimit_per_min">Zu viele Anfragen — bitte einen Moment warten.</string>
@@ -94,8 +95,58 @@
     <string name="mms_received_text">Diese App unterstützt keine MMS</string>
     <string name="mms_received_big">Eine MMS wurde empfangen, kann aber nicht angezeigt werden, weil \'Tesla Messages Manager\' als Default-SMS-App MMS nicht verarbeitet. Setze Google Messages temporär als Default, falls du die MMS sehen willst.</string>
     <string name="quickreply_failed_title">Quick-Reply nicht zugestellt</string>
-    <string name="quickreply_failed_text_to">Wollte an %1$s senden — tap um in Google Messages zu öffnen</string>
-    <string name="quickreply_failed_text_generic">Tap, um SMS in Google Messages zu öffnen</string>
-    <string name="quickreply_failed_big">Das System hat über diese App eine Quick-Reply-SMS senden wollen (z.B. aus der Anruf-UI). Diese App sendet keine SMS — bitte öffne Google Messages und sende den Text manuell.\n\n%1$s</string>
+    <string name="quickreply_failed_text_to">Wollte an %1$s senden — tap zum Prüfen und Senden</string>
+    <string name="quickreply_failed_text_generic">Tap, um die SMS zu prüfen und zu senden</string>
+    <string name="quickreply_failed_big">Das System hat über diese App eine Quick-Reply-SMS senden wollen (z.B. aus der Anruf-UI). Tap, um den Text zu prüfen und selbst zu senden.\n\n%1$s</string>
     <string name="shell_not_full_client_toast">Tesla Messages Manager ist kein vollwertiger SMS-Client. Installiere Google Messages, um echte SMS zu senden.</string>
+
+    <!-- Tesla Fleet API settings -->
+    <string name="tesla_api_section">Tesla Fleet API</string>
+    <string name="tesla_api_card_title">Tesla-Fahrzeugverbindung</string>
+    <string name="tesla_api_card_desc">Mit Tesla-Account einloggen, um per Grok direkt Navigationsziele an das Fahrzeug zu senden.</string>
+    <string name="tesla_api_connect">Mit Tesla verbinden</string>
+    <string name="tesla_api_disconnect">Verbindung trennen</string>
+    <string name="tesla_api_status_connected">Verbunden</string>
+    <string name="tesla_api_status_not_connected">Nicht verbunden</string>
+    <string name="tesla_api_status_loading">Lädt…</string>
+    <string name="tesla_api_vehicle_selected">Fahrzeug: %1$s</string>
+    <string name="tesla_api_load_vehicles">Fahrzeuge laden</string>
+    <string name="tesla_api_no_vehicle">Kein Fahrzeug gewählt</string>
+    <string name="tesla_api_token_expires">Token läuft ab: %1$s</string>
+    <string name="tesla_api_error_prefix">Fehler: %1$s</string>
+    <string name="tesla_api_missing_credentials">Keine Tesla-API-Zugangsdaten hinterlegt. Erstelle eine eigene App auf developer.tesla.com und hinterlege deren Client-ID und Client-Secret in den App-Einstellungen, um Fahrzeug-Funktionen zu aktivieren.</string>
+    <string name="tesla_api_diagnostic_failed">Region-Diagnose fehlgeschlagen</string>
+
+    <!-- Tesla API credentials (user-provided app registration) -->
+    <string name="tesla_credentials_title">Tesla-API-Zugangsdaten</string>
+    <string name="tesla_credentials_desc">Erstelle eine eigene App auf developer.tesla.com und trage hier deren Client-ID und Client-Secret ein. Wird verschlüsselt auf dem Gerät gespeichert und ist von Backups ausgenommen.</string>
+    <string name="tesla_credentials_status_set">Zugangsdaten hinterlegt</string>
+    <string name="tesla_credentials_status_none">Keine Zugangsdaten</string>
+    <string name="tesla_credentials_client_id_label">Client-ID</string>
+    <string name="tesla_credentials_client_secret_label">Client-Secret</string>
+    <string name="tesla_credentials_show">Wert anzeigen</string>
+    <string name="tesla_credentials_hide">Wert verbergen</string>
+    <string name="tesla_credentials_save">Speichern</string>
+    <string name="tesla_credentials_remove">Entfernen</string>
+    <string name="tesla_credentials_remove_hint">Beim Entfernen der Zugangsdaten wird auch die Fahrzeugverbindung getrennt.</string>
+    <string name="tesla_credentials_redirect_help">Hinterlege exakt diese Redirect-URI in deiner App-Registrierung auf developer.tesla.com:</string>
+    <string name="tesla_credentials_copy_redirect">Redirect-URI kopieren</string>
+    <string name="tesla_credentials_feedback_saved">Tesla-API-Zugangsdaten gespeichert</string>
+    <string name="tesla_credentials_feedback_removed">Tesla-API-Zugangsdaten entfernt</string>
+    <string name="tesla_credentials_feedback_invalid">Ungültige Eingabe: Client-ID und Client-Secret dürfen nicht leer sein oder Zeilenumbrüche enthalten</string>
+
+    <!-- Tesla Fleet API errors (spoken via Grok and shown in settings) -->
+    <string name="tesla_error_missing_credentials">Tesla-API-Zugangsdaten fehlen — bitte in den App-Einstellungen hinterlegen</string>
+    <string name="tesla_error_unauthorized">Tesla-Login abgelaufen — bitte in den App-Einstellungen erneut einloggen</string>
+    <string name="tesla_error_vehicle_not_found">Fahrzeug nicht gefunden oder offline</string>
+    <string name="tesla_error_command_rejected">Befehl abgelehnt: %1$s</string>
+    <string name="tesla_error_reason_unknown">unbekannter Grund</string>
+    <string name="tesla_error_network">Netzwerkfehler bei der Verbindung zum Fahrzeug</string>
+    <string name="tesla_error_region_discovery">Kein passender Fleet-API-Endpunkt gefunden (EU und NA probiert). Bitte App-Registrierung auf developer.tesla.com prüfen.</string>
+    <string name="tesla_error_unknown">Fahrzeugbefehl fehlgeschlagen (HTTP %1$d)</string>
+    <string name="tesla_error_no_vehicle_configured">Kein Tesla-Fahrzeug konfiguriert — bitte in den App-Einstellungen einloggen</string>
+    <string name="tesla_error_no_destination">Kein Zielort angegeben</string>
+    <string name="tesla_error_login_cancelled">Tesla-Login abgebrochen</string>
+    <string name="tesla_error_state_invalid">Login-Versuch ungültig oder abgelaufen — bitte Tesla-Login erneut starten</string>
+    <string name="tesla_error_token_exchange">Tesla-Token-Exchange fehlgeschlagen</string>
 </resources>

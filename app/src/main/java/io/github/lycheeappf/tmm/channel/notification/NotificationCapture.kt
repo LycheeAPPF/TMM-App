@@ -1,5 +1,6 @@
 package io.github.lycheeappf.tmm.channel.notification
 
+import android.app.Notification
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import io.github.lycheeappf.tmm.core.model.ChannelId
@@ -10,6 +11,7 @@ import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.repository.MappingRepository
 import io.github.lycheeappf.tmm.listener.filter.MessagingStyleExtractor
 import io.github.lycheeappf.tmm.listener.filter.WhitelistFilter
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
 import io.github.lycheeappf.tmm.sms.provider.SmsContentProviderWriter
 import kotlinx.coroutines.sync.Mutex
@@ -27,10 +29,15 @@ import javax.inject.Singleton
  * 2. Body-Extraktion (MessagingStyle / Title-Fallback)
  * 3. **Dedup**: gleicher (conversationKey, bodyHash) wie vorher → skip
  *    (Messenger posten oft mehrere Update-Events für dieselbe Nachricht)
- * 4. roleManager.isDefault()
- * 5. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
- * 6. Mapping allocate/reuse + ActionCache + injectIncoming
- * 7. Bei Insert-Fehler: SendBudget.rollback() ← reservierten Slot wieder freigeben
+ * 4. **Echo-Guard**: Body gleicht einem kürzlich via [NotificationReplyExecutor]
+ *    gesendeten eigenen Reply → skip (Belt-and-Suspenders zum Self-Skip im
+ *    [MessagingStyleExtractor], siehe [SentReplyLedger])
+ * 5. roleManager.isDefault()
+ * 6. **Bluetooth**: gewählter Tesla verbunden? (sonst droppen — vor dem Budget,
+ *    damit „nicht im Auto" das Tageslimit nicht verbraucht). Fail-open ohne Auswahl.
+ * 7. SendBudget.checkAndIncrement()  ← Budget wird hier RESERVIERT
+ * 8. Mapping allocate/reuse + ActionCache + injectIncoming
+ * 9. Bei Insert-Fehler: SendBudget.rollback() ← reservierten Slot wieder freigeben
  */
 @Singleton
 class NotificationCapture @Inject constructor(
@@ -42,8 +49,10 @@ class NotificationCapture @Inject constructor(
     private val smsWriter: SmsContentProviderWriter,
     private val sendBudget: SendBudget,
     private val roleManager: DefaultSmsRoleManager,
+    private val bluetoothConnectionChecker: BluetoothConnectionChecker,
     private val settingsStore: SettingsStore,
-    private val logBuffer: LogBuffer
+    private val logBuffer: LogBuffer,
+    private val sentReplyLedger: SentReplyLedger
 ) {
 
     private val captureMutex = Mutex()
@@ -60,6 +69,13 @@ class NotificationCapture @Inject constructor(
      */
     private val lastBodies = ConcurrentHashMap<String, String>()
 
+    /**
+     * Throttle für die „Tesla nicht verbunden"-Log-Zeile: nur einmal pro
+     * Disconnect-Phase schreiben (zurückgesetzt sobald wieder weitergeleitet wird).
+     * Kein @Volatile nötig — Zugriff ausschließlich serialisiert unter [captureMutex].
+     */
+    private var disconnectedDropLogged = false
+
     suspend fun onPosted(sbn: StatusBarNotification) {
         try {
             captureMutex.withLock { captureInternal(sbn) }
@@ -72,6 +88,13 @@ class NotificationCapture @Inject constructor(
     private suspend fun captureInternal(sbn: StatusBarNotification) {
         if (!whitelist.allow(sbn.packageName)) return
 
+        // Group-Summary-Notifications (z.B. WhatsApps Sammel-Notification bei ≥2 aktiven
+        // Chats) tragen die MessagingStyle der neuesten Konversation, aber KEINE
+        // Reply-Action. Ohne Filter würde (a) ihr Summary-Text als fake Inbound-SMS
+        // injiziert und (b) via allocateOrReuse der notificationKey eines guten
+        // Mappings mit dem action-losen Summary-Key überschrieben → Reply = NO_ACTION.
+        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+
         val msg = messagingStyleExtractor.extract(sbn) ?: return
         if (msg.body.isBlank()) return
 
@@ -81,11 +104,35 @@ class NotificationCapture @Inject constructor(
         val previousBody = lastBodies[msg.conversationKey]
         if (previousBody == msg.body) return
 
+        // Echo-Guard (Belt-and-Suspenders zum Self-Skip im Extractor): Body
+        // gleicht einem soeben via RemoteInput gesendeten eigenen Reply → das
+        // ist der Notification-Re-Post des Messengers, keine neue Nachricht.
+        if (sentReplyLedger.isRecentReply(sbn.packageName, msg.body)) {
+            logBuffer.info(TAG, "Echo drop ${sbn.key} (own reply re-post, ${msg.body.length} chars)")
+            return
+        }
+
         if (!roleManager.isDefault()) {
             Log.w(TAG, "Skipping capture: app is not default SMS app — inject would silent-fail")
             logBuffer.warn(TAG, "Skipped ${sbn.key}: not default SMS app")
             return
         }
+
+        // Nur weiterleiten, wenn das Handy mit dem gewählten Tesla verbunden ist.
+        // VOR dem Budget-Reserve, damit „nicht im Auto" das Tageslimit nicht
+        // verbraucht. Fail-open, solange kein Gerät gewählt/Permission fehlt.
+        if (!bluetoothConnectionChecker.isTeslaConnected()) {
+            Log.i(TAG, "Skipping capture: Tesla not connected — ${sbn.key} dropped")
+            // Nur EINMAL pro Disconnect-Phase ins exportierbare LogBuffer schreiben —
+            // sonst flutet jede gedroppte Notification das (geteilte) Diagnose-Log.
+            if (!disconnectedDropLogged) {
+                logBuffer.info(TAG, "Tesla not connected — dropping notifications until reconnect")
+                disconnectedDropLogged = true
+            }
+            return
+        }
+        // Verbindung steht wieder → nächste Disconnect-Phase darf erneut einmal loggen.
+        disconnectedDropLogged = false
 
         if (!sendBudget.checkAndIncrement()) {
             Log.w(TAG, "Skipping capture: send budget reached for today")

@@ -28,7 +28,8 @@ class NotificationReplyExecutorTest {
     private val rebuilder = mockk<PendingIntentRebuilder>(relaxed = true)
     private val fallback = mockk<FallbackNotifier>(relaxed = true)
     private val logBuffer = mockk<LogBuffer>(relaxed = true)
-    private val executor = NotificationReplyExecutor(context, cache, rebuilder, fallback, logBuffer)
+    private val sentReplyLedger = mockk<SentReplyLedger>(relaxed = true)
+    private val executor = NotificationReplyExecutor(context, cache, rebuilder, fallback, logBuffer, sentReplyLedger)
 
     private val payload = ChannelPayload.Notification(
         sourcePackage = "com.whatsapp",
@@ -110,5 +111,30 @@ class NotificationReplyExecutorTest {
         verify { fallback.post(payload, "hello") }
         coVerify(exactly = 0) { pi.send(any<Context>(), any<Int>(), any()) }
         verify { logBuffer.warn("ReplyExecutor", "reply NO_REMOTE_INPUT notif=${payload.notificationKey}") }
+    }
+
+    @Test
+    fun `successful reply records body in sent-reply ledger`() = runTest {
+        // arrange wie im bestehenden "cache hit" Success-Test (gecachte Action, send() ok)
+        val pi = mockk<PendingIntent>(relaxed = true)
+        val ri = mockk<RemoteInput>(relaxed = true) { every { resultKey } returns "input_text" }
+        val resolved = ResolvedReplyAction(pi, listOf(ri), 0L)
+        every { cache.get(payload.notificationKey) } returns resolved
+        every { pi.send(any<Context>(), any<Int>(), any()) } just Runs
+
+        executor.reply(payload, mappingId = 7L, text = "meine Antwort")
+
+        verify(exactly = 1) { sentReplyLedger.record(payload.sourcePackage, "meine Antwort") }
+    }
+
+    @Test
+    fun `failed reply does not record in sent-reply ledger`() = runTest {
+        // arrange wie im bestehenden NO_ACTION-Test (cache-miss + rebuild-miss)
+        every { cache.get(any()) } returns null
+        every { rebuilder.rebuild(payload) } returns null
+
+        executor.reply(payload, mappingId = 7L, text = "meine Antwort")
+
+        verify(exactly = 0) { sentReplyLedger.record(any(), any()) }
     }
 }

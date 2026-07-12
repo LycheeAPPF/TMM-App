@@ -12,7 +12,9 @@ import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogFileStore
 import io.github.lycheeappf.tmm.core.util.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.util.Locale
 import javax.inject.Qualifier
@@ -33,6 +35,16 @@ object AppModule {
 
     @Provides @Singleton
     fun provideClock(): Clock = SystemClock
+
+    /**
+     * Prozess-langer Scope für Arbeit, die KEINEN UI-Lifecycle hat und nicht
+     * mitsterben darf (z.B. OAuth-Callback-Exchange bei Kaltstart). SupervisorJob:
+     * ein fehlgeschlagener Job reißt die anderen nicht mit.
+     */
+    @Provides @Singleton @ApplicationScope
+    fun provideApplicationScope(
+        @IoDispatcher ioDispatcher: CoroutineDispatcher
+    ): CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     /**
      * Rollierende On-Disk-Persistenz für [io.github.lycheeappf.tmm.core.util.LogBuffer].
@@ -61,3 +73,4 @@ object AppModule {
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class IoDispatcher
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class DefaultDispatcher
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class MainDispatcher
+@Qualifier @Retention(AnnotationRetention.BINARY) annotation class ApplicationScope

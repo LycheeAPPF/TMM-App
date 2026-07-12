@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import io.github.lycheeappf.tmm.MainActivity
 import io.github.lycheeappf.tmm.MfsApplication
 import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.locale.localizedString
@@ -22,9 +23,9 @@ import io.github.lycheeappf.tmm.core.locale.localizedString
  * Required für Default-SMS-App-Role: respondiert auf RESPOND_VIA_MESSAGE
  * (z.B. Quick-Reply vom Telefon-UI beim abgewiesenen Anruf).
  *
- * Wir senden SMS nicht selbst (das ist Aufgabe von Google Messages parallel),
- * postet aber eine Notification, dass der Quick-Reply nicht zugestellt wurde,
- * damit der User die SMS manuell senden kann.
+ * Wir senden SMS nicht selbst automatisch, postet aber eine Notification,
+ * dass der Quick-Reply nicht zugestellt wurde, damit der User die SMS manuell
+ * senden kann — Tap öffnet dafür den eigenen TMM-Compose-Screen vorbefüllt.
  */
 class HeadlessSmsSendService : Service() {
 
@@ -65,12 +66,10 @@ class HeadlessSmsSendService : Service() {
 
         val nm = getSystemService<NotificationManager>() ?: return
 
-        val openIntent = Intent(Intent.ACTION_VIEW).apply {
-            data = if (recipient != null) Uri.parse("smsto:$recipient") else Uri.parse("smsto:")
-            setPackage(GOOGLE_MESSAGES_PKG)
-            if (text != null) putExtra("sms_body", text)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        // Tap öffnet unseren eigenen Compose-Screen (vorbefüllt) — NICHT Google
+        // Messages: solange TMM ROLE_SMS hält, zeigt Google Messages als
+        // Nicht-Default nur sein "Standard-App festlegen"-Gate (Issue-Report C).
+        val openIntent = MainActivity.composeIntent(this, recipient, text)
         val pi = PendingIntent.getActivity(
             this,
             recipient?.hashCode() ?: 0,
@@ -104,7 +103,6 @@ class HeadlessSmsSendService : Service() {
 
     companion object {
         private const val TAG = "HeadlessSmsSendService"
-        private const val GOOGLE_MESSAGES_PKG = "com.google.android.apps.messaging"
         private const val NOTIF_ID = 4002
     }
 }

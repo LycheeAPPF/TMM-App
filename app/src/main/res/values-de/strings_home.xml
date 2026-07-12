@@ -26,6 +26,7 @@
     </plurals>
     <string name="home_status_forwarded_label">Heute weitergeleitet</string>
     <string name="home_status_forwarded_value">%1$d / %2$d</string>
+    <string name="home_status_forwarded_unlimited">%1$d (unbegrenzt)</string>
     <string name="home_status_preflight_label">Netz-Test</string>
     <string name="home_status_preflight_pending">noch nicht ausgeführt</string>
 

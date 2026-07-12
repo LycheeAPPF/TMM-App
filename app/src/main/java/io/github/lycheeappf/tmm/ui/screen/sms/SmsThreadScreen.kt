@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +42,12 @@ import io.github.lycheeappf.tmm.domain.sms.SmsDirection
 import io.github.lycheeappf.tmm.domain.sms.SmsMessage
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
+
+// Konstant über alle Bubbles: Unterstreichung statt eigener Farbe, damit Links
+// auf allen drei Bubble-Containern (surfaceVariant/primaryContainer/errorContainer)
+// lesbar bleiben. Top-level statt lokal in MessageBubble, damit remember() den
+// AnnotatedString nicht bei jeder Recomposition neu aufbaut (siehe unten).
+private val linkStyle = SpanStyle(textDecoration = TextDecoration.Underline, fontWeight = FontWeight.Bold)
 
 @Composable
 fun SmsThreadScreen(
@@ -153,7 +163,7 @@ private fun ReplyBar(
 }
 
 @Composable
-private fun MessageBubble(message: SmsMessage) {
+internal fun MessageBubble(message: SmsMessage) {
     val incoming = message.isIncoming
     val failed = message.direction == SmsDirection.FAILED
     val outboxPending = message.direction == SmsDirection.OUTBOX
@@ -171,18 +181,27 @@ private fun MessageBubble(message: SmsMessage) {
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Surface(
+            modifier = Modifier.align(if (incoming) Alignment.CenterStart else Alignment.CenterEnd),
             color = container,
-            shape = MaterialTheme.shapes.large,
-            // Surface umschließt seinen Inhalt; Start/End-Ausrichtung erzeugt das
-            // typische Chat-Layout (eingehend links, ausgehend rechts).
-            modifier = Modifier.align(if (incoming) Alignment.CenterStart else Alignment.CenterEnd)
+            shape = MaterialTheme.shapes.large
         ) {
-            Column(modifier = Modifier.padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)) {
-                Text(
-                    message.body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = onContainer
-                )
+            Column(
+                modifier = Modifier.padding(horizontal = MfsSpacing.md, vertical = MfsSpacing.sm)
+            ) {
+                // Links im Body tappbar machen (LinkAnnotation.Url → Default-UriHandler).
+                // Unterstreichung statt eigener Farbe: bleibt auf allen drei
+                // Bubble-Containern (surfaceVariant/primaryContainer/errorContainer) lesbar.
+                val body = remember(message.body) { linkifySmsBody(message.body, linkStyle) }
+                // Long-Press startet die native Teiltext-Selektion (z. B. 2FA-Code);
+                // Kopieren übernimmt die System-Toolbar; Links bleiben per Tap öffenbar;
+                // die Meta-Zeile bleibt bewusst unselektierbar.
+                SelectionContainer {
+                    Text(
+                        body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onContainer
+                    )
+                }
                 val failedLabel = stringResource(R.string.sms_thread_meta_failed)
                 val sendingLabel = stringResource(R.string.sms_thread_meta_sending)
                 val meta = buildString {

@@ -304,7 +304,7 @@ class MappingRepositoryImplTest {
     }
 
     @Test
-    fun `sweepStaleAssistantMappings removes non-reserved LLM rows and preserves id 0`() = runTest {
+    fun `sweepStaleAssistantMappings removes non-reserved LLM rows and preserves ids 0 and 1`() = runTest {
         val now = System.currentTimeMillis()
         fun llm(id: Long) = MappingEntity(
             mappingId = id,
@@ -329,9 +329,39 @@ class MappingRepositoryImplTest {
             contactSyncWriter.deleteContact("+88810000003")
             dao.deleteById(3L, ChannelId.LLM.code)
         }
-        // Reservierte id 0 bleibt unangetastet.
+        // Beide reservierte Ids (Grok id 0 + Sprach-Alias id 1) bleiben unangetastet.
         coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
+    }
+
+    @Test
+    fun `sweepStaleAssistantMappings preserves voice alias id 1 when stale LLM row with id 1 exists`() = runTest {
+        // Regressionstest: vor der Einführung von RESERVED_MAPPING_IDS = {0, 1} konnte
+        // nextMappingId() id=1 an eine LLM-Session vergeben. Diese Altlast-Row hat
+        // fakeAddress=+88810000001 — exakt die Sprach-Alias-Adresse. Der Sweep DARF
+        // sie weder löschen (Kontakt) noch aus der DB entfernen.
+        val now = System.currentTimeMillis()
+        val staleVoiceAliasRow = MappingEntity(
+            mappingId = 1L,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+88810000001",
+            conversationKey = "default-assistant-1",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
+            createdAt = now,
+            expiresAt = Long.MAX_VALUE,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(staleVoiceAliasRow)
+
+        val removed = repository.sweepStaleAssistantMappings()
+
+        assertThat(removed).isEqualTo(0)
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
     @Test
@@ -349,7 +379,7 @@ class MappingRepositoryImplTest {
             replyCount = 0,
             replyable = true
         )
-        // Zwei Altlast-Rows neben der reservierten id 0 → beide müssen weg (count == 2).
+        // Zwei Altlast-Rows neben den reservierten Ids 0 und 1 → beide müssen weg (count == 2).
         // Schützt gegen eine break-/return-nach-erstem-Regression, die nur 1 entfernte.
         coEvery { dao.findByChannel(ChannelId.LLM.code) } returns listOf(llm(0L), llm(3L), llm(4L))
         coEvery { dao.deleteById(3L, ChannelId.LLM.code) } returns 1
@@ -362,9 +392,11 @@ class MappingRepositoryImplTest {
         coVerify { contactSyncWriter.deleteContact("+88810000004") }
         coVerify { dao.deleteById(3L, ChannelId.LLM.code) }
         coVerify { dao.deleteById(4L, ChannelId.LLM.code) }
-        // Reservierte id 0 unangetastet.
+        // Reservierte Ids 0 und 1 unangetastet.
         coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
     @Test
@@ -398,5 +430,115 @@ class MappingRepositoryImplTest {
         // Ein Button-Start darf das nicht-ablaufende Mapping nicht auf now+ttl ziehen.
         assertThat(expirySlot.captured).isEqualTo(Long.MAX_VALUE)
         assertThat(mapping.expiresAt).isEqualTo(Long.MAX_VALUE)
+    }
+
+    @Test
+    fun `allocateOrReuse keeps replyable payload when new capture is action-less`() = runTest {
+        val now = System.currentTimeMillis()
+        val replyableJson = PayloadJson.encode(testPayload) // remoteInputResultKey = "input"
+        val existing = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.NOTIFICATION.code,
+            fakeAddress = "+88800000007",
+            conversationKey = "com.whatsapp::anna",
+            payloadJson = replyableJson,
+            createdAt = now - 60_000,
+            expiresAt = now + 60_000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
+        } returns existing
+        val writtenJson = slot<String>()
+        coEvery { dao.refreshOnReuse(any(), any(), payloadJson = capture(writtenJson), any(), any(), any()) } just Runs
+
+        val summaryPayload = ChannelPayload.Notification(
+            sourcePackage = "com.whatsapp",
+            notificationKey = "0|com.whatsapp|1|null|10467",
+            remoteInputResultKey = null,
+            conversationLabel = "WhatsApp",
+            senderDisplayName = "WhatsApp"
+        )
+        val mapping = repository.allocateOrReuse(
+            channel = ChannelId.NOTIFICATION,
+            conversationKey = "com.whatsapp::anna",
+            payload = summaryPayload,
+            ttlMillis = 24L * 60 * 60 * 1000
+        )
+
+        assertThat(writtenJson.captured).isEqualTo(replyableJson)
+        val kept = mapping.payload as ChannelPayload.Notification
+        assertThat(kept.notificationKey).isEqualTo("key-1")
+        assertThat(kept.remoteInputResultKey).isEqualTo("input")
+    }
+
+    @Test
+    fun `allocateOrReuse overwrites payload when new capture is replyable`() = runTest {
+        val now = System.currentTimeMillis()
+        val existing = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.NOTIFICATION.code,
+            fakeAddress = "+88800000007",
+            conversationKey = "com.whatsapp::anna",
+            payloadJson = PayloadJson.encode(testPayload),
+            createdAt = now - 60_000,
+            expiresAt = now + 60_000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
+        } returns existing
+        val writtenJson = slot<String>()
+        coEvery { dao.refreshOnReuse(any(), any(), payloadJson = capture(writtenJson), any(), any(), any()) } just Runs
+
+        val freshPayload = testPayload.copy(notificationKey = "key-2")
+        val mapping = repository.allocateOrReuse(
+            channel = ChannelId.NOTIFICATION,
+            conversationKey = "com.whatsapp::anna",
+            payload = freshPayload,
+            ttlMillis = 24L * 60 * 60 * 1000
+        )
+
+        assertThat(writtenJson.captured).isEqualTo(PayloadJson.encode(freshPayload))
+        assertThat((mapping.payload as ChannelPayload.Notification).notificationKey).isEqualTo("key-2")
+    }
+
+    @Test
+    fun `allocateOrReuse overwrites action-less payload with action-less payload`() = runTest {
+        // Kein Sticky-Fall: bestehendes Payload ist selbst nicht replyable →
+        // neuestes Update gewinnt (frischerer notificationKey hilft dem Rebuilder).
+        val now = System.currentTimeMillis()
+        val actionless = testPayload.copy(remoteInputResultKey = null)
+        val existing = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.NOTIFICATION.code,
+            fakeAddress = "+88800000007",
+            conversationKey = "com.whatsapp::anna",
+            payloadJson = PayloadJson.encode(actionless),
+            createdAt = now - 60_000,
+            expiresAt = now + 60_000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = false
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.NOTIFICATION.code, "com.whatsapp::anna")
+        } returns existing
+        val writtenJson = slot<String>()
+        coEvery { dao.refreshOnReuse(any(), any(), payloadJson = capture(writtenJson), any(), any(), any()) } just Runs
+
+        val newer = actionless.copy(notificationKey = "key-3")
+        repository.allocateOrReuse(
+            channel = ChannelId.NOTIFICATION,
+            conversationKey = "com.whatsapp::anna",
+            payload = newer,
+            ttlMillis = 24L * 60 * 60 * 1000
+        )
+
+        assertThat(writtenJson.captured).isEqualTo(PayloadJson.encode(newer))
     }
 }

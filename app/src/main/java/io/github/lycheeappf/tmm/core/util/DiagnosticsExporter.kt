@@ -11,6 +11,8 @@ import io.github.lycheeappf.tmm.data.db.MappingEntity
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryDao
 import io.github.lycheeappf.tmm.data.db.ReplyHistoryEntity
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
+import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -38,7 +40,9 @@ class DiagnosticsExporter @Inject constructor(
     private val mappingDao: MappingDao,
     private val replyHistoryDao: ReplyHistoryDao,
     private val logFileStore: LogFileStore,
-    private val settingsStore: SettingsStore
+    private val settingsStore: SettingsStore,
+    private val teslaTokenStore: TeslaTokenStore,
+    private val teslaRegionStore: TeslaRegionStore
 ) {
 
     private val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -46,6 +50,13 @@ class DiagnosticsExporter @Inject constructor(
     suspend fun exportToCache(): File {
         val mappings = collectAllMappings()
         val history = collectRecentHistory()
+        val teslaSnapshot = TeslaApiSnapshot(
+            authenticated = teslaTokenStore.isAuthenticated(),
+            // VIN ist PII → maskiert auf die letzten 4 Zeichen (reicht zur Zuordnung).
+            selectedVin = teslaTokenStore.readSelectedVin()?.let { vin -> "…${vin.takeLast(4)}" },
+            fleetApiBaseUrl = teslaRegionStore.readFleetApiBaseUrl(),
+            tokenExpiresAtMs = teslaTokenStore.readExpiresAtMs().takeIf { it > 0L }
+        )
         val payload = DiagnosticsSnapshot(
             generatedAt = System.currentTimeMillis(),
             build = BuildInfo(
@@ -68,6 +79,7 @@ class DiagnosticsExporter @Inject constructor(
             ),
             mappings = mappings.map { it.toSerializable() },
             replyHistory = history.map { it.toSerializable() },
+            teslaApi = teslaSnapshot,
             logs = logFileStore.readTail(MAX_LOG_LINES).map {
                 LogSerializable(ts = it.timestamp, level = it.level.name, tag = it.tag, message = it.message)
             }
@@ -132,7 +144,16 @@ private data class DiagnosticsSnapshot(
     val settings: SettingsSnapshot,
     val mappings: List<MappingSerializable>,
     val replyHistory: List<ReplyHistorySerializable>,
+    val teslaApi: TeslaApiSnapshot,
     val logs: List<LogSerializable>
+)
+
+@Serializable
+private data class TeslaApiSnapshot(
+    val authenticated: Boolean,
+    val selectedVin: String?,
+    val fleetApiBaseUrl: String?,
+    val tokenExpiresAtMs: Long?
 )
 
 @Serializable

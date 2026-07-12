@@ -49,7 +49,17 @@ class MappingRepositoryImpl @Inject constructor(
             // Notification ohne RemoteInput postet (z.B. "delivered"-Update),
             // soll der Chat weiter beantwortbar bleiben.
             val effectiveReplyable = existing.replyable || newReplyable
-            val newPayloadJson = PayloadJson.encode(payload)
+            // Payload-Stickiness (Erweiterung von CX7 aufs Payload selbst): ein
+            // action-loses Update (Group-Summary, "delivered"-Re-Post) darf ein
+            // replyfähiges Payload nicht überschreiben — sonst zeigt
+            // notificationKey auf eine Notification ohne RemoteInput und der
+            // nächste Reply endet in NO_ACTION (Cache-Miss + Rebuild-Miss).
+            val existingPayload = PayloadJson.decodeOrFallback(existing.payloadJson)
+            val newPayloadJson = if (existingPayload.isReplyable && !payload.isReplyable) {
+                existing.payloadJson
+            } else {
+                PayloadJson.encode(payload)
+            }
             // Reuse verlängert die TTL, verkürzt sie aber NIE. Wichtig fürs statische
             // Grok-Mapping (expiresAt = Long.MAX_VALUE): ein Button-Start
             // (`allocateOrReuse`) darf es nicht auf now+ttl herunterziehen und damit
@@ -169,7 +179,7 @@ class MappingRepositoryImpl @Inject constructor(
         var removed = 0
         val llmRows = dao.findByChannel(ChannelId.LLM.code)
         for (entity in llmRows) {
-            if (entity.mappingId == AssistantIdentity.RESERVED_MAPPING_ID) continue
+            if (entity.mappingId in AssistantIdentity.RESERVED_MAPPING_IDS) continue
             // ZUERST Kontakt löschen (fakeAddress als Lookup-Key), DANN die Row.
             coRunCatching { contactSyncWriter.deleteContact(entity.fakeAddress) }
             dao.deleteById(entity.mappingId, ChannelId.LLM.code)

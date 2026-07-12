@@ -15,6 +15,21 @@ Ideen für später, noch nicht umgesetzt.
   Tesla Fleet API `navigation_request` (ungesigntes REST, opt-in BYO-Credentials); Default-Fallback
   = Maps-Link als SMS. Braucht ebenfalls den Tool-Loop. (Reiner Android-Share-Intent an die
   Tesla-App ist nur ein Share-Sheet-Target, kein stiller Weg.)
+- **Tageslimit abschaltbar machen** — Checkbox in den Einstellungen, ob die tägliche
+  Weiterleitungsquote (`SendBudget`) überhaupt aktiv ist (Default: **an**). Beim Ausschalten eine
+  Warnung mit den Risiken anzeigen: ohne Limit kann ein Messenger-Runaway/Spam beliebig viele
+  Fake-SMS in die SMS-Datenbank schreiben, und im unwahrscheinlichen Fall eines Carriers, der die
+  `+888`-Antwort-SMS doch zustellt (statt sie zu verwerfen), entstehen die Reply-Kosten ohne
+  Obergrenze. Umsetzung: `booleanPreferencesKey` in `SettingsStore`, `SendBudget.checkAndIncrement`
+  bei deaktiviertem Limit früh `true` liefern, Toggle-`SettingCard` + Warn-Dialog in
+  `SettingsScreen` (EN + DE).
+- **Nur weiterleiten, wenn mit dem Auto verbunden** — Nachrichten erst dann als Fake-SMS injizieren,
+  wenn das Handy per Bluetooth (MAP/PBAP) mit dem Tesla verbunden ist. Aktuell wird rund um die Uhr
+  injiziert (die Fake-SMS landet nur in der DB und wird beim nächsten MAP-Sync gezogen), was u.a.
+  das Tageslimit unnötig schnell füllt, obwohl man gar nicht im Auto sitzt. Umsetzung: BT-Verbindungs-
+  Check (verbundenes MAP/PBAP-Device via `BluetoothAdapter`/`BluetoothProfile`) als zusätzliches Gate
+  in `NotificationCapture.captureInternal` vor `smsWriter.injectIncoming`; sinnvoll als eigener
+  Toggle, plus Entscheidung, ob bei fehlender Verbindung verworfen oder bis zum Connect gepuffert wird.
 
 ---
 

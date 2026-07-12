@@ -43,6 +43,7 @@
     <!-- Grok assistant: spoken (TTS) status & error messages -->
     <string name="llm_inactive">The assistant is not active. Please confirm consent and your API key in the app.</string>
     <string name="llm_empty_response">Grok didn\'t send a reply.</string>
+    <string name="llm_tool_success_fallback">Done — the request was carried out.</string>
     <string name="llm_conversation_expired">Sorry — the conversation has expired.</string>
     <string name="llm_error_wrapper">Sorry, I can\'t answer that right now — %1$s</string>
     <string name="llm_ratelimit_per_min">Too many requests — please wait a moment.</string>
@@ -96,8 +97,58 @@
     <string name="mms_received_text">This app does not support MMS</string>
     <string name="mms_received_big">An MMS was received but cannot be displayed because \'Tesla Messages Manager\' as the default SMS app does not handle MMS. Set Google Messages as the default temporarily if you want to see the MMS.</string>
     <string name="quickreply_failed_title">Quick reply not delivered</string>
-    <string name="quickreply_failed_text_to">Wanted to send to %1$s — tap to open in Google Messages</string>
-    <string name="quickreply_failed_text_generic">Tap to open the SMS in Google Messages</string>
-    <string name="quickreply_failed_big">The system tried to send a quick-reply SMS via this app (e.g. from the call UI). This app does not send SMS — please open Google Messages and send the text manually.\n\n%1$s</string>
+    <string name="quickreply_failed_text_to">Wanted to send to %1$s — tap to review and send</string>
+    <string name="quickreply_failed_text_generic">Tap to review and send the SMS</string>
+    <string name="quickreply_failed_big">The system tried to send a quick-reply SMS via this app (e.g. from the call UI). Tap to review the text and send it yourself.\n\n%1$s</string>
     <string name="shell_not_full_client_toast">Tesla Messages Manager is not a full SMS client. Install Google Messages to send real SMS.</string>
+
+    <!-- Tesla Fleet API settings -->
+    <string name="tesla_api_section">Tesla Fleet API</string>
+    <string name="tesla_api_card_title">Tesla vehicle connection</string>
+    <string name="tesla_api_card_desc">Log in with your Tesla account to send navigation destinations directly to your vehicle via Grok.</string>
+    <string name="tesla_api_connect">Connect with Tesla</string>
+    <string name="tesla_api_disconnect">Disconnect</string>
+    <string name="tesla_api_status_connected">Connected</string>
+    <string name="tesla_api_status_not_connected">Not connected</string>
+    <string name="tesla_api_status_loading">Loading…</string>
+    <string name="tesla_api_vehicle_selected">Vehicle: %1$s</string>
+    <string name="tesla_api_load_vehicles">Load vehicles</string>
+    <string name="tesla_api_no_vehicle">No vehicle selected</string>
+    <string name="tesla_api_token_expires">Token expires: %1$s</string>
+    <string name="tesla_api_error_prefix">Error: %1$s</string>
+    <string name="tesla_api_missing_credentials">No Tesla API credentials stored. Create your own app at developer.tesla.com and add its Client ID and Client Secret in the app settings to enable vehicle features.</string>
+    <string name="tesla_api_diagnostic_failed">Region diagnostics failed</string>
+
+    <!-- Tesla API credentials (user-provided app registration) -->
+    <string name="tesla_credentials_title">Tesla API credentials</string>
+    <string name="tesla_credentials_desc">Create your own app at developer.tesla.com and enter its Client ID and Client Secret here. Stored encrypted on the device and not included in backups.</string>
+    <string name="tesla_credentials_status_set">Credentials stored</string>
+    <string name="tesla_credentials_status_none">No credentials</string>
+    <string name="tesla_credentials_client_id_label">Client ID</string>
+    <string name="tesla_credentials_client_secret_label">Client Secret</string>
+    <string name="tesla_credentials_show">Show value</string>
+    <string name="tesla_credentials_hide">Hide value</string>
+    <string name="tesla_credentials_save">Save</string>
+    <string name="tesla_credentials_remove">Remove</string>
+    <string name="tesla_credentials_remove_hint">Removing the credentials also disconnects the vehicle.</string>
+    <string name="tesla_credentials_redirect_help">Register exactly this redirect URI in your app registration at developer.tesla.com:</string>
+    <string name="tesla_credentials_copy_redirect">Copy redirect URI</string>
+    <string name="tesla_credentials_feedback_saved">Tesla API credentials saved</string>
+    <string name="tesla_credentials_feedback_removed">Tesla API credentials removed</string>
+    <string name="tesla_credentials_feedback_invalid">Invalid input: Client ID and Client Secret must not be empty or contain line breaks</string>
+
+    <!-- Tesla Fleet API errors (spoken via Grok and shown in settings) -->
+    <string name="tesla_error_missing_credentials">Tesla API credentials are missing — please add them in the app settings</string>
+    <string name="tesla_error_unauthorized">Tesla login expired — please log in again in the app settings</string>
+    <string name="tesla_error_vehicle_not_found">Vehicle not found or offline</string>
+    <string name="tesla_error_command_rejected">Command rejected: %1$s</string>
+    <string name="tesla_error_reason_unknown">unknown reason</string>
+    <string name="tesla_error_network">Network error while contacting the vehicle</string>
+    <string name="tesla_error_region_discovery">No matching Fleet API endpoint found (EU and NA tried). Please check your app registration on developer.tesla.com.</string>
+    <string name="tesla_error_unknown">Vehicle command failed (HTTP %1$d)</string>
+    <string name="tesla_error_no_vehicle_configured">No Tesla vehicle configured — please log in in the app settings</string>
+    <string name="tesla_error_no_destination">No destination provided</string>
+    <string name="tesla_error_login_cancelled">Tesla login cancelled</string>
+    <string name="tesla_error_state_invalid">Login attempt invalid or expired — please restart the Tesla login</string>
+    <string name="tesla_error_token_exchange">Tesla token exchange failed</string>
 </resources>

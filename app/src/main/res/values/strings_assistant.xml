@@ -4,9 +4,19 @@
     <string name="assistant_intro">Your dictations from the Tesla go to Grok (xAI). Your Tesla reads the reply aloud. The conversation context for Grok stays in memory only briefly. Your dictations are additionally logged locally on the device (for diagnostics and re-delivery) and only ever leave it toward xAI.</string>
 
     <string name="assistant_consent_title">Consent</string>
-    <string name="assistant_consent_desc">Mandatory before the first start — confirms that dictations go to xAI.</string>
+    <string name="assistant_consent_desc">Mandatory before the first start — confirms that dictations (and, if location sharing is enabled, your GPS position) go to xAI.</string>
     <string name="assistant_consent_granted">Consent given — start enabled.</string>
     <string name="assistant_consent_not_granted">Not consented yet — start blocked.</string>
+
+    <string name="assistant_location_title">Share location with Grok</string>
+    <string name="assistant_location_desc">Lets Grok answer location-based questions (\"best restaurant nearby\"). When enabled, GPS coordinates are included in each xAI request — same trust boundary as your dictation. Off by default.</string>
+    <string name="assistant_location_action">Grant permission</string>
+    <string name="assistant_location_on">Location sharing on.</string>
+    <string name="assistant_location_off">Location sharing off.</string>
+    <string name="assistant_location_on_no_permission">On — but the location permission is missing.</string>
+    <string name="assistant_location_background_title">In-car use needs \"Allow all the time\"</string>
+    <string name="assistant_location_background_desc">Grok replies are processed in the background while you drive — Android only provides a location then if access is set to \"Allow all the time\". Choose it in the app settings under Permissions &gt; Location.</string>
+    <string name="assistant_location_background_action">Open app settings</string>
 
     <string name="assistant_apikey_title">xAI API key</string>
     <string name="assistant_apikey_desc">Stored encrypted on the device and not included in backups.</string>
@@ -26,6 +36,37 @@
     <string name="assistant_keytest_server">Server/config error</string>
     <string name="assistant_keytest_missing_key">No key configured</string>
     <string name="assistant_keytest_error">Test failed</string>
+
+    <string name="assistant_selftest_title">Grok self-test</string>
+    <string name="assistant_selftest_desc">Tests the whole chain without sitting in the car: API key, GPS position, Tesla account, and one real Grok turn that sends a navigation destination to your Tesla via the Fleet API. The car really receives the destination, and the run costs one xAI request.</string>
+    <string name="assistant_selftest_destination_label">Test destination</string>
+    <string name="assistant_selftest_start">Run self-test</string>
+    <string name="assistant_selftest_running">running…</string>
+    <string name="assistant_selftest_skipped">skipped</string>
+    <string name="assistant_selftest_stage_key">1 · API key</string>
+    <string name="assistant_selftest_stage_position">2 · GPS position</string>
+    <string name="assistant_selftest_stage_tesla">3 · Tesla account</string>
+    <string name="assistant_selftest_stage_nav">4 · Navigation via Grok</string>
+    <string name="assistant_selftest_stage_echo">Position reached Grok</string>
+    <string name="assistant_selftest_position_ok">Fresh fix available</string>
+    <string name="assistant_selftest_position_foreground_only">Fix available — in the car \"Allow all the time\" is required</string>
+    <string name="assistant_selftest_position_disabled">Location sharing is off</string>
+    <string name="assistant_selftest_position_no_permission">Location permission missing</string>
+    <string name="assistant_selftest_position_no_fix">No fresh fix (max. 15 min old)</string>
+    <string name="assistant_selftest_position_detail">%1$s (±%2$d m)</string>
+    <string name="assistant_selftest_tesla_ok">Account connected, vehicle selected</string>
+    <string name="assistant_selftest_tesla_no_credentials">No Tesla account connected</string>
+    <string name="assistant_selftest_tesla_no_vehicle">No vehicle selected</string>
+    <string name="assistant_selftest_nav_ok">Destination sent to the car</string>
+    <string name="assistant_selftest_nav_failed">Navigation failed</string>
+    <string name="assistant_selftest_nav_wrong_address">Wrong destination sent</string>
+    <string name="assistant_selftest_nav_not_called">Grok did not call the navigation tool</string>
+    <string name="assistant_selftest_nav_truncated">Reply hit the token limit before the tool call — run the test again</string>
+    <string name="assistant_selftest_consent_missing">Consent missing — enable it at the top</string>
+    <string name="assistant_selftest_echo_matched">Grok knows the position</string>
+    <string name="assistant_selftest_echo_not_found">Position not found in the reply</string>
+    <string name="assistant_selftest_echo_no_clause">System prompt is empty — the position clause is never appended</string>
+    <string name="assistant_selftest_answer_label">Grok\'s reply: %1$s</string>
 
     <string name="assistant_websearch_title">Allow internet access (web search)</string>
     <string name="assistant_websearch_desc">Lets Grok look things up live on the web via xAI for current questions (weather, news, prices). Your dictated question then goes to xAI\'s search subsystem — the same xAI trust boundary as a normal reply. Costs can add up: xAI bills tokens plus each successful search, and one question can trigger several searches. Off by default.</string>
@@ -56,6 +97,7 @@
 
     <string name="assistant_behavior_title">Grok behavior</string>
     <string name="assistant_behavior_desc">Instructs Grok how it should reply. {driver} is replaced by your name. Keep it short — it goes into every request.</string>
+    <string name="assistant_behavior_reset">Restore default</string>
 
     <string name="assistant_ttl_title">Discard history after</string>
     <string name="assistant_ttl_desc">After this many seconds without input, the conversation history is deleted.</string>

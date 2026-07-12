@@ -117,7 +117,7 @@ class OutboundSmsObserver @Inject constructor(
         handlerThread.quitSafely()
     }
 
-    private suspend fun processChanges() = dispatchMutex.withLock {
+    internal suspend fun processChanges() = dispatchMutex.withLock {
         if (!initialized.get()) {
             initLastSeenInternal()
             initialized.set(true)
@@ -177,15 +177,6 @@ class OutboundSmsObserver @Inject constructor(
     }
 
     private suspend fun processRow(row: OutboundSmsRow) {
-        // DIAGNOSE: Jede outbox-Row im LogBuffer protokollieren, damit der
-        // User in Settings > Diagnostics nachvollziehen kann, was Tesla beim
-        // Reply tatsächlich in den Provider schreibt (ADDRESS-Form, TYPE,
-        // Body-Länge). Body selbst landet nicht im Buffer (Privacy).
-        logBuffer.info(
-            TAG,
-            "Outbox-Row #${row.id} type=${row.type} addr='${addrForLog(row.address)}' body=${row.body.length}ch"
-        )
-
         if (preFlightCoordinator.isReservedForPreflight(row.address)) {
             logBuffer.info(TAG, "Row ${row.id}: preflight reserved → skip")
             return
@@ -213,14 +204,27 @@ class OutboundSmsObserver @Inject constructor(
         }
 
         val previousType = dispatchedRowStates[row.id]
-
-        // Identische Notification (gleiche rowId, gleicher TYPE) → schon verarbeitet
+        // Identische Row (gleiche rowId, gleicher TYPE) → schon verarbeitet.
+        // MUSS vor dem Diagnose-Log stehen: der 50-Row-Lookback liest alte Rows
+        // bei JEDEM content://sms-Change erneut — ohne den Early-Return spammen
+        // stale FAILED-Rows das exportierte Log (396 Duplikate im Juli-Export).
         if (previousType == row.type) return
+
+        // DIAGNOSE: erste Sichtung (oder Status-Wechsel) einer Row protokollieren,
+        // damit der User in Settings > Diagnostics nachvollziehen kann, was Tesla
+        // beim Reply in den Provider schreibt. Body bleibt draußen (Privacy).
+        logBuffer.info(
+            TAG,
+            "Outbox-Row #${row.id} type=${row.type} addr='${addrForLog(row.address)}' body=${row.body.length}ch"
+        )
 
         val cls = classifier.classify(row)
         if (cls is OutboundSmsClassifier.Classification.NotOurs) {
-            // user-initiated SMS via Google Messages → nicht anfassen
+            // user-initiated SMS via Google Messages → nicht anfassen. Aber im
+            // State-Tracking vermerken, sonst wird die Row bei jedem Lookback-Pass
+            // erneut klassifiziert und geloggt.
             logBuffer.info(TAG, "Row ${row.id} ('${addrForLog(row.address)}') → NotOurs, kein Dispatch")
+            dispatchedRowStates[row.id] = row.type
             return
         }
         cls as OutboundSmsClassifier.Classification.TeslaReply

@@ -1,12 +1,15 @@
 package io.github.lycheeappf.tmm.ui.screen.sms
 
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.domain.sms.SmsSendResult
 import io.github.lycheeappf.tmm.domain.sms.SmsSender
+import io.github.lycheeappf.tmm.ui.navigation.ARG_BODY
+import io.github.lycheeappf.tmm.ui.navigation.ARG_RECIPIENT
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,10 +29,16 @@ data class SmsComposeUiState(
 @HiltViewModel
 class SmsComposeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val sender: SmsSender
+    private val sender: SmsSender,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SmsComposeUiState())
+    private val _uiState = MutableStateFlow(
+        SmsComposeUiState(
+            recipient = savedStateHandle.get<String>(ARG_RECIPIENT) ?: "",
+            body = savedStateHandle.get<String>(ARG_BODY) ?: ""
+        )
+    )
     val uiState: StateFlow<SmsComposeUiState> = _uiState.asStateFlow()
 
     fun setRecipient(value: String) = _uiState.update { it.copy(recipient = value) }

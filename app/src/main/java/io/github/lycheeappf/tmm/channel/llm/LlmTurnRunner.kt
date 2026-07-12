@@ -1,14 +1,22 @@
 package io.github.lycheeappf.tmm.channel.llm
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProvider
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
+import io.github.lycheeappf.tmm.channel.llm.provider.LlmResponse
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmTurn
 import io.github.lycheeappf.tmm.channel.llm.provider.TokenUsage
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolCallExecutor
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,12 +39,15 @@ import javax.inject.Singleton
  */
 @Singleton
 class LlmTurnRunner @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val store: LlmConversationStore,
     private val provider: LlmProvider,
     private val prefs: AssistantPreferencesStore,
     private val rateLimiter: LlmRateLimiter,
     private val formatter: LlmResponseFormatter,
     private val toolRegistry: ToolRegistry,
+    private val toolCallExecutor: ToolCallExecutor,
+    private val locationProvider: LocationProvider,
     private val logBuffer: LogBuffer,
     private val clock: Clock
 ) {
@@ -73,9 +84,13 @@ class LlmTurnRunner @Inject constructor(
             // sonst "du kannst suchen" sagen, ohne die Tools mitzuschicken — oder umgekehrt).
             val webSearch = prefs.webSearchEnabled()
             val xSearch = prefs.xSearchEnabled()
+            // Standort nur bei aktivem Opt-in ÜBERHAUPT abfragen; die Permission
+            // prüft der Provider selbst (fehlend/stale → null, Turn läuft ohne
+            // Standort-Klausel weiter).
+            val location = if (prefs.locationContextEnabled()) locationProvider.lastKnownLocation() else null
             val req = LlmRequest(
                 model = model,
-                systemPrompt = prefs.systemPrompt(webSearch, xSearch),
+                systemPrompt = prefs.systemPrompt(webSearch, xSearch, location),
                 history = historyBefore,
                 userMessage = userText,
                 tools = toolRegistry.activeSchemas(),
@@ -84,7 +99,7 @@ class LlmTurnRunner @Inject constructor(
                 webSearch = webSearch,
                 xSearch = xSearch
             )
-            val response = try {
+            val initialResponse = try {
                 provider.complete(req)
             } catch (e: LlmProviderError) {
                 // Nur Typ-Name loggen — Provider-Error-Messages können Body-Fragmente
@@ -104,11 +119,39 @@ class LlmTurnRunner @Inject constructor(
                 return@withLock TurnResult.ProviderFailed(LlmProviderError.Network(e))
             }
 
-            val cleaned = formatter.format(response.content.orEmpty())
-            if (cleaned.isBlank()) {
-                logBuffer.warn(TAG, "Empty response from provider (resp=${response.responseId})")
+            // Tool-Execution-Loop (geteilt mit dem Grok-Selbsttest, siehe ToolCallExecutor).
+            val loop = try {
+                toolCallExecutor.run(req, initialResponse) { provider.complete(it) }
+            } catch (e: LlmProviderError) {
+                logBuffer.warn(TAG, "Provider error in tool loop: ${e::class.simpleName}")
                 rateLimiter.refund(mappingId)
-                return@withLock TurnResult.EmptyResponse
+                return@withLock TurnResult.ProviderFailed(e)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                logBuffer.error(TAG, "Unexpected exception in tool loop: ${e::class.simpleName}")
+                rateLimiter.refund(mappingId)
+                return@withLock TurnResult.ProviderFailed(LlmProviderError.Network(e))
+            }
+            val response: LlmResponse = loop.finalResponse
+            val anyToolSucceeded = loop.steps.any { it.result is ToolInvocationResult.Success }
+
+            var cleaned = formatter.format(response.content.orEmpty())
+            if (cleaned.isBlank()) {
+                if (anyToolSucceeded) {
+                    // Belt-and-braces zu C1: bleibt das Modell nach einem erfolgreichen
+                    // Tool-Call stumm, wird eine lokalisierte Kurz-Bestätigung vorgelesen
+                    // statt des Fehlerpfads. Jede Tool-Aktion (z.B. Navigation) wird so
+                    // hörbar angekündigt — auch bei stiller Prompt-Injection.
+                    logBuffer.info(
+                        TAG,
+                        "Blank reply after successful tool call — injecting localized confirmation"
+                    )
+                    cleaned = context.localizedString(R.string.llm_tool_success_fallback)
+                } else {
+                    logBuffer.warn(TAG, "Empty response from provider (resp=${response.responseId})")
+                    rateLimiter.refund(mappingId)
+                    return@withLock TurnResult.EmptyResponse
+                }
             }
 
             // Persist nur jetzt — bei Provider-Fehler oder Empty bleibt history sauber.

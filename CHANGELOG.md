@@ -4,6 +4,126 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-07-12 — "The Big One"
+
+First stable release. It brings the entire 0.7.x/0.8.x development line to a stable
+footing on top of the rc1/rc2 message-bridge hardening. Highlights since v0.6.0:
+
+### Added
+- **In-car navigation via Grok.** Dictate a destination and Grok sends it to your Tesla
+  through the official **Fleet API** (`TeslaNavigateTool`), confirming the target out loud.
+- **Bring-your-own credentials.** You provide your own Tesla Fleet API and xAI keys in
+  Settings; both are AES-256-GCM encrypted with an AndroidKeyStore master key — nothing is
+  ever bundled with the app.
+- **Grok location context (opt-in).** With explicit consent your current position is shared
+  with Grok for location-aware answers; off by default, behind a proper permission flow.
+- **Forward only while connected to your Tesla + toggleable daily limit** (0.7.0/0.7.1):
+  pick your car once; messages inject only while it's connected; the daily cap can be off.
+- **Grok in-app self-test.** A staged diagnostics card (key → position → Tesla → end-to-end)
+  verifies the assistant without driving, in EN + DE.
+
+### Changed
+- **Messenger-bridge hardening** (rc1/rc2): group-summary notifications filtered, own sent
+  replies no longer read back, action-less updates can't clobber a replyable mapping,
+  quick-reply fallback opens TMM's own composer, incoming-SMS notifications show the contact
+  name, long-press starts native text selection with copy + tappable links.
+
+### Security / Privacy
+- Diagnostics export masks the VIN to its last 4 chars and strips destination, GPS and VIN
+  from Fleet API logging; message bodies and dictations are never logged.
+
+## [1.0.0-rc2] — 2026-07-11
+
+Second release candidate: two field reports from rc1 testing.
+
+### Fixed
+- **Incoming-SMS notifications now show the contact's name** instead of the raw phone
+  number, using the same contact lookup as the in-app conversation list (falls back to
+  the number without contacts permission or without a match).
+
+### Changed
+- **Long-pressing a message bubble now starts text selection** — select any part of a
+  message (e.g. a 2FA code) directly in the bubble and copy it via the system toolbar;
+  previously long-press always copied the entire message.
+
+## [1.0.0-rc1] — 2026-07-10
+
+Release candidate for 1.0. Fixes the field-reported WhatsApp bridge failures
+(root-cause analysis in `issue-reports/analyse-report-2026-07-10.md`).
+
+### Fixed
+- **1:1 replies no longer fail with "Reply not delivered".** WhatsApp's group-summary
+  notification (which has no reply action) was captured like a message and overwrote the
+  mapping's notification pointer; it is now filtered out, and an action-less update can
+  no longer overwrite a replyable mapping payload.
+- **Your own replies are no longer read back as new messages.** The messenger's
+  notification re-post containing your just-sent reply is recognized (self-authored
+  message skip + short-lived sent-reply ledger) and dropped instead of injected.
+- **The quick-reply fallback notification now opens TMM's own compose screen** prefilled
+  with recipient and text, instead of Google Messages (which only showed its
+  "set default SMS app" prompt while TMM holds the SMS role).
+- **Diagnostics log spam:** stale real-SMS rows are no longer re-logged on every
+  SMS-provider change, and the reply-rebuilder log no longer claims "found-action"
+  before actually checking for a reply action.
+
+### Added
+- **Links in SMS messages are now tappable** in the app's conversation view.
+
+## [0.7.1] — 2026-06-24
+
+Robustness pass on the v0.7.0 Bluetooth/budget features, from a multi-agent review.
+
+### Added
+- **The Grok assistant now respects the Tesla-connection gate too.** A dictated question is
+  only answered while the phone is connected to your selected Tesla — the check runs *before*
+  the xAI call, so leaving the car between dictation and answer no longer spends tokens or
+  injects a stray reply. (The "start AI chat" button stays car-independent for desk testing.)
+- **Stale-device warning.** If your selected Tesla is no longer paired (unpaired, reset), the
+  Tesla-connection card now shows a warning instead of silently dropping every message.
+- **"Open app settings" fallback** when the Bluetooth permission is permanently denied, so the
+  Grant button is never a dead end (both Settings and the setup guide).
+- **First unit tests for the connection checker** (`BluetoothConnectionCheckerTest`) covering the
+  fail-open contract, plus a Grok "not connected → skip" test.
+
+### Changed
+- **More reliable connection detection.** In addition to the HFP/A2DP audio profiles, the app now
+  tracks Bluetooth ACL connect/disconnect events — so a Tesla that's connected for messages but
+  not currently the audio sink is still recognised as "connected" (fewer false drops).
+- The device picker now **pre-selects your current device** and shows a brief loading state instead
+  of flashing "no paired devices".
+- Your selected device can always be **removed**, even if the Bluetooth permission was later revoked.
+- The Home screen shows **"N (unlimited)"** for forwarded-today when the daily limit is switched off,
+  instead of a misleading "N / limit".
+- "Restart setup" now leaves a **clean back stack** (no duplicate Home, back exits properly).
+- The disconnected-drop diagnostic log is written **once per disconnect**, not per message.
+
+## [0.7.0] — 2026-06-24
+
+### Added
+- **Forward only while connected to your Tesla.** A new **Settings → Forwarding → "Tesla
+  connection"** card lets you pick your car once from the paired Bluetooth devices. From
+  then on, messenger notifications are injected as fake SMS **only while that device is
+  connected** — so being away from the car no longer fills the daily limit with messages
+  you can't hear anyway. When not connected, the message is dropped (no buffering). The
+  check runs before the daily-limit reserve, so a disconnected phone never burns budget.
+  Requires the **BLUETOOTH_CONNECT** permission (requested from the same card). Until a
+  device is selected — or if the permission isn't granted — forwarding behaves as before
+  (24/7), so nothing silently stops working before you've set it up. The same picker also
+  appears as an optional step in the **setup guide**.
+- **Developer settings → "Restart setup".** A button in the developer section reopens the
+  setup guide so you can review the steps after first-run; your existing setup is kept
+  (the onboarding flag is not reset).
+- **Daily limit can be switched off.** The **Settings → Forwarding → "Daily limit"** card
+  now has an on/off switch (**on by default**). Turning it off shows a warning explaining
+  the risks — without a cap, a misbehaving messenger could write unlimited fake SMS into
+  the message database, and in the unlikely event a carrier delivers the `+888` reply SMS,
+  reply costs would be uncapped. While off, the limit slider and today's count are hidden.
+
+### Changed
+- The inbound capture pipeline (`NotificationCapture`) gained a Bluetooth-connection gate
+  between the default-SMS-role check and the send-budget reserve. `SendBudget` is now a
+  no-op (always allows, never counts) when the daily limit is switched off.
+
 ## [0.6.0] — 2026-06-24
 
 ### Added

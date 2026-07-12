@@ -3,6 +3,7 @@ package io.github.lycheeappf.tmm.listener.filter
 import android.app.Notification
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -139,4 +140,77 @@ class MessagingStyleExtractorTest {
             .setContentTitle(title)
             .setContentText(text)
             .build()
+
+    private fun messagingStyleNotif(style: NotificationCompat.MessagingStyle): Notification =
+        NotificationCompat.Builder(context, "ch")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(style)
+            .build()
+
+    @Test
+    fun `skips trailing self message with null person and returns newest incoming`() {
+        val me = Person.Builder().setName("Ich").setKey("me-key").build()
+        val anna = Person.Builder().setName("Anna").setKey("anna-key").build()
+        val style = NotificationCompat.MessagingStyle(me)
+            .addMessage("Hallo!", 1L, anna)
+            .addMessage("meine eigene Antwort", 2L, null as Person?)
+
+        val result = extractor.extractFromNotification("com.whatsapp", messagingStyleNotif(style))
+
+        assertThat(result).isNotNull()
+        assertThat(result!!.body).isEqualTo("Hallo!")
+        assertThat(result.senderName).isEqualTo("Anna")
+    }
+
+    @Test
+    fun `skips trailing self message whose person equals style user by key`() {
+        val me = Person.Builder().setName("Ich").setKey("me-key").build()
+        val anna = Person.Builder().setName("Anna").setKey("anna-key").build()
+        val style = NotificationCompat.MessagingStyle(me)
+            .addMessage("Hallo!", 1L, anna)
+            .addMessage("meine eigene Antwort", 2L, me)
+
+        val result = extractor.extractFromNotification("com.whatsapp", messagingStyleNotif(style))
+
+        assertThat(result).isNotNull()
+        assertThat(result!!.body).isEqualTo("Hallo!")
+    }
+
+    @Test
+    fun `skips trailing self message whose person matches style user by name when keys absent`() {
+        val me = Person.Builder().setName("Ich").build()
+        val anna = Person.Builder().setName("Anna").build()
+        val style = NotificationCompat.MessagingStyle(me)
+            .addMessage("Hallo!", 1L, anna)
+            .addMessage("meine eigene Antwort", 2L, Person.Builder().setName("Ich").build())
+
+        val result = extractor.extractFromNotification("com.whatsapp", messagingStyleNotif(style))
+
+        assertThat(result).isNotNull()
+        assertThat(result!!.body).isEqualTo("Hallo!")
+    }
+
+    @Test
+    fun `returns null when all messages are self authored`() {
+        val me = Person.Builder().setName("Ich").setKey("me-key").build()
+        val style = NotificationCompat.MessagingStyle(me)
+            .addMessage("nur ich", 1L, null as Person?)
+            .addMessage("schon wieder ich", 2L, me)
+
+        assertThat(extractor.extractFromNotification("com.whatsapp", messagingStyleNotif(style))).isNull()
+    }
+
+    @Test
+    fun `incoming message from other person is still extracted normally`() {
+        val me = Person.Builder().setName("Ich").setKey("me-key").build()
+        val anna = Person.Builder().setName("Anna").setKey("anna-key").build()
+        val style = NotificationCompat.MessagingStyle(me)
+            .addMessage("Hallo!", 1L, anna)
+
+        val result = extractor.extractFromNotification("com.whatsapp", messagingStyleNotif(style))
+
+        assertThat(result).isNotNull()
+        assertThat(result!!.body).isEqualTo("Hallo!")
+        assertThat(result.senderName).isEqualTo("Anna")
+    }
 }

@@ -1,5 +1,6 @@
 package io.github.lycheeappf.tmm.channel.llm.provider.grok
 
+import io.github.lycheeappf.tmm.channel.llm.provider.FINISH_REASON_INCOMPLETE
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProvider
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
@@ -64,7 +65,18 @@ class GrokProvider @Inject constructor(
             req.history.forEach { turn ->
                 add(ResponsesInputItem(role = turn.role, content = turn.content))
             }
+            // User-Turn gehört zum ersten API-Call und steht immer vor den Tool-Items.
             add(ResponsesInputItem(role = "user", content = req.userMessage))
+            // Zwischenstände des Tool-Execution-Loops (leer beim ersten Call):
+            // function_call-Block des Modells, dann unsere function_call_output-Ergebnisse.
+            req.inFlightToolCalls.forEach { call ->
+                add(ResponsesInputItem(type = "function_call", callId = call.id,
+                    name = call.name, arguments = call.argumentsJson))
+            }
+            req.inFlightToolResults.forEach { result ->
+                add(ResponsesInputItem(type = "function_call_output",
+                    callId = result.callId, output = result.output))
+            }
         }
         // Client-Function-Tools (V2 leer) + server-seitige Agent-Tools (web/x search).
         val tools = buildList {
@@ -82,11 +94,20 @@ class GrokProvider @Inject constructor(
             temperature = req.temperature.toDouble().takeIf { it >= 0.0 },
             store = false,
             tools = tools,
+            // tool_choice ohne tools wäre ein API-Fehler — nur mit Tool-Liste senden.
+            toolChoice = req.toolChoice?.takeIf { tools != null },
             include = include
         )
     }
 
     private fun mapResponse(payload: ResponsesResponse): LlmResponse {
+        logBuffer.info(
+            TAG,
+            "Response status=${payload.status ?: "-"} items=${payload.output.map { it.type }} " +
+                "outTokens=${payload.usage?.outputTokens ?: -1} " +
+                "reasoningTokens=${payload.usage?.outputTokensDetails?.reasoningTokens ?: -1}" +
+                (payload.incompleteDetails?.reason?.let { " incomplete=$it" } ?: "")
+        )
         val content = extractText(payload)
         val tools = payload.output
             .filter { it.type == "function_call" }
@@ -97,7 +118,14 @@ class GrokProvider @Inject constructor(
                     argumentsJson = it.arguments.orEmpty()
                 )
             }
-        val finish = payload.output.firstOrNull { it.type == "message" }?.status ?: "stop"
+        // Top-Level-Status VOR dem message-Item-Status prüfen: eine incomplete
+        // Response (Reasoning hat das Token-Budget aufgebraucht) hat oft GAR KEIN
+        // message-Item — der alte Fallback fabrizierte dann ein irreführendes "stop".
+        val finish = if (payload.status == FINISH_REASON_INCOMPLETE) {
+            FINISH_REASON_INCOMPLETE
+        } else {
+            payload.output.firstOrNull { it.type == "message" }?.status ?: "stop"
+        }
         val usage = payload.usage?.let {
             TokenUsage(
                 inputTokens = it.inputTokens ?: 0,

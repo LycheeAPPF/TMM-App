@@ -15,11 +15,33 @@
 
     <string name="settings_budget_title">Tageslimit</string>
     <string name="settings_budget_desc">Maximale Anzahl weitergeleiteter Nachrichten pro Tag — ein Sicherheitsnetz.</string>
+    <string name="settings_budget_enabled_label">Tageslimit aktiv</string>
     <plurals name="settings_budget_messages">
         <item quantity="one">%1$d Nachricht</item>
         <item quantity="other">%1$d Nachrichten</item>
     </plurals>
     <string name="settings_budget_today">heute: %1$d</string>
+    <string name="settings_budget_disabled_hint">Limit aus — jede Nachricht wird ohne Tagesobergrenze weitergeleitet.</string>
+    <string name="settings_budget_dialog_title">Tageslimit ausschalten?</string>
+    <string name="settings_budget_dialog_text">Ohne Limit könnte ein außer Kontrolle geratener Messenger beliebig viele Fake-SMS in deine Nachrichten-Datenbank schreiben.\n\nUnd im unwahrscheinlichen Fall, dass dein Mobilfunkanbieter die +888-Antwort-SMS doch zustellt statt sie zu verwerfen, hätten die Antwort-Kosten keine Obergrenze.</string>
+    <string name="settings_budget_dialog_confirm">Ausschalten</string>
+    <string name="settings_budget_dialog_cancel">Limit behalten</string>
+
+    <string name="settings_tesla_conn_title">Tesla-Verbindung</string>
+    <string name="settings_tesla_conn_desc">Nachrichten werden nur weitergeleitet, während dein Tesla per Bluetooth verbunden ist.</string>
+    <string name="settings_tesla_conn_selected">Ausgewählt: %1$s</string>
+    <string name="settings_tesla_conn_none">Kein Gerät ausgewählt — Nachrichten werden rund um die Uhr weitergeleitet.</string>
+    <string name="settings_tesla_conn_missing">Gewähltes Gerät ist nicht mehr gekoppelt — neu auswählen oder entfernen, sonst wird nichts weitergeleitet.</string>
+    <string name="settings_tesla_conn_select">Gerät auswählen</string>
+    <string name="settings_tesla_conn_change">Gerät ändern</string>
+    <string name="settings_tesla_conn_clear">Entfernen</string>
+    <string name="settings_tesla_conn_perm_missing">Bluetooth-Berechtigung nötig, um die Verbindung zu erkennen.</string>
+    <string name="settings_tesla_conn_grant">Bluetooth-Berechtigung erteilen</string>
+    <string name="settings_tesla_conn_open_settings">App-Einstellungen öffnen</string>
+    <string name="settings_tesla_conn_dialog_title">Wähle deinen Tesla</string>
+    <string name="settings_tesla_conn_dialog_empty">Keine gekoppelten Bluetooth-Geräte gefunden. Koppele deinen Tesla zuerst in den System-Bluetooth-Einstellungen.</string>
+    <string name="settings_tesla_conn_dialog_loading">Gekoppelte Geräte werden geladen…</string>
+    <string name="settings_tesla_conn_dialog_cancel">Abbrechen</string>
 
     <string name="settings_section_apps">Apps</string>
     <string name="settings_whitelist_title">Freigegebene Apps</string>
@@ -64,6 +86,10 @@
     <string name="settings_diagnostics_item_subtitle">Mappings, Reply-Verlauf, Live-Log, Sender-Test</string>
     <string name="settings_channels_item_title">Channels</string>
     <string name="settings_channels_item_subtitle">Notification (V1) + Grok-LLM (V2)</string>
+
+    <string name="settings_restart_setup_title">Setup erneut starten</string>
+    <string name="settings_restart_setup_desc">Öffnet die Einrichtung erneut, um die Schritte anzusehen. Deine bestehende Einrichtung bleibt erhalten — nichts wird zurückgesetzt.</string>
+    <string name="settings_restart_setup_button">Setup öffnen</string>
 
     <string name="settings_devmode_title">Entwicklermodus</string>
     <string name="settings_devmode_desc">Blendet Diagnose, Channels und die Experten-Einstellungen ein. Ausschalten versteckt sie wieder; das Versions-Label unten bleibt der Wieder-Einstieg.</string>

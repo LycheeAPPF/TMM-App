@@ -14,6 +14,7 @@ import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelMapping
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
 import io.github.lycheeappf.tmm.domain.reply.ReplyResult
+import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.sms.provider.SmsContentProviderWriter
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -40,6 +41,7 @@ class LlmChannelTest {
     private val prefs: AssistantPreferencesStore = mockk()
     private val apiKeyStore: ApiKeyStore = mockk()
     private val logBuffer: LogBuffer = mockk(relaxed = true)
+    private val btChecker: BluetoothConnectionChecker = mockk()
     private lateinit var channel: LlmChannel
 
     private val llmMapping = ChannelMapping(
@@ -60,12 +62,13 @@ class LlmChannelTest {
     )
 
     @Before fun setup() {
-        channel = LlmChannel(turnRunner, smsWriter, sendBudget, prefs, apiKeyStore, logBuffer, context)
+        channel = LlmChannel(turnRunner, smsWriter, sendBudget, prefs, apiKeyStore, logBuffer, btChecker, context)
         coEvery { sendBudget.checkAndIncrement() } returns true
         coEvery { sendBudget.rollback() } returns Unit
-        // Default: Assistent aktiv (Consent gegeben + Key gesetzt).
+        // Default: Assistent aktiv (Consent gegeben + Key gesetzt) + Tesla verbunden.
         coEvery { prefs.isPrivacyConsentGiven() } returns true
         coEvery { apiKeyStore.read() } returns "xai-key"
+        coEvery { btChecker.isTeslaConnected() } returns true
     }
 
     @Test fun `handleTeslaReply with blank text returns Ignored without provider call`() = runTest {
@@ -106,6 +109,14 @@ class LlmChannelTest {
         coEvery { apiKeyStore.read() } returns null
         val result = channel.handleTeslaReply(llmMapping, "Frage")
         assertThat(result).isInstanceOf(ReplyResult.ProviderError::class.java)
+        coVerify(exactly = 0) { turnRunner.run(any(), any()) }
+    }
+
+    @Test fun `handleTeslaReply skips turn when Tesla not connected`() = runTest {
+        coEvery { btChecker.isTeslaConnected() } returns false
+        val result = channel.handleTeslaReply(llmMapping, "Frage")
+        // Ignored → ReplyDispatcher überspringt das Follow-up-Inject; kein xAI-Call.
+        assertThat(result).isEqualTo(ReplyResult.Ignored)
         coVerify(exactly = 0) { turnRunner.run(any(), any()) }
     }
 

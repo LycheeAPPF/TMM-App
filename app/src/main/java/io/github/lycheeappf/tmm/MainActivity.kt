@@ -1,13 +1,18 @@
 package io.github.lycheeappf.tmm
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
@@ -22,6 +27,8 @@ import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.ui.navigation.MfsDestination
 import io.github.lycheeappf.tmm.ui.navigation.MfsNavHost
+import io.github.lycheeappf.tmm.ui.navigation.smsComposeRoute
+import io.github.lycheeappf.tmm.ui.navigation.smsThreadRoute
 import io.github.lycheeappf.tmm.ui.theme.MfsTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,14 +42,87 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var teslaAuthManager: TeslaAuthManager
+    private val rootViewModel: RootViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Launch-Intent NUR beim echten Erststart verarbeiten: bei einer Recreation
+        // (Rotation, Prozess-Restore — savedInstanceState != null) liefert getIntent()
+        // denselben, bereits konsumierten Intent erneut. Ein Replay würde den
+        // OAuth-Callback ein zweites Mal einlösen (State-Mismatch → transienter
+        // Error-State) bzw. SMS-Deep-Links doppelt navigieren.
+        if (savedInstanceState == null) {
+            handleLaunchIntent(intent)
+        }
         setContent {
             MfsTheme {
                 MfsApp()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Neuen Intent als aktuellen setzen, damit eine spätere Recreation nicht
+        // wieder den alten Launch-Intent sieht — dann einmalig verarbeiten.
+        setIntent(intent)
+        handleLaunchIntent(intent)
+    }
+
+    /**
+     * Verarbeitet einen Launch-/New-Intent genau EINMAL — sowohl den Tesla-OAuth-
+     * Callback (`intent.data`) als auch die SMS-Deep-Link-Extras. Konsumierte
+     * One-Shot-Semantik auf UI-Seite über das post/consume-Muster des [RootViewModel].
+     */
+    private fun handleLaunchIntent(intent: Intent?) {
+        if (intent == null) return
+        // Tesla-OAuth-Redirect: io.github.lycheeappf.tmm://tesla/callback?code=...&state=...
+        // Der Manager tauscht den Code eager in einem application-scoped Coroutine ein —
+        // es muss kein ViewModel/Screen leben, die UI beobachtet nur den Auth-State-Flow.
+        intent.data?.let { teslaAuthManager.handleCallback(it) }
+        handleSmsIntent(intent)
+    }
+
+    private fun handleSmsIntent(intent: Intent) {
+        when {
+            intent.hasExtra(EXTRA_THREAD_ID) -> {
+                val threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
+                rootViewModel.postThreadRequest(threadId)
+            }
+            intent.hasExtra(EXTRA_COMPOSE_RECIPIENT) -> {
+                // Exportierte Activity: Extras sind nicht vertrauenswürdig — Länge hart
+                // kappen und strikt als Plain-Text behandeln (nur Textfeld-Vorbelegung).
+                rootViewModel.postComposeRequest(
+                    recipient = intent.getStringExtra(EXTRA_COMPOSE_RECIPIENT)
+                        .orEmpty().take(MAX_EXTRA_LENGTH),
+                    body = intent.getStringExtra(EXTRA_COMPOSE_BODY)
+                        .orEmpty().take(MAX_EXTRA_LENGTH)
+                )
+            }
+        }
+    }
+
+    companion object {
+        private const val EXTRA_COMPOSE_RECIPIENT = "compose_recipient"
+        private const val EXTRA_COMPOSE_BODY = "compose_body"
+        const val EXTRA_THREAD_ID = "sms_thread_id"
+
+        /** Obergrenze für nicht vertrauenswürdige String-Extras der exportierten Activity. */
+        private const val MAX_EXTRA_LENGTH = 2000
+
+        fun composeIntent(context: Context, recipient: String?, body: String?): Intent =
+            Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_COMPOSE_RECIPIENT, recipient ?: "")
+                if (body != null) putExtra(EXTRA_COMPOSE_BODY, body)
+            }
+
+        fun threadIntent(context: Context, threadId: Long): Intent =
+            Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_THREAD_ID, threadId)
+            }
     }
 }
 
@@ -50,16 +130,33 @@ class MainActivity : ComponentActivity() {
 private fun MfsApp(rootViewModel: RootViewModel = hiltViewModel()) {
     val startDestination by rootViewModel.startDestination.collectAsStateWithLifecycle()
     val developerMode by rootViewModel.developerMode.collectAsStateWithLifecycle()
+    val composeRequest by rootViewModel.composeRequest.collectAsStateWithLifecycle()
+    val threadRequest by rootViewModel.threadRequest.collectAsStateWithLifecycle()
     val navController = rememberNavController()
 
-    // Kein äusseres Scaffold mehr — jeder Screen bringt via MfsScaffold seine
-    // eigene TopAppBar (+ optional die geteilte BottomBar) mit.
     val dest = startDestination
     if (dest == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
     } else {
+        LaunchedEffect(composeRequest) {
+            composeRequest?.let { (recipient, body) ->
+                navController.navigate(
+                    smsComposeRoute(
+                        recipient.takeIf { it.isNotEmpty() },
+                        body.takeIf { it.isNotEmpty() }
+                    )
+                )
+                rootViewModel.consumeComposeRequest()
+            }
+        }
+        LaunchedEffect(threadRequest) {
+            val tid = threadRequest ?: return@LaunchedEffect
+            if (tid > 0L) navController.navigate(smsThreadRoute(tid))
+            else navController.navigate(MfsDestination.Sms.route)
+            rootViewModel.consumeThreadRequest()
+        }
         MfsNavHost(
             navController = navController,
             startDestination = dest,
@@ -80,6 +177,28 @@ class RootViewModel @Inject constructor(
     val developerMode: StateFlow<Boolean> =
         settingsStore.developerModeFlow()
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val _composeRequest = MutableStateFlow<Pair<String, String>?>(null)
+    val composeRequest: StateFlow<Pair<String, String>?> = _composeRequest.asStateFlow()
+
+    private val _threadRequest = MutableStateFlow<Long?>(null)
+    val threadRequest: StateFlow<Long?> = _threadRequest.asStateFlow()
+
+    fun postComposeRequest(recipient: String, body: String) {
+        _composeRequest.value = recipient to body
+    }
+
+    fun consumeComposeRequest() {
+        _composeRequest.value = null
+    }
+
+    fun postThreadRequest(threadId: Long) {
+        _threadRequest.value = threadId
+    }
+
+    fun consumeThreadRequest() {
+        _threadRequest.value = null
+    }
 
     init {
         viewModelScope.launch {

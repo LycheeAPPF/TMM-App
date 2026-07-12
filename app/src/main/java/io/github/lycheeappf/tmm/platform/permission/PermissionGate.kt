@@ -64,6 +64,41 @@ class PermissionGate @Inject constructor(
     }
 
     /**
+     * BLUETOOTH_CONNECT (Runtime ab API 31, minSdk 33 → kein SDK-Guard nötig).
+     * Wird gebraucht, um die verbundenen Bluetooth-Geräte/gekoppelten Geräte zu
+     * lesen und so zu erkennen, ob das Handy gerade mit dem Tesla verbunden ist.
+     */
+    fun hasBluetoothConnect(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.BLUETOOTH_CONNECT
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Returns true when either ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION is granted.
+     * Both suffice for [android.location.LocationManager.getLastKnownLocation].
+     * Without this permission [AndroidLocationProvider] returns null and no coordinates
+     * are forwarded to Grok.
+     */
+    fun hasLocationAccess(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * ACCESS_BACKGROUND_LOCATION („Immer erlauben"). Der Grok-Turn läuft im
+     * Hintergrund (Tesla-Reply ohne UI) — ohne diese Stufe liefert der OS-Cache
+     * dort keine Koordinaten. Ab API 30 nicht per Runtime-Dialog anforderbar,
+     * nur über die App-Einstellungen (Settings.ACTION_APPLICATION_DETAILS_SETTINGS).
+     */
+    fun hasBackgroundLocationAccess(): Boolean =
+        ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /**
      * Notification-Listener Access ist nicht runtime-grantbar – User muss in
      * Settings > Apps > Special access > Notification access aktivieren.
      */

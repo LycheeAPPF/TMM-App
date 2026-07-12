@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,8 @@ import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.component.SettingCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.component.StepCard
+import io.github.lycheeappf.tmm.ui.component.TeslaConnectionCard
+import io.github.lycheeappf.tmm.ui.component.TeslaDevicePickerDialog
 import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
 import io.github.lycheeappf.tmm.ui.component.mfsExpandExit
 import io.github.lycheeappf.tmm.ui.component.preflightStatusUi
@@ -63,6 +66,18 @@ fun OnboardingScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showPreFlightDialog by remember { mutableStateOf(false) }
+    var showDevicePicker by remember { mutableStateOf(false) }
+    var btPermanentlyDenied by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    val openAppSettings: () -> Unit = {
+        activity?.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.fromParts("package", context.packageName, null)
+            )
+        )
+    }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -84,6 +99,15 @@ fun OnboardingScreen(
     val nlsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { viewModel.refresh() }
+    val btPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted && activity != null) {
+            btPermanentlyDenied = !androidx.core.app.ActivityCompat
+                .shouldShowRequestPermissionRationale(activity, android.Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        viewModel.refresh()
+    }
 
     if (showPreFlightDialog) {
         PreFlightConfirmDialog(
@@ -93,6 +117,18 @@ fun OnboardingScreen(
                 viewModel.runPreFlight()
             },
             onCancel = { showPreFlightDialog = false }
+        )
+    }
+    if (showDevicePicker) {
+        TeslaDevicePickerDialog(
+            devices = state.pairedDevices,
+            selectedAddress = state.teslaBtAddress,
+            loading = state.pairedDevicesLoading,
+            onSelect = { device ->
+                showDevicePicker = false
+                viewModel.selectTeslaDevice(device.address, device.name)
+            },
+            onCancel = { showDevicePicker = false }
         )
     }
 
@@ -221,6 +257,23 @@ fun OnboardingScreen(
                     onAcknowledge = { viewModel.acknowledgeRisk() }
                 )
             }
+
+            // Optionaler Schritt: jetzt schon das Tesla-Bluetooth-Gerät wählen, damit
+            // Nachrichten nur im Auto weitergeleitet werden. Nicht erforderlich zum
+            // Abschluss — ohne Auswahl wird (wie bisher) rund um die Uhr weitergeleitet.
+            TeslaConnectionCard(
+                deviceName = state.teslaBtDeviceName,
+                deviceMissing = state.teslaDeviceMissing,
+                hasPermission = state.hasBluetoothPermission,
+                permanentlyDenied = btPermanentlyDenied,
+                onGrantPermission = { btPermLauncher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
+                onOpenAppSettings = openAppSettings,
+                onSelectDevice = {
+                    viewModel.loadPairedDevices()
+                    showDevicePicker = true
+                },
+                onClearDevice = { viewModel.clearTeslaDevice() }
+            )
 
             // Optionaler Schritt: jetzt schon wählen, welche Messenger-Apps ans Tesla
             // gehen. Standardmäßig ist keine App aktiv. Nicht erforderlich, um das

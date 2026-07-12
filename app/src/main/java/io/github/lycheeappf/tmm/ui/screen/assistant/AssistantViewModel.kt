@@ -9,15 +9,21 @@ import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerCoordinator
 import io.github.lycheeappf.tmm.channel.llm.AssistantTriggerSource
+import io.github.lycheeappf.tmm.channel.llm.E2eResult
 import io.github.lycheeappf.tmm.channel.llm.GrokKeyTester
+import io.github.lycheeappf.tmm.channel.llm.GrokSelfTester
 import io.github.lycheeappf.tmm.channel.llm.KeyTestOutcome
 import io.github.lycheeappf.tmm.channel.llm.LlmStarter
+import io.github.lycheeappf.tmm.channel.llm.PositionLocalResult
+import io.github.lycheeappf.tmm.channel.llm.SelfTestEvent
+import io.github.lycheeappf.tmm.channel.llm.SelfTestStage
 import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
+import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -28,6 +34,31 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+
+/**
+ * Standort-Berechtigungsstufe als Tri-State. WHILE_IN_USE reicht nur für den
+ * manuellen Test im Vordergrund — der eigentliche Grok-Turn läuft im Hintergrund
+ * und braucht ALWAYS („Immer erlauben", nur über die App-Einstellungen erteilbar).
+ */
+enum class LocationPermissionLevel { NONE, WHILE_IN_USE, ALWAYS }
+
+/** Ergebnis-Zelle einer Selbsttest-Stufe: „übersprungen", „noch nicht gelaufen" (value=null) und „Ergebnis da" sind unterscheidbar. */
+data class StageCell<T>(val value: T? = null, val skipped: Boolean = false)
+
+data class SelfTestUiState(
+    val running: Boolean = false,
+    val destination: String = DEFAULT_DESTINATION,
+    val key: StageCell<KeyTestOutcome> = StageCell(),
+    val position: StageCell<PositionLocalResult> = StageCell(),
+    /** (credentialsSet, vinSelected) — rein lokale Tesla-Info-Stufe. */
+    val teslaLocal: StageCell<Pair<Boolean, Boolean>> = StageCell(),
+    val e2e: StageCell<E2eResult> = StageCell(),
+    val currentStage: SelfTestStage? = null
+) {
+    companion object {
+        const val DEFAULT_DESTINATION = "Alexanderplatz, Berlin"
+    }
+}
 
 data class AssistantUiState(
     val apiKeyIsSet: Boolean = false,
@@ -51,7 +82,11 @@ data class AssistantUiState(
     val triggerInFlight: Boolean = false,
     val keyTestRunning: Boolean = false,
     val keyTestResult: KeyTestOutcome? = null,
-    val lastFeedback: String? = null
+    val locationContextEnabled: Boolean = false,
+    val locationPermission: LocationPermissionLevel = LocationPermissionLevel.NONE,
+    val lastFeedback: String? = null,
+    val isSystemPromptCustomized: Boolean = false,
+    val selfTest: SelfTestUiState = SelfTestUiState()
 )
 
 @HiltViewModel
@@ -60,9 +95,11 @@ class AssistantViewModel @Inject constructor(
     private val prefs: AssistantPreferencesStore,
     private val apiKeyStore: ApiKeyStore,
     private val keyTester: GrokKeyTester,
+    private val selfTester: GrokSelfTester,
     private val coordinator: AssistantTriggerCoordinator,
     private val contactProvisioner: AssistantContactProvisioner,
     private val teslaContactResync: TeslaContactResync,
+    private val permissionGate: PermissionGate,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -95,7 +132,10 @@ class AssistantViewModel @Inject constructor(
                     webSearchEnabled = prefs.webSearchEnabled(),
                     xSearchEnabled = prefs.xSearchEnabled(),
                     voiceAliasEnabled = prefs.voiceAliasEnabled(),
-                    voiceAliasName = prefs.voiceAliasName()
+                    voiceAliasName = prefs.voiceAliasName(),
+                    locationContextEnabled = prefs.locationContextEnabled(),
+                    locationPermission = locationPermissionLevel(),
+                    isSystemPromptCustomized = prefs.isSystemPromptCustomized()
                 )
             }
             // Tippt der User gerade (ein Persist-Job läuft noch), die editierbaren
@@ -104,8 +144,12 @@ class AssistantViewModel @Inject constructor(
             // (API-Key gesetzt?, Consent) trotzdem übernehmen.
             val persisting = persistJobs.values.any { it.isActive }
             _uiState.update { cur ->
+                // Selbsttest-State ist rein transient (kein Platten-Backing) —
+                // IMMER aus dem aktuellen State übernehmen, sonst wipet jedes
+                // Resume Destination/Ergebnisse/running.
+                val base = snapshot.copy(selfTest = cur.selfTest)
                 if (persisting) {
-                    snapshot.copy(
+                    base.copy(
                         driverName = cur.driverName,
                         systemPrompt = cur.systemPrompt,
                         welcomeMessage = cur.welcomeMessage,
@@ -117,7 +161,7 @@ class AssistantViewModel @Inject constructor(
                         rateLimitPerHour = cur.rateLimitPerHour
                     )
                 } else {
-                    snapshot
+                    base
                 }
             }
         }
@@ -128,6 +172,7 @@ class AssistantViewModel @Inject constructor(
     fun saveApiKey() {
         val value = _uiState.value.apiKeyDraft.trim()
         if (value.isEmpty()) return
+        if (_uiState.value.selfTest.running) return
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(saving = true) }
             val (apiKeyIsSet, feedback) = try {
@@ -162,6 +207,7 @@ class AssistantViewModel @Inject constructor(
     }
 
     fun clearApiKey() {
+        if (_uiState.value.selfTest.running) return
         viewModelScope.launch(ioDispatcher) {
             apiKeyStore.clear()
             // Key weg → Grok-Auto-Kontakt entfernen.
@@ -186,11 +232,87 @@ class AssistantViewModel @Inject constructor(
      * sich also während eines laufenden Tests nicht ändern.
      */
     fun testApiKey() {
+        if (_uiState.value.selfTest.running) return
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(keyTestRunning = true, keyTestResult = null) }
             val outcome = coRunCatching { keyTester.run() }
                 .getOrDefault(KeyTestOutcome.UNKNOWN)
             _uiState.update { it.copy(keyTestRunning = false, keyTestResult = outcome) }
+        }
+    }
+
+    /** Reines UI-State-Update — Destination wird bewusst nicht persistiert. */
+    fun setSelfTestDestination(value: String) =
+        _uiState.update { it.copy(selfTest = it.selfTest.copy(destination = value)) }
+
+    /**
+     * Startet den mehrstufigen Grok-Selbsttest ([GrokSelfTester]) und zeichnet die
+     * Stufen-Events live in den State. Der Guard claimt den Lauf ATOMAR/SYNCHRON via
+     * `_uiState.update`, BEVOR überhaupt eine Coroutine gestartet wird (Buttons können
+     * durch State-Latenz doppelt feuern — ein Guard, der erst innerhalb der
+     * `launch`-Coroutine `running=true` setzt, würde zwei schnelle Taps beide durchlassen).
+     * Key-Test/Save/Remove sind währenddessen gesperrt (Race-Guard, wie bisher
+     * Key-Test ↔ Save/Remove).
+     */
+    fun runSelfTest() {
+        var claimed = false
+        _uiState.update { cur ->
+            val blocked = cur.selfTest.running || cur.keyTestRunning || cur.saving ||
+                cur.selfTest.destination.isBlank()
+            claimed = !blocked
+            if (blocked) {
+                cur
+            } else {
+                cur.copy(
+                    selfTest = cur.selfTest.copy(
+                        running = true,
+                        key = StageCell(),
+                        position = StageCell(),
+                        teslaLocal = StageCell(),
+                        e2e = StageCell(),
+                        currentStage = null
+                    )
+                )
+            }
+        }
+        if (!claimed) return
+        val destination = _uiState.value.selfTest.destination.trim()
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                selfTester.run(destination).collect { event ->
+                    _uiState.update { it.copy(selfTest = it.selfTest.applyEvent(event)) }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // GrokSelfTester fängt erwartbare Fehler selbst — das hier ist der
+                // Belt-and-braces-Pfad für Unerwartetes im Flow/Collect.
+                _uiState.update {
+                    it.copy(
+                        selfTest = it.selfTest.copy(
+                            e2e = StageCell(E2eResult.ProviderFailed(KeyTestOutcome.UNKNOWN))
+                        )
+                    )
+                }
+            } finally {
+                // Immer aufräumen — auch bei rethrowter Cancellation darf running
+                // nicht hängen bleiben (würde Selbsttest + Key-Buttons dauerhaft sperren).
+                _uiState.update { it.copy(selfTest = it.selfTest.copy(running = false, currentStage = null)) }
+            }
+        }
+    }
+
+    private fun SelfTestUiState.applyEvent(event: SelfTestEvent): SelfTestUiState = when (event) {
+        is SelfTestEvent.StageRunning -> copy(currentStage = event.stage)
+        is SelfTestEvent.KeyResult -> copy(key = StageCell(event.outcome), currentStage = null)
+        is SelfTestEvent.PositionResult -> copy(position = StageCell(event.result), currentStage = null)
+        is SelfTestEvent.TeslaLocalResult ->
+            copy(teslaLocal = StageCell(event.credentialsSet to event.vinSelected), currentStage = null)
+        is SelfTestEvent.E2eDone -> copy(e2e = StageCell(event.result), currentStage = null)
+        is SelfTestEvent.StageSkipped -> when (event.stage) {
+            SelfTestStage.POSITION -> copy(position = StageCell(skipped = true))
+            SelfTestStage.TESLA_LOCAL -> copy(teslaLocal = StageCell(skipped = true))
+            SelfTestStage.E2E -> copy(e2e = StageCell(skipped = true))
+            SelfTestStage.KEY -> this
         }
     }
 
@@ -225,7 +347,21 @@ class AssistantViewModel @Inject constructor(
         edit("driver_name", { it.copy(driverName = value) }) { prefs.setDriverName(value) }
 
     fun setSystemPrompt(value: String) =
-        edit("system_prompt", { it.copy(systemPrompt = value) }) { prefs.setSystemPrompt(value) }
+        edit(EDIT_KEY_SYSTEM_PROMPT, { it.copy(systemPrompt = value, isSystemPromptCustomized = true) }) {
+            prefs.setSystemPrompt(value)
+        }
+
+    fun resetSystemPromptToDefault() {
+        // Ein noch ausstehender (debounced) Persist-Job des Prompt-Editors würde den
+        // Reset sonst nach Ablauf der 350 ms wieder mit dem alten Text überschreiben —
+        // erst abbrechen, dann zurücksetzen.
+        persistJobs[EDIT_KEY_SYSTEM_PROMPT]?.cancel()
+        viewModelScope.launch(ioDispatcher) {
+            prefs.resetSystemPromptToDefault()
+            val defaultPrompt = prefs.systemPromptRaw()
+            _uiState.update { it.copy(systemPrompt = defaultPrompt, isSystemPromptCustomized = false) }
+        }
+    }
 
     fun setWelcome(value: String) =
         edit("welcome", { it.copy(welcomeMessage = value) }) { prefs.setWelcomeMessage(value) }
@@ -281,6 +417,19 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
+    fun setLocationContextEnabled(enabled: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            prefs.setLocationContextEnabled(enabled)
+            _uiState.update { it.copy(locationContextEnabled = enabled) }
+        }
+    }
+
+    private fun locationPermissionLevel(): LocationPermissionLevel = when {
+        !permissionGate.hasLocationAccess() -> LocationPermissionLevel.NONE
+        permissionGate.hasBackgroundLocationAccess() -> LocationPermissionLevel.ALWAYS
+        else -> LocationPermissionLevel.WHILE_IN_USE
+    }
+
     fun triggerAssistant() {
         viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(triggerInFlight = true) }
@@ -330,6 +479,9 @@ class AssistantViewModel @Inject constructor(
 
     companion object {
         private const val PERSIST_DEBOUNCE_MS = 350L
+
+        /** persistJobs-Key des System-Prompt-Editors ([setSystemPrompt]/[resetSystemPromptToDefault]). */
+        private const val EDIT_KEY_SYSTEM_PROMPT = "system_prompt"
 
         /**
          * Vorgefertigte Namen für den Sprach-Ansprech-Kontakt. Zweiteilige Namen

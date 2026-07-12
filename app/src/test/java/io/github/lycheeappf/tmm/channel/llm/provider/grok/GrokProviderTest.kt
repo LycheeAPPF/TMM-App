@@ -1,9 +1,13 @@
 package io.github.lycheeappf.tmm.channel.llm.provider.grok
 
 import com.google.common.truth.Truth.assertThat
+import io.github.lycheeappf.tmm.channel.llm.provider.FINISH_REASON_INCOMPLETE
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmProviderError
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmRequest
 import io.github.lycheeappf.tmm.channel.llm.provider.LlmTurn
+import io.github.lycheeappf.tmm.channel.llm.provider.ToolCall
+import io.github.lycheeappf.tmm.channel.llm.provider.ToolResult
+import io.github.lycheeappf.tmm.channel.llm.tools.ToolSchema
 import io.github.lycheeappf.tmm.core.network.ConnectivityChecker
 import io.github.lycheeappf.tmm.core.security.ApiKeyStore
 import io.github.lycheeappf.tmm.core.util.LogBuffer
@@ -12,6 +16,13 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -195,5 +206,162 @@ class GrokProviderTest {
         assertThat(body).doesNotContain("no_inline_citations")
         assertThat(body).doesNotContain("\"tools\"")
         assertThat(body).doesNotContain("\"include\"")
+    }
+
+    // ---- Request-Serialisierung: In-Flight-Tool-Items (Tool-Execution-Loop) ----
+
+    /** Parst den aufgezeichneten Request-Body zurück und liefert das `input`-Array. */
+    private fun recordedInput(body: String) =
+        json.parseToJsonElement(body).jsonObject.getValue("input").jsonArray
+
+    @Test fun `in-flight tool call serializes as function_call item with call_id name and arguments`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val call = ToolCall(id = "call_42", name = "tesla_navigate", argumentsJson = """{"destination":"Berlin Hbf"}""")
+        provider.complete(sampleRequest().copy(inFlightToolCalls = listOf(call)))
+        val input = recordedInput(server.takeRequest().body.readUtf8())
+        val item = input.map { it.jsonObject }
+            .single { it["type"]?.jsonPrimitive?.contentOrNull == "function_call" }
+        assertThat(item["call_id"]?.jsonPrimitive?.content).isEqualTo("call_42")
+        assertThat(item["name"]?.jsonPrimitive?.content).isEqualTo("tesla_navigate")
+        // arguments bleibt ein JSON-*String* (Modell-Output wörtlich wiederholt), kein Objekt
+        assertThat(item["arguments"]?.jsonPrimitive?.content)
+            .isEqualTo("""{"destination":"Berlin Hbf"}""")
+        // explicitNulls=false: role/content dürfen im function_call-Item nicht auftauchen
+        assertThat(item.keys).containsNoneOf("role", "content", "output")
+    }
+
+    @Test fun `in-flight tool result serializes as function_call_output item with call_id and output`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val result = ToolResult(callId = "call_42", output = """{"status":"ok","destination":"Berlin Hbf"}""")
+        provider.complete(sampleRequest().copy(inFlightToolResults = listOf(result)))
+        val input = recordedInput(server.takeRequest().body.readUtf8())
+        val item = input.map { it.jsonObject }
+            .single { it["type"]?.jsonPrimitive?.contentOrNull == "function_call_output" }
+        assertThat(item["call_id"]?.jsonPrimitive?.content).isEqualTo("call_42")
+        assertThat(item["output"]?.jsonPrimitive?.content)
+            .isEqualTo("""{"status":"ok","destination":"Berlin Hbf"}""")
+        assertThat(item.keys).containsNoneOf("role", "content", "name", "arguments")
+    }
+
+    @Test fun `tool items follow the user turn with calls before outputs in list order`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val calls = listOf(
+            ToolCall(id = "call_1", name = "tool_a", argumentsJson = """{"a":1}"""),
+            ToolCall(id = "call_2", name = "tool_b", argumentsJson = """{"b":2}""")
+        )
+        val results = listOf(
+            ToolResult(callId = "call_1", output = "ok-a"),
+            ToolResult(callId = "call_2", output = "ok-b")
+        )
+        provider.complete(sampleRequest().copy(inFlightToolCalls = calls, inFlightToolResults = results))
+        val input = recordedInput(server.takeRequest().body.readUtf8())
+        // system + 2 History-Turns + User-Turn + 2 function_call + 2 function_call_output
+        assertThat(input).hasSize(8)
+        val types = input.map { it.jsonObject["type"]?.jsonPrimitive?.contentOrNull }
+        assertThat(types).containsExactly(
+            null, null, null, null,
+            "function_call", "function_call",
+            "function_call_output", "function_call_output"
+        ).inOrder()
+        // User-Turn steht direkt vor den Tool-Items
+        assertThat(input[3].jsonObject["role"]?.jsonPrimitive?.content).isEqualTo("user")
+        assertThat(input[3].jsonObject["content"]?.jsonPrimitive?.content).isEqualTo("Wer bist du?")
+        // Listen-Reihenfolge bleibt innerhalb der Blöcke erhalten
+        assertThat(input[4].jsonObject["call_id"]?.jsonPrimitive?.content).isEqualTo("call_1")
+        assertThat(input[5].jsonObject["call_id"]?.jsonPrimitive?.content).isEqualTo("call_2")
+        assertThat(input[6].jsonObject["call_id"]?.jsonPrimitive?.content).isEqualTo("call_1")
+        assertThat(input[7].jsonObject["call_id"]?.jsonPrimitive?.content).isEqualTo("call_2")
+    }
+
+    @Test fun `tool arguments and output with quotes backslashes and newlines survive serialization`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val nastyArguments = "line1\nline2 \"quoted\" back\\slash tab\t umlaut ü"
+        val nastyOutput = "{\"text\":\"a \\\"nested\\\" value\"}\nsecond line"
+        provider.complete(
+            sampleRequest().copy(
+                inFlightToolCalls = listOf(ToolCall(id = "c1", name = "t", argumentsJson = nastyArguments)),
+                inFlightToolResults = listOf(ToolResult(callId = "c1", output = nastyOutput))
+            )
+        )
+        val input = recordedInput(server.takeRequest().body.readUtf8())
+        val callItem = input.map { it.jsonObject }
+            .single { it["type"]?.jsonPrimitive?.contentOrNull == "function_call" }
+        val outputItem = input.map { it.jsonObject }
+            .single { it["type"]?.jsonPrimitive?.contentOrNull == "function_call_output" }
+        // Round-Trip: nach HTTP + JSON-Decoding kommen die Strings byteidentisch zurück
+        assertThat(callItem["arguments"]?.jsonPrimitive?.content).isEqualTo(nastyArguments)
+        assertThat(outputItem["output"]?.jsonPrimitive?.content).isEqualTo(nastyOutput)
+    }
+
+    @Test fun `first call sends no in-flight tool items`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        provider.complete(sampleRequest())
+        val input = recordedInput(server.takeRequest().body.readUtf8())
+        // Nur role/content-Items (System + History + User), keine Tool-Zwischenstände
+        assertThat(input).hasSize(4)
+        input.forEach { item ->
+            assertThat(item.jsonObject.keys).containsExactly("role", "content")
+        }
+    }
+
+    @Test fun `client function tools serialize with name description and parameters schema`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val schema = ToolSchema(
+            name = "tesla_navigate",
+            description = "Startet die Navigation im Fahrzeug",
+            parametersJson = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("destination") { put("type", "string") }
+                }
+            }
+        )
+        provider.complete(sampleRequest().copy(tools = listOf(schema)))
+        val body = server.takeRequest().body.readUtf8()
+        val tool = json.parseToJsonElement(body).jsonObject
+            .getValue("tools").jsonArray.single().jsonObject
+        assertThat(tool["type"]?.jsonPrimitive?.content).isEqualTo("function")
+        assertThat(tool["name"]?.jsonPrimitive?.content).isEqualTo("tesla_navigate")
+        assertThat(tool["description"]?.jsonPrimitive?.content).isEqualTo("Startet die Navigation im Fahrzeug")
+        // parameters wird als strukturiertes JSON-Objekt gesendet (kein String-Encoding)
+        assertThat(tool["parameters"]).isEqualTo(schema.parametersJson)
+    }
+
+    // ---- Truncation-Sichtbarkeit + tool_choice ----
+
+    @Test fun `incomplete reasoning-only response maps to finishReason incomplete with no tool calls`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"id":"resp_i","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"reasoning"}]}"""
+            )
+        )
+        val response = provider.complete(sampleRequest())
+        assertThat(response.finishReason).isEqualTo(FINISH_REASON_INCOMPLETE)
+        assertThat(response.toolCalls).isEmpty()
+        assertThat(response.content).isNull()
+    }
+
+    @Test fun `completed response keeps message-item finish reason`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"id":"r","status":"completed","output":[{"type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok"}]}]}"""
+            )
+        )
+        val response = provider.complete(sampleRequest())
+        assertThat(response.finishReason).isEqualTo("completed")
+    }
+
+    @Test fun `tool_choice is sent only when tools are present`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"r","output_text":"ok"}"""))
+        val schema = ToolSchema(
+            name = "t", description = "d",
+            parametersJson = buildJsonObject { put("type", "object") }
+        )
+        provider.complete(sampleRequest().copy(tools = listOf(schema), toolChoice = "required"))
+        assertThat(server.takeRequest().body.readUtf8()).contains("\"tool_choice\":\"required\"")
+        // Ohne Tools wäre tool_choice ein API-Fehler — Feld muss wegfallen.
+        provider.complete(sampleRequest().copy(toolChoice = "required"))
+        assertThat(server.takeRequest().body.readUtf8()).doesNotContain("tool_choice")
     }
 }

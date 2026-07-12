@@ -53,8 +53,16 @@ class PendingIntentRebuilder @Inject constructor(
             logBuffer.warn(TAG, "rebuild notif=${payload.notificationKey} no-longer-active")
             return null
         }
-        logBuffer.info(TAG, "rebuild notif=${payload.notificationKey} found-action")
-        return resolver.findReplyAction(match.notification)
+        // Erst NACH findReplyAction loggen — die alte "found-action"-Zeile feuerte
+        // vor dem Check und hat bei der Issue-Triage zweimal in die Irre geführt
+        // (Notification aktiv ≠ Reply-Action vorhanden, s. Group-Summary).
+        val action = resolver.findReplyAction(match.notification)
+        if (action == null) {
+            logBuffer.warn(TAG, "rebuild notif=${payload.notificationKey} active-but-no-action")
+        } else {
+            logBuffer.info(TAG, "rebuild notif=${payload.notificationKey} action-rebuilt")
+        }
+        return action
     }
 
     companion object {

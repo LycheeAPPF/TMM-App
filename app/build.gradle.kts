@@ -38,11 +38,14 @@ android {
         applicationId = "io.github.lycheeappf.tmm"
         minSdk = 33
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 13
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // Tesla-Fleet-API-Credentials sind vollständig nutzer-bereitgestellt
+        // (Keystore-verschlüsselt zur Laufzeit) — es wird NICHTS einkompiliert.
 
         // i18n: unterstützte Sprachen. Default-Resources (values/) sind Englisch,
         // values-de/ liefert die deutsche Übersetzung. Begrenzt zugleich die
@@ -141,6 +144,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.startup)
+    implementation(libs.androidx.browser)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -154,6 +158,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     implementation(libs.androidx.navigation.compose)
 
@@ -184,6 +189,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp.mockwebserver)
+    testDebugImplementation(platform(libs.androidx.compose.bom))
+    testDebugImplementation(libs.androidx.compose.ui.test.junit4)
 
     androidTestImplementation(libs.androidx.junit.ext)
     androidTestImplementation(libs.androidx.espresso.core)
