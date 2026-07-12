@@ -4,6 +4,34 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-07-12 — "The Big One"
+
+First stable release. It brings the entire 0.7.x/0.8.x development line to a stable
+footing on top of the rc1/rc2 message-bridge hardening. Highlights since v0.6.0:
+
+### Added
+- **In-car navigation via Grok.** Dictate a destination and Grok sends it to your Tesla
+  through the official **Fleet API** (`TeslaNavigateTool`), confirming the target out loud.
+- **Bring-your-own credentials.** You provide your own Tesla Fleet API and xAI keys in
+  Settings; both are AES-256-GCM encrypted with an AndroidKeyStore master key — nothing is
+  ever bundled with the app.
+- **Grok location context (opt-in).** With explicit consent your current position is shared
+  with Grok for location-aware answers; off by default, behind a proper permission flow.
+- **Forward only while connected to your Tesla + toggleable daily limit** (0.7.0/0.7.1):
+  pick your car once; messages inject only while it's connected; the daily cap can be off.
+- **Grok in-app self-test.** A staged diagnostics card (key → position → Tesla → end-to-end)
+  verifies the assistant without driving, in EN + DE.
+
+### Changed
+- **Messenger-bridge hardening** (rc1/rc2): group-summary notifications filtered, own sent
+  replies no longer read back, action-less updates can't clobber a replyable mapping,
+  quick-reply fallback opens TMM's own composer, incoming-SMS notifications show the contact
+  name, long-press starts native text selection with copy + tappable links.
+
+### Security / Privacy
+- Diagnostics export masks the VIN to its last 4 chars and strips destination, GPS and VIN
+  from Fleet API logging; message bodies and dictations are never logged.
+
 ## [1.0.0-rc2] — 2026-07-11
 
 Second release candidate: two field reports from rc1 testing.

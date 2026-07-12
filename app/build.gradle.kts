@@ -38,8 +38,8 @@ android {
         applicationId = "io.github.lycheeappf.tmm"
         minSdk = 33
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.0.0-rc2"
+        versionCode = 13
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
