@@ -69,11 +69,15 @@ Einstellungen), Anzahl ungelesener echter SMS.
 - `SmsInboxReader.unreadCount(): Int` — dedizierte billige Query
   (`TYPE = INBOX AND READ = 0`, Projektion nur `ADDRESS`), Fakes Kotlin-seitig via
   `FakeAddress.isFakeAddress` gefiltert. Ohne READ_SMS-Permission/Fehler → 0.
-  Zählt damit exakt das, was der SMS-Tab als ungelesen ausweist.
-- Neues `UnreadBadgeViewModel` (`@HiltViewModel`): beobachtet `reader.changes()`
-  mit 250 ms Debounce + initialem Load (Muster der bestehenden SMS-VMs) und exponiert
-  `StateFlow<Int>`.
-- `MfsBottomBar`: bezieht das VM per `hiltViewModel()`; das SMS-Item bekommt
+  Gleiche Ausschluss-Semantik wie die Konversationsliste; zählt aber ALLE Rows
+  (kein Scan-/Thread-Limit wie in der Liste).
+- Neues `UnreadBadgeViewModel` (`@HiltViewModel`): alle Trigger (Provider-Änderungen,
+  initialer Load, manueller Refresh) laufen durch EINEN gemergten Flow mit einem
+  einzigen Collector (250 ms Debounce, `onStart` vor `debounce`) und exponieren
+  `StateFlow<Int>` — serialisiert, keine Refresh-Races.
+- `MfsBottomBar`: bekommt das VM vom `MfsNavHost` gereicht (dort per `hiltViewModel()`
+  im Activity-Scope aufgelöst — in den Destinations wäre der Owner der jeweilige
+  BackStack-Entry und jeder Tab bekäme einen eigenen SMS-Observer); das SMS-Item bekommt
   `BadgedBox` mit `Badge` (Material3-Default = Error-Rot). Anzeige nur bei Count > 0;
   ab 100 → „99+". ContentDescription lokalisiert (Plural).
 
@@ -95,6 +99,18 @@ Delete-Fehlschlag-Feedback, Badge-ContentDescription (Plural EN+DE).
 ## Version
 
 `app/build.gradle.kts`: `versionName = "1.0.1"`, `versionCode` +1.
+
+## Nachtrag (2026-07-18): Codex-Review-Härtung
+
+Der Implementierungsplan wurde vor Ausführung extern verifiziert (Codex `gpt-5.6-sol`,
+xhigh). Übernommene Korrekturen: (1) Delete löscht atomar über die validierte
+`_ID`-Liste des Guard-Snapshots statt über die breite Selection; (2) zusätzliche
+Robolectric-Wiring-Tests des destruktiven Pfads (Default-App-Gate + Fake-Guard vor
+jedem `delete`); (3) Badge-Trigger serialisiert (ein gemergter Flow, `onStart` vor
+`debounce`) und VM Activity-scoped im `MfsNavHost`; (4) deprecated
+`confirmValueChange` bewusst mit begründetem `@Suppress` beibehalten;
+(5) `MfsListItem` behandelt Long-Click-only; (6) Badge-Semantik-Formulierung
+korrigiert (zählt alle Rows, Liste hat Scan-Limits).
 
 ## Nicht-Ziele
 
