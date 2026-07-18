@@ -92,6 +92,81 @@ class SmsInboxReaderImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteMessage(messageId: Long): Boolean =
+        deleteRows("${Telephony.Sms._ID} = ?", arrayOf(messageId.toString()))
+
+    override suspend fun deleteThread(threadId: Long): Boolean =
+        deleteRows("${Telephony.Sms.THREAD_ID} = ?", arrayOf(threadId.toString()))
+
+    override suspend fun unreadCount(): Int = withContext(ioDispatcher) {
+        try {
+            countUnread(queryUnreadAddresses()) { FakeAddress.isFakeAddress(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "unreadCount failed", e)
+            0
+        }
+    }
+
+    /**
+     * Löscht die Rows der Selection — nur als Standard-SMS-App und nur, wenn KEINE
+     * Ziel-Row eine Fake-Adresse trägt (Grok-/Bridge-Zeilen sind auch bei einem
+     * fehlerhaften Aufrufer unlöschbar). Gelöscht wird über die validierte
+     * _ID-Liste des Snapshots — NICHT über die breite Selection —, damit Rows, die
+     * zwischen Prüfung und Delete dazukommen, nie ungeprüft mitgelöscht werden.
+     * true nur bei ≥1 gelöschter Row.
+     */
+    private suspend fun deleteRows(selection: String, args: Array<String>): Boolean =
+        withContext(ioDispatcher) {
+            if (!roleManager.isDefault()) return@withContext false
+            runCatching {
+                val targets = queryDeleteTargets(selection, args)
+                val addresses = targets.map { it.second }
+                if (!mayDelete(addresses) { FakeAddress.isFakeAddress(it) }) return@runCatching false
+                deleteByIds(targets.map { it.first }) > 0
+            }.onFailure { Log.w(TAG, "deleteRows failed", it) }.getOrDefault(false)
+        }
+
+    /** (_ID, ADDRESS) aller Rows der Selection — Snapshot für den Fake-Guard. */
+    private fun queryDeleteTargets(selection: String, args: Array<String>): List<Pair<Long, String>> =
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS),
+            selection,
+            args,
+            null
+        )?.use { c ->
+            val idIdx = c.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val addrIdx = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val list = ArrayList<Pair<Long, String>>(c.count)
+            while (c.moveToNext()) list += c.getLong(idIdx) to c.getString(addrIdx).orEmpty()
+            list
+        } ?: emptyList()
+
+    /** Löscht exakt die validierten Row-IDs (gechunkt; IDs sind Provider-Longs). */
+    private fun deleteByIds(ids: List<Long>): Int =
+        ids.chunked(DELETE_CHUNK).sumOf { chunk ->
+            context.contentResolver.delete(
+                Telephony.Sms.CONTENT_URI,
+                "${Telephony.Sms._ID} IN (${chunk.joinToString(",")})",
+                null
+            )
+        }
+
+    /** Adressen aller ungelesenen INBOX-Rows (für unreadCount). */
+    private fun queryUnreadAddresses(): List<String> =
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(Telephony.Sms.ADDRESS),
+            "${Telephony.Sms.TYPE} = ? AND ${Telephony.Sms.READ} = 0",
+            arrayOf(Telephony.Sms.MESSAGE_TYPE_INBOX.toString()),
+            null
+        )?.use { c ->
+            val idx = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val list = ArrayList<String>(c.count)
+            while (c.moveToNext()) list += c.getString(idx).orEmpty()
+            list
+        } ?: emptyList()
+
     override fun changes(): Flow<Unit> = callbackFlow {
         val thread = HandlerThread("MfsSmsReader").apply { start() }
         val handler = Handler(thread.looper)
@@ -248,5 +323,16 @@ class SmsInboxReaderImpl @Inject constructor(
             var unreadCount: Int = 0,
             var messageCount: Int = 0
         )
+
+        /** Zählt echte ungelesene Adressen (Fakes/leere Adressen wie in der Liste ausgeschlossen). Pure für Tests. */
+        internal fun countUnread(addresses: List<String>, isFake: (String) -> Boolean): Int =
+            addresses.count { it.isNotBlank() && !isFake(it) }
+
+        /** Delete-Guard: nur nicht-leere Ziellisten ohne jede Fake-Adresse sind löschbar. Pure für Tests. */
+        internal fun mayDelete(addresses: List<String>, isFake: (String) -> Boolean): Boolean =
+            addresses.isNotEmpty() && addresses.none { it.isNotBlank() && isFake(it) }
+
+        /** Chunk-Größe für _ID-IN-Deletes (SQLite-Statement-Größe im Zaum halten). */
+        private const val DELETE_CHUNK = 400
     }
 }
