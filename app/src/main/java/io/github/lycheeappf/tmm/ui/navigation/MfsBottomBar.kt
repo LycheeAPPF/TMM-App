@@ -1,24 +1,47 @@
 package io.github.lycheeappf.tmm.ui.navigation
 
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import io.github.lycheeappf.tmm.R
 
 /**
  * Geteilte untere NavigationBar. Der ausgewählte Zustand leitet sich rein aus der
  * aktuellen Route ab (currentBackStackEntryAsState), sodass Back-Stack und
- * Prozess-Tod-Restore korrekt bleiben.
+ * Prozess-Tod-Restore korrekt bleiben. Das SMS-Item trägt ein Unread-Badge
+ * (Anzahl ungelesener echter SMS, „99+"-gekappt). Das [badgeViewModel] wird vom
+ * Aufrufer (MfsNavHost, Activity-Scope) gereicht — hier per hiltViewModel()
+ * aufgelöst wäre der Owner der jeweilige BackStack-Entry und jeder Tab bekäme
+ * einen eigenen SMS-Observer.
  */
 @Composable
-fun MfsBottomBar(navController: NavController) {
+fun MfsBottomBar(
+    navController: NavController,
+    badgeViewModel: UnreadBadgeViewModel
+) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val unreadCount by badgeViewModel.unreadCount.collectAsStateWithLifecycle()
+
+    // Observer sieht keine Permission-Wechsel → beim Resume frisch laden.
+    LifecycleResumeEffect(Unit) {
+        badgeViewModel.refresh()
+        onPauseOrDispose {}
+    }
 
     NavigationBar {
         MfsBottomNavItem.entries.forEach { item ->
@@ -30,10 +53,25 @@ fun MfsBottomBar(navController: NavController) {
                     if (!selected) navController.navigateToTab(item.destination.route)
                 },
                 icon = {
-                    Icon(
-                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = label
-                    )
+                    val icon = @Composable {
+                        Icon(
+                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                            contentDescription = label
+                        )
+                    }
+                    if (item == MfsBottomNavItem.Sms && unreadCount > 0) {
+                        val badgeDesc =
+                            pluralStringResource(R.plurals.nav_sms_badge_desc, unreadCount, unreadCount)
+                        BadgedBox(
+                            badge = {
+                                Badge(modifier = Modifier.semantics { contentDescription = badgeDesc }) {
+                                    Text(UnreadBadgeViewModel.formatBadgeCount(unreadCount))
+                                }
+                            }
+                        ) { icon() }
+                    } else {
+                        icon()
+                    }
                 },
                 label = { Text(label) }
             )

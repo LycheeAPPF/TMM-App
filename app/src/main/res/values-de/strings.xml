@@ -66,6 +66,10 @@
     <string name="nav_sms_label">SMS</string>
     <string name="nav_sms_thread_label">Konversation</string>
     <string name="nav_sms_compose_label">Neue SMS</string>
+    <plurals name="nav_sms_badge_desc">
+        <item quantity="one">%1$d ungelesene Nachricht</item>
+        <item quantity="other">%1$d ungelesene Nachrichten</item>
+    </plurals>
 
     <!-- Health-check worker notifications -->
     <string name="health_role_title">Default SMS App nicht gesetzt</string>
