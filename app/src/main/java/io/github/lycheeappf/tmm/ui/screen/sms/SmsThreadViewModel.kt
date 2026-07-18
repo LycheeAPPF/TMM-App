@@ -93,6 +93,16 @@ class SmsThreadViewModel @Inject constructor(
         }
     }
 
+    /** Löscht eine einzelne Nachricht; Fehlschlag → Snackbar-Feedback.
+     *  Erfolg: der ContentObserver-Flow lädt den Thread automatisch neu. */
+    fun deleteMessage(messageId: Long) {
+        viewModelScope.launch {
+            if (!reader.deleteMessage(messageId)) {
+                _uiState.update { it.copy(feedback = context.localizedString(R.string.sms_delete_failed)) }
+            }
+        }
+    }
+
     private suspend fun reload() {
         if (threadId < 0) {
             _uiState.update { it.copy(loading = false) }
