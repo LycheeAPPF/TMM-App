@@ -33,4 +33,13 @@
     <string name="sms_feedback_blank_body">Message is empty.</string>
     <string name="sms_feedback_fake_address">This address cannot be messaged.</string>
     <string name="sms_feedback_error">Sending failed.</string>
+
+    <!-- SMS delete -->
+    <string name="sms_delete_thread_dialog_title">Delete conversation?</string>
+    <string name="sms_delete_thread_dialog_text">All messages with %1$s will be deleted permanently.</string>
+    <string name="sms_delete_message_dialog_title">Delete message?</string>
+    <string name="sms_delete_message_dialog_text">This message will be deleted permanently.</string>
+    <string name="sms_delete_confirm">Delete</string>
+    <string name="sms_delete_cancel">Cancel</string>
+    <string name="sms_delete_failed">Deleting failed.</string>
 </resources>

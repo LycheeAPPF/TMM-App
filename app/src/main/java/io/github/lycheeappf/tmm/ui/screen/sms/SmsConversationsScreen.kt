@@ -13,14 +13,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lycheeappf.tmm.R
+import io.github.lycheeappf.tmm.domain.sms.SmsConversation
 import io.github.lycheeappf.tmm.ui.component.MfsListItem
 import io.github.lycheeappf.tmm.ui.component.MfsScaffold
 import io.github.lycheeappf.tmm.ui.component.MfsStatus
@@ -44,6 +53,16 @@ fun SmsConversationsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    var pendingDelete by remember { mutableStateOf<SmsConversation?>(null) }
+
+    LaunchedEffect(state.feedback) {
+        state.feedback?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.consumeFeedback()
+        }
+    }
+
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose {}
@@ -59,6 +78,7 @@ fun SmsConversationsScreen(
     MfsScaffold(
         title = stringResource(R.string.sms_list_title),
         bottomBar = bottomBar,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         actions = {
             IconButton(onClick = onCompose) {
                 Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.sms_compose_action))
@@ -123,6 +143,7 @@ fun SmsConversationsScreen(
                                 }
                             },
                             onClick = { onOpenThread(conv.threadId) },
+                            onLongClick = { pendingDelete = conv },
                             modifier = Modifier.animateItem()
                         )
                         if (index < state.items.lastIndex) HorizontalDivider()
@@ -130,5 +151,31 @@ fun SmsConversationsScreen(
                 }
             }
         }
+    }
+
+    pendingDelete?.let { conv ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.sms_delete_thread_dialog_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.sms_delete_thread_dialog_text,
+                        conv.displayName ?: conv.address
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteThread(conv.threadId)
+                    pendingDelete = null
+                }) { Text(stringResource(R.string.sms_delete_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.sms_delete_cancel))
+                }
+            }
+        )
     }
 }
