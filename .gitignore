@@ -34,3 +34,6 @@ keystore.properties
 
 # Loose local artifacts (download/export dumps — never publish)
 *.zip
+
+#issue-reports
+issue-reports/

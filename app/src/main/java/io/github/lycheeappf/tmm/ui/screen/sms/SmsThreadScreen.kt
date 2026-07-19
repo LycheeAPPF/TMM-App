@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -23,11 +25,17 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -111,7 +119,10 @@ fun SmsThreadScreen(
                         verticalArrangement = Arrangement.spacedBy(MfsSpacing.sm)
                     ) {
                         items(state.messages, key = { it.id }) { message ->
-                            MessageBubble(message)
+                            DeletableMessageBubble(
+                                message = message,
+                                onDelete = { viewModel.deleteMessage(message.id) }
+                            )
                         }
                     }
                 }
@@ -159,6 +170,67 @@ private fun ReplyBar(
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.sms_thread_send_action))
             }
         }
+    }
+}
+
+/**
+ * Swipe (beide Richtungen) zeigt den Lösch-Hintergrund und öffnet den
+ * Bestätigungsdialog; die Bubble springt immer zurück (confirmValueChange → false),
+ * gelöscht wird erst nach Bestätigung. Long-Press-Textauswahl bleibt unberührt.
+ */
+@Composable
+private fun DeletableMessageBubble(message: SmsMessage, onDelete: () -> Unit) {
+    var showConfirm by remember { mutableStateOf(false) }
+    // confirmValueChange ist in M3 1.4.0 deprecated (ohne direkten Ersatz fürs
+    // Veto-Pattern); bewusst beibehalten: false = nie dismissen → Bubble springt
+    // zurück, gelöscht wird erst nach Dialog-Bestätigung.
+    @Suppress("DEPRECATION")
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) showConfirm = true
+            false
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(horizontal = MfsSpacing.lg),
+                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                    Alignment.CenterStart
+                } else {
+                    Alignment.CenterEnd
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.sms_delete_message_dialog_title),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    ) {
+        MessageBubble(message)
+    }
+
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            title = { Text(stringResource(R.string.sms_delete_message_dialog_title)) },
+            text = { Text(stringResource(R.string.sms_delete_message_dialog_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showConfirm = false
+                    onDelete()
+                }) { Text(stringResource(R.string.sms_delete_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) {
+                    Text(stringResource(R.string.sms_delete_cancel))
+                }
+            }
+        )
     }
 }
 

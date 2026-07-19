@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -116,7 +118,11 @@ fun TeslaDevicePickerDialog(
             when {
                 loading -> Text(stringResource(R.string.settings_tesla_conn_dialog_loading))
                 devices.isEmpty() -> Text(stringResource(R.string.settings_tesla_conn_dialog_empty))
-                else -> Column(modifier = Modifier.selectableGroup()) {
+                else -> Column(
+                    modifier = Modifier
+                        .selectableGroup()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     devices.forEach { device ->
                         Row(
                             modifier = Modifier

@@ -106,4 +106,25 @@ class SmsInboxReaderImplTest {
         // Höchstes Datum zuerst (i=1 → date 599).
         assertThat(convs.first().threadId).isEqualTo(1L)
     }
+
+    @Test
+    fun `countUnread ignores fakes and blank addresses`() {
+        val addresses = listOf("+49111", "+88810000005", "", "+49222")
+        val count = SmsInboxReaderImpl.countUnread(addresses) { FakeAddress.isFakeAddress(it) }
+        assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun `mayDelete refuses fake rows and empty targets`() {
+        val isFake = { a: String -> FakeAddress.isFakeAddress(a) }
+        assertThat(SmsInboxReaderImpl.mayDelete(listOf("+49111"), isFake)).isTrue()
+        assertThat(SmsInboxReaderImpl.mayDelete(listOf("+49111", "+88810000005"), isFake)).isFalse()
+        assertThat(SmsInboxReaderImpl.mayDelete(emptyList(), isFake)).isFalse()
+    }
+
+    @Test
+    fun `mayDelete allows blank addresses`() {
+        // Service-SMS ohne Absenderadresse sind echte Rows und müssen löschbar bleiben.
+        assertThat(SmsInboxReaderImpl.mayDelete(listOf(""), isFake = { false })).isTrue()
+    }
 }

@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -26,7 +27,10 @@ fun MfsNavHost(
 ) {
     // Geteilte BottomBar — nur an die Haupt-Routen gehängt; Onboarding & Detail-/
     // Dev-Screens bekommen sie nicht (sie nutzen stattdessen einen Zurück-Pfeil).
-    val bottomBar: @Composable () -> Unit = { MfsBottomBar(navController) }
+    // VM HIER auflösen (MfsNavHost-Scope = Activity-Owner) und in die Lambda
+    // schließen — so existiert genau EIN Badge-Observer für alle Tabs.
+    val badgeViewModel: UnreadBadgeViewModel = hiltViewModel()
+    val bottomBar: @Composable () -> Unit = { MfsBottomBar(navController, badgeViewModel) }
 
     NavHost(
         navController = navController,

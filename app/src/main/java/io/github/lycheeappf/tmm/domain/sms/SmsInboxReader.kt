@@ -29,6 +29,25 @@ interface SmsInboxReader {
      */
     suspend fun markThreadRead(threadId: Long)
 
+    /**
+     * Löscht eine einzelne (echte) SMS endgültig. Nur als Standard-SMS-App;
+     * Fake-Rows (`+888…`) werden nie gelöscht. true nur bei ≥1 gelöschter Row.
+     */
+    suspend fun deleteMessage(messageId: Long): Boolean
+
+    /**
+     * Löscht alle (echten) Nachrichten eines Threads endgültig. Nur als
+     * Standard-SMS-App; Threads mit Fake-Adressen werden nie gelöscht.
+     */
+    suspend fun deleteThread(threadId: Long): Boolean
+
+    /**
+     * Anzahl ungelesener eingehender echter SMS. Gleiche Ausschluss-Semantik wie die
+     * Konversationsliste (Fakes/leere Adressen zählen nicht), aber ohne deren
+     * Scan-/Thread-Limits — es zählen ALLE Rows. 0 bei fehlender Permission/Fehler.
+     */
+    suspend fun unreadCount(): Int
+
     /** Emittiert, wenn sich `content://sms` ändert (für Live-Refresh; im VM debounced). */
     fun changes(): Flow<Unit>
 

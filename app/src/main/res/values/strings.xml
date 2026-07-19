@@ -68,6 +68,10 @@
     <string name="nav_sms_thread_label">Conversation</string>
     <string name="nav_sms_compose_label">New SMS</string>
     <string name="nav_tab_assistant" translatable="false">Grok</string>
+    <plurals name="nav_sms_badge_desc">
+        <item quantity="one">%1$d unread message</item>
+        <item quantity="other">%1$d unread messages</item>
+    </plurals>
 
     <!-- Health-check worker notifications -->
     <string name="health_role_title">Default SMS app not set</string>

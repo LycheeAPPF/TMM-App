@@ -1,10 +1,14 @@
 package io.github.lycheeappf.tmm.ui.screen.sms
 
+import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
+import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.domain.sms.SmsConversation
 import io.github.lycheeappf.tmm.domain.sms.SmsInboxReader
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
@@ -25,11 +29,13 @@ data class SmsConversationsUiState(
     val items: List<SmsConversation> = emptyList(),
     val loading: Boolean = true,
     val isDefaultSmsApp: Boolean = true,
-    val hasReadSms: Boolean = true
+    val hasReadSms: Boolean = true,
+    val feedback: String? = null
 )
 
 @HiltViewModel
 class SmsConversationsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val reader: SmsInboxReader,
     private val roleManager: DefaultSmsRoleManager,
     private val permissionGate: PermissionGate,
@@ -71,6 +77,20 @@ class SmsConversationsViewModel @Inject constructor(
         _uiState.update {
             it.copy(items = items, loading = false, isDefaultSmsApp = isDefault, hasReadSms = true)
         }
+    }
+
+    /** Löscht eine ganze Konversation; Fehlschlag → Snackbar-Feedback.
+     *  Erfolg: der ContentObserver-Flow lädt die Liste automatisch neu. */
+    fun deleteThread(threadId: Long) {
+        viewModelScope.launch {
+            if (!reader.deleteThread(threadId)) {
+                _uiState.update { it.copy(feedback = context.localizedString(R.string.sms_delete_failed)) }
+            }
+        }
+    }
+
+    fun consumeFeedback() {
+        _uiState.update { it.copy(feedback = null) }
     }
 
     /** Intent zum Anfordern der Standard-SMS-Rolle (oder null vor Android Q). */

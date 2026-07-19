@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.ui.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,9 +28,17 @@ fun MfsListItem(
     subtitleMonospace: Boolean = false,
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
-    val clickModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    // onLongClick funktioniert auch ohne onClick (Tap ist dann ein No-op) —
+    // sonst würde eine Long-Click-only-Nutzung stillschweigend ignoriert.
+    val clickModifier = when {
+        onLongClick != null ->
+            Modifier.combinedClickable(onClick = onClick ?: {}, onLongClick = onLongClick)
+        onClick != null -> Modifier.clickable(onClick = onClick)
+        else -> Modifier
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
