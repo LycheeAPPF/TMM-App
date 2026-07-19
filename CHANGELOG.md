@@ -4,6 +4,22 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-07-19
+
+Maintenance release on top of v1.0.0, focused on managing the in-app SMS inbox,
+plus one UI fix.
+
+### Added
+- **Delete whole conversations.** Long-press a thread in the SMS list to delete it,
+  behind a confirmation dialog.
+- **Swipe-to-delete single messages.** Swipe a message bubble to remove just that
+  message, behind a confirmation dialog.
+- **Unread SMS badge.** The bottom-bar SMS tab now shows a live unread-message count.
+
+### Fixed
+- **Bluetooth device picker** list is now scrollable, so every paired device stays
+  reachable on long lists.
+
 ## [1.0.0] — 2026-07-12 — "The Big One"
 
 First stable release. It brings the entire 0.7.x/0.8.x development line to a stable
