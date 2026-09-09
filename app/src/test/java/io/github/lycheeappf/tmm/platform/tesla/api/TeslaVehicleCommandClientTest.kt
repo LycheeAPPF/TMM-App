@@ -5,7 +5,7 @@ import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.core.util.LogFileStore
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
-import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.VehicleRef
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
 import io.mockk.Runs
@@ -35,7 +35,9 @@ import java.util.concurrent.TimeUnit
 /**
  * MockWebServer-Tests für [TeslaVehicleCommandClient]: Region-Discovery
  * (Kandidaten-Probe + Persistenz in [TeslaRegionStore]), Wake-up-and-retry bei
- * schlafendem Fahrzeug, Mapping der HTTP-Fehler auf die sealed
+ * schlafendem Fahrzeug (die numerische ID kommt aus der [VehicleRef] des
+ * Ziel-Fahrzeugs — nie aus einer globalen Auswahl — und wird ohne ID über die
+ * Fahrzeugliste nachgeschlagen), Mapping der HTTP-Fehler auf die sealed
  * [TeslaCommandError]-Hierarchie sowie die PII-Regel — [LogBuffer] darf nach
  * keinem Call Ziel-Adresse, VIN oder Koordinaten enthalten (nur Metadaten).
  */
@@ -51,7 +53,6 @@ class TeslaVehicleCommandClientTest {
     private lateinit var naBase: String
 
     private val authManager: TeslaAuthManager = mockk()
-    private val tokenStore: TeslaTokenStore = mockk()
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -83,7 +84,6 @@ class TeslaVehicleCommandClientTest {
         coEvery { authManager.refreshIfNeeded() } just Runs
         coEvery { authManager.hasCredentials() } returns true
         coEvery { authManager.readAccessToken() } returns "access-token"
-        coEvery { tokenStore.readSelectedVehicleId() } returns VEHICLE_ID
 
         regionStore = FakeTeslaRegionStore()
         logBuffer = LogBuffer(
@@ -91,7 +91,7 @@ class TeslaVehicleCommandClientTest {
             UnconfinedTestDispatcher()
         )
         client = TeslaVehicleCommandClient(
-            api, authManager, tokenStore, regionStore, logBuffer, Clock { FIXED_NOW }
+            api, authManager, regionStore, logBuffer, Clock { FIXED_NOW }
         )
     }
 
@@ -188,7 +188,7 @@ class TeslaVehicleCommandClientTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"response":{"state":"online"}}"""))
         server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
 
-        client.navigate(VIN, ADDRESS)
+        client.navigate(VEHICLE, ADDRESS)
 
         assertThat(server.requestCount).isEqualTo(3)
         val attempt = server.takeRequest()
@@ -198,11 +198,39 @@ class TeslaVehicleCommandClientTest {
         assertThat(server.takeRequest().path).isEqualTo("/eu/api/1/vehicles/$VIN/command/navigation_request")
     }
 
+    @Test fun `wake up without a known vehicle id looks it up via the vehicle list`() = runTest {
+        regionStore.baseUrl = euBase
+        server.enqueue(vehicleAsleep())
+        server.enqueue(MockResponse().setResponseCode(200).setBody(vehiclesJson()))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"response":{"state":"online"}}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
+
+        client.navigate(VehicleRef(VIN, vehicleId = null), ADDRESS)
+
+        assertThat(server.requestCount).isEqualTo(4)
+        assertThat(server.takeRequest().path).isEqualTo("/eu/api/1/vehicles/$VIN/command/navigation_request")
+        assertThat(server.takeRequest().path).isEqualTo("/eu/api/1/vehicles")
+        assertThat(server.takeRequest().path).isEqualTo("/eu/api/1/vehicles/$VEHICLE_ID/wake_up")
+        assertThat(server.takeRequest().path).isEqualTo("/eu/api/1/vehicles/$VIN/command/navigation_request")
+    }
+
+    @Test fun `wake up uses the id of the addressed vehicle, not any other`() = runTest {
+        regionStore.baseUrl = euBase
+        server.enqueue(vehicleAsleep())
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"response":{"state":"online"}}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
+
+        client.navigate(VehicleRef("5YJ3E1EA7KF999999", vehicleId = 9999L), ADDRESS)
+
+        server.takeRequest()
+        assertThat(server.takeRequest().path).isEqualTo("/eu/api/1/vehicles/9999/wake_up")
+    }
+
     @Test fun `successful command does not wake the vehicle`() = runTest {
         regionStore.baseUrl = euBase
         server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
 
-        client.navigate(VIN, ADDRESS)
+        client.navigate(VEHICLE, ADDRESS)
 
         assertThat(server.requestCount).isEqualTo(1)
     }
@@ -211,7 +239,7 @@ class TeslaVehicleCommandClientTest {
         regionStore.baseUrl = euBase
         server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
 
-        client.navigate(VIN, ADDRESS)
+        client.navigate(VEHICLE, ADDRESS)
 
         val body = server.takeRequest().body.readUtf8()
         assertThat(body).contains("\"timestamp_ms\":$FIXED_NOW")
@@ -223,7 +251,7 @@ class TeslaVehicleCommandClientTest {
         regionStore.baseUrl = euBase
         server.enqueue(MockResponse().setResponseCode(401).setBody("expired"))
 
-        val ex = runCatching { client.navigate(VIN, ADDRESS) }.exceptionOrNull()
+        val ex = runCatching { client.navigate(VEHICLE, ADDRESS) }.exceptionOrNull()
 
         assertThat(ex).isInstanceOf(TeslaCommandError.Unauthorized::class.java)
     }
@@ -234,7 +262,7 @@ class TeslaVehicleCommandClientTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"response":{"state":"waking"}}"""))
         server.enqueue(MockResponse().setResponseCode(404).setBody("not found"))
 
-        val ex = runCatching { client.navigate(VIN, ADDRESS) }.exceptionOrNull()
+        val ex = runCatching { client.navigate(VEHICLE, ADDRESS) }.exceptionOrNull()
 
         assertThat(ex).isInstanceOf(TeslaCommandError.VehicleNotFound::class.java)
         assertThat(server.requestCount).isEqualTo(3)
@@ -247,7 +275,7 @@ class TeslaVehicleCommandClientTest {
                 .setBody("""{"response":{"result":false,"reason":"car_in_drive"}}""")
         )
 
-        val ex = runCatching { client.navigate(VIN, ADDRESS) }.exceptionOrNull()
+        val ex = runCatching { client.navigate(VEHICLE, ADDRESS) }.exceptionOrNull()
 
         assertThat(ex).isInstanceOf(TeslaCommandError.CommandRejected::class.java)
         assertThat((ex as TeslaCommandError.CommandRejected).reason).isEqualTo("car_in_drive")
@@ -257,7 +285,7 @@ class TeslaVehicleCommandClientTest {
         regionStore.baseUrl = euBase
         server.enqueue(MockResponse().setResponseCode(500).setBody("x".repeat(300)))
 
-        val ex = runCatching { client.navigate(VIN, ADDRESS) }.exceptionOrNull()
+        val ex = runCatching { client.navigate(VEHICLE, ADDRESS) }.exceptionOrNull()
 
         assertThat(ex).isInstanceOf(TeslaCommandError.Unknown::class.java)
         val unknown = ex as TeslaCommandError.Unknown
@@ -269,7 +297,7 @@ class TeslaVehicleCommandClientTest {
         regionStore.baseUrl = euBase
         coEvery { authManager.hasCredentials() } returns false
 
-        val ex = runCatching { client.navigate(VIN, ADDRESS) }.exceptionOrNull()
+        val ex = runCatching { client.navigate(VEHICLE, ADDRESS) }.exceptionOrNull()
 
         assertThat(ex).isInstanceOf(TeslaCommandError.MissingCredentials::class.java)
         assertThat(server.requestCount).isEqualTo(0)
@@ -283,7 +311,7 @@ class TeslaVehicleCommandClientTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"response":{"state":"online"}}"""))
         server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
 
-        client.navigate(VIN, ADDRESS)
+        client.navigate(VEHICLE, ADDRESS)
 
         assertThat(logBuffer.snapshot()).isNotEmpty()
         val logged = loggedText()
@@ -296,7 +324,7 @@ class TeslaVehicleCommandClientTest {
         regionStore.baseUrl = euBase
         server.enqueue(MockResponse().setResponseCode(200).setBody(commandOk()))
 
-        client.navigateGps(VIN, 52.5200, 13.4050)
+        client.navigateGps(VEHICLE, 52.5200, 13.4050)
 
         assertThat(logBuffer.snapshot()).isNotEmpty()
         val logged = loggedText()
@@ -312,7 +340,7 @@ class TeslaVehicleCommandClientTest {
                 .setBody("""{"response":{"result":false,"reason":"driver left car at $ADDRESS"}}""")
         )
 
-        runCatching { client.navigate(VIN, ADDRESS) }
+        runCatching { client.navigate(VEHICLE, ADDRESS) }
 
         assertThat(logBuffer.snapshot()).isNotEmpty()
         val logged = loggedText()
@@ -326,7 +354,7 @@ class TeslaVehicleCommandClientTest {
             MockResponse().setResponseCode(500).setBody("""{"error":"could not route to $ADDRESS"}""")
         )
 
-        runCatching { client.navigate(VIN, ADDRESS) }
+        runCatching { client.navigate(VEHICLE, ADDRESS) }
 
         assertThat(logBuffer.snapshot()).isNotEmpty()
         val logged = loggedText()
@@ -344,6 +372,7 @@ class TeslaVehicleCommandClientTest {
     companion object {
         private const val VIN = "5YJ3E1EA7KF317000"
         private const val VEHICLE_ID = 4711L
+        private val VEHICLE = VehicleRef(VIN, VEHICLE_ID)
         private const val ADDRESS = "Musterstraße 42, 10999 Berlin"
         private const val FIXED_NOW = 1_720_000_000_000L
     }

@@ -50,12 +50,16 @@ class DiagnosticsExporter @Inject constructor(
     suspend fun exportToCache(): File {
         val mappings = collectAllMappings()
         val history = collectRecentHistory()
+        // Multi-Tesla: nur Counts — Gerätename (= Autoname), MAC und VIN sind PII.
+        val teslaDevices = settingsStore.teslaDevices()
         val teslaSnapshot = TeslaApiSnapshot(
             authenticated = teslaTokenStore.isAuthenticated(),
             // VIN ist PII → maskiert auf die letzten 4 Zeichen (reicht zur Zuordnung).
             selectedVin = teslaTokenStore.readSelectedVin()?.let { vin -> "…${vin.takeLast(4)}" },
             fleetApiBaseUrl = teslaRegionStore.readFleetApiBaseUrl(),
-            tokenExpiresAtMs = teslaTokenStore.readExpiresAtMs().takeIf { it > 0L }
+            tokenExpiresAtMs = teslaTokenStore.readExpiresAtMs().takeIf { it > 0L },
+            configuredTeslaDevices = teslaDevices.size,
+            linkedVehicles = teslaDevices.count { it.isLinked }
         )
         val payload = DiagnosticsSnapshot(
             generatedAt = System.currentTimeMillis(),
@@ -151,9 +155,14 @@ private data class DiagnosticsSnapshot(
 @Serializable
 private data class TeslaApiSnapshot(
     val authenticated: Boolean,
+    /** Standard-Fahrzeug (Fallback des Resolvers), maskiert. */
     val selectedVin: String?,
     val fleetApiBaseUrl: String?,
-    val tokenExpiresAtMs: Long?
+    val tokenExpiresAtMs: Long?,
+    /** Gewählte Tesla-Bluetooth-Geräte (nur Anzahl). */
+    val configuredTeslaDevices: Int,
+    /** Davon mit Fleet-Fahrzeug verknüpft (nur Anzahl). */
+    val linkedVehicles: Int
 )
 
 @Serializable

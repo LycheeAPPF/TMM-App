@@ -122,11 +122,11 @@ fun OnboardingScreen(
     if (showDevicePicker) {
         TeslaDevicePickerDialog(
             devices = state.pairedDevices,
-            selectedAddress = state.teslaBtAddress,
+            selectedAddresses = state.teslaDevices.map { it.device.address }.toSet(),
             loading = state.pairedDevicesLoading,
-            onSelect = { device ->
+            onConfirm = { selected ->
                 showDevicePicker = false
-                viewModel.selectTeslaDevice(device.address, device.name)
+                viewModel.setTeslaDevices(selected)
             },
             onCancel = { showDevicePicker = false }
         )
@@ -258,21 +258,20 @@ fun OnboardingScreen(
                 )
             }
 
-            // Optionaler Schritt: jetzt schon das Tesla-Bluetooth-Gerät wählen, damit
-            // Nachrichten nur im Auto weitergeleitet werden. Nicht erforderlich zum
-            // Abschluss — ohne Auswahl wird (wie bisher) rund um die Uhr weitergeleitet.
+            // Optionaler Schritt: jetzt schon die Tesla-Bluetooth-Geräte wählen (eins oder
+            // mehrere), damit Nachrichten nur im Auto weitergeleitet werden. Nicht
+            // erforderlich zum Abschluss — ohne Auswahl wird rund um die Uhr weitergeleitet.
             TeslaConnectionCard(
-                deviceName = state.teslaBtDeviceName,
-                deviceMissing = state.teslaDeviceMissing,
+                devices = state.teslaDevices,
                 hasPermission = state.hasBluetoothPermission,
                 permanentlyDenied = btPermanentlyDenied,
                 onGrantPermission = { btPermLauncher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
                 onOpenAppSettings = openAppSettings,
-                onSelectDevice = {
+                onSelectDevices = {
                     viewModel.loadPairedDevices()
                     showDevicePicker = true
                 },
-                onClearDevice = { viewModel.clearTeslaDevice() }
+                onRemoveDevice = { viewModel.removeTeslaDevice(it) }
             )
 
             // Optionaler Schritt: jetzt schon wählen, welche Messenger-Apps ans Tesla

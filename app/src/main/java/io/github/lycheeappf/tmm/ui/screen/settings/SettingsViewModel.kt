@@ -15,8 +15,10 @@ import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.core.util.DiagnosticsExporter
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.tesla.TeslaDevice
 import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
+import io.github.lycheeappf.tmm.platform.bluetooth.TeslaDeviceStatus
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaCommandError
 import io.github.lycheeappf.tmm.platform.tesla.api.VehicleInfo
@@ -44,13 +46,12 @@ data class SettingsUiState(
     val sendBudget: Int = SettingsStore.DEFAULT_SEND_BUDGET,
     val sendBudgetEnabled: Boolean = true,
     val sendCountToday: Int = 0,
-    /** Anzeigename des gewählten Tesla-Bluetooth-Geräts; null = keins gewählt. */
-    val teslaBtDeviceName: String? = null,
-    /** MAC des gewählten Geräts (zum Vorauswählen im Picker). */
-    val teslaBtAddress: String? = null,
+    /**
+     * Gewählte Tesla-Bluetooth-Geräte mit Zeilen-Zustand (nicht mehr gekoppelt /
+     * verbunden / verknüpftes Fahrzeug); leer = keins gewählt → Gate aus.
+     */
+    val teslaDevices: List<TeslaDeviceStatus> = emptyList(),
     val hasBluetoothPermission: Boolean = false,
-    /** Gewähltes Gerät ist nicht mehr gekoppelt → Weiterleitung stillschweigend tot. */
-    val teslaDeviceMissing: Boolean = false,
     /** Gekoppelte Geräte für den Auswahl-Dialog (on-demand geladen). */
     val pairedDevices: List<PairedBtDevice> = emptyList(),
     val pairedDevicesLoading: Boolean = false,
@@ -169,22 +170,18 @@ class SettingsViewModel @Inject constructor(
     /** Billige DataStore-Reads — wird nach jedem Setter aufgerufen. */
     private fun refreshSettings() {
         viewModelScope.launch(ioDispatcher) {
-            val btAddress = store.teslaBtAddress()
             val hasBt = permissionGate.hasBluetoothConnect()
-            // Gespeichertes Gerät nicht mehr gekoppelt? Dann gated der Check stillschweigend
-            // alles weg — als Warnung surfacen. Nur prüfbar mit Permission.
-            val deviceMissing = btAddress != null && hasBt &&
-                bluetoothConnectionChecker.pairedDevices().none { it.address.equals(btAddress, ignoreCase = true) }
+            // Zeilen-Zustände (nicht mehr gekoppelt / verbunden) kommen aus dem Checker —
+            // ein entkoppeltes Gerät würde sonst stillschweigend alles weggaten.
+            val teslaDevices = bluetoothConnectionChecker.teslaDeviceStatuses()
             _uiState.update {
                 it.copy(
                     ttlHours = store.mappingTtlHours(),
                     sendBudget = store.sendBudgetPerDay(),
                     sendBudgetEnabled = store.isSendBudgetEnabled(),
                     sendCountToday = store.dailySendCount(),
-                    teslaBtDeviceName = store.teslaBtName(),
-                    teslaBtAddress = btAddress,
+                    teslaDevices = teslaDevices,
                     hasBluetoothPermission = hasBt,
-                    teslaDeviceMissing = deviceMissing,
                     preflightStatus = store.preflightResult(),
                     developerMode = store.isDeveloperMode(),
                     languageTag = appLocaleManager.currentTag(),
@@ -289,18 +286,33 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Merkt sich das gewählte Tesla-Gerät → ab jetzt wird nur verbunden weitergeleitet. */
-    fun selectTeslaDevice(address: String, name: String) {
+    /**
+     * Ersetzt die Tesla-Geräteauswahl (Mehrfach-Picker) → ab jetzt wird nur
+     * weitergeleitet, während eines dieser Geräte verbunden ist. Fahrzeug-Links
+     * behaltener Geräte bleiben erhalten (Merge passiert atomar im Store).
+     */
+    fun setTeslaDevices(selected: List<PairedBtDevice>) {
         viewModelScope.launch(ioDispatcher) {
-            store.setTeslaBtDevice(address, name)
+            store.setTeslaDevices(selected.map { TeslaDevice(address = it.address, name = it.name) })
             refreshSettings()
         }
     }
 
-    /** Hebt die Tesla-Gerätewahl auf → Verbindungs-Gate aus, Weiterleitung wieder rund um die Uhr. */
-    fun clearTeslaDevice() {
+    /** Entfernt ein Gerät aus der Auswahl; ohne Geräte ist das Gate aus (rund um die Uhr). */
+    fun removeTeslaDevice(address: String) {
         viewModelScope.launch(ioDispatcher) {
-            store.clearTeslaBtDevice()
+            store.removeTeslaDevice(address)
+            refreshSettings()
+        }
+    }
+
+    /**
+     * Ordnet ein Fleet-Fahrzeug einem Tesla-Gerät zu (`address == null` = entkoppeln)
+     * → Grok navigiert das Auto, mit dem das Handy gerade verbunden ist.
+     */
+    fun linkTeslaVehicle(vehicle: VehicleInfo, address: String?) {
+        viewModelScope.launch(ioDispatcher) {
+            store.linkVehicleToDevice(vehicle.vin, vehicle.id, address)
             refreshSettings()
         }
     }

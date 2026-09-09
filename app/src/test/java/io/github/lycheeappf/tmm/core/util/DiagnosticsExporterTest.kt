@@ -14,6 +14,7 @@ import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
 import io.github.lycheeappf.tmm.domain.channel.ChannelPayload
+import io.github.lycheeappf.tmm.domain.tesla.TeslaDevice
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -110,5 +111,23 @@ class DiagnosticsExporterTest {
 
         assertThat(content).doesNotContain("5YJ3E7EB1KF000123")
         assertThat(content).contains("…0123")
+    }
+
+    @Test fun `export counts tesla devices and links without leaking mac, name or vin`() = runTest {
+        coEvery { settingsStore.teslaDevices() } returns listOf(
+            TeslaDevice("AA:BB:CC:DD:EE:FF", "Model Y", vin = "5YJ3E7EB1KF000123", vehicleId = 42L),
+            TeslaDevice("11:22:33:44:55:66", "Model 3")
+        )
+        every { mappingDao.observeByChannel(any(), any()) } returns flowOf(emptyList())
+        every { replyHistoryDao.observeRecent(any()) } returns flowOf(emptyList())
+
+        val content = exporter().exportToCache().readText()
+
+        assertThat(content).contains("\"configuredTeslaDevices\": 2")
+        assertThat(content).contains("\"linkedVehicles\": 1")
+        // Gerätename = Autoname, MAC = Geräte-Identifier, VIN: alles PII → nie im Export.
+        assertThat(content).doesNotContain("AA:BB:CC")
+        assertThat(content).doesNotContain("Model Y")
+        assertThat(content).doesNotContain("5YJ3E7EB1KF000123")
     }
 }

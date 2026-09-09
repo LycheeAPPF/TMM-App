@@ -4,7 +4,7 @@ import android.util.Log
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
-import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.VehicleRef
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
 import kotlinx.coroutines.CancellationException
@@ -30,11 +30,16 @@ sealed class TeslaCommandError(message: String?) : Exception(message) {
     class Unknown(val code: Int, val body: String?) : TeslaCommandError("HTTP $code")
 }
 
+/**
+ * Führt Fleet-API-Kommandos gegen ein konkretes Fahrzeug ([VehicleRef]) aus.
+ * Das Ziel kommt vom Aufrufer (Multi-Tesla: `ActiveVehicleResolver`) — der
+ * Client kennt keine „globale" Fahrzeugauswahl mehr; insbesondere `wake_up`
+ * nutzt die ID des adressierten Fahrzeugs, nicht die eines anderen Autos.
+ */
 @Singleton
 class TeslaVehicleCommandClient @Inject constructor(
     private val api: TeslaFleetApi,
     private val authManager: TeslaAuthManager,
-    private val tokenStore: TeslaTokenStore,
     private val regionStore: TeslaRegionStore,
     private val logBuffer: LogBuffer,
     private val clock: Clock
@@ -72,15 +77,19 @@ class TeslaVehicleCommandClient @Inject constructor(
     }
 
     /** Sendet ein Text-Navigationsziel an das Fahrzeug, weckt es vorher auf falls nötig. */
-    suspend fun navigate(vin: String, address: String) {
+    suspend fun navigate(vehicle: VehicleRef, address: String) {
         val base = ensureRegion()
         val body = NavigationRequestBody(
             locale = Locale.getDefault().toLanguageTag(),
             timestampMs = clock.now(),
             value = NavigationValue(text = address, extraText = address)
         )
-        sendWithWakeUpRetry(vin, "navigation_request") {
-            api.navigationRequest("${base}api/1/vehicles/$vin/command/navigation_request", "Bearer ${requireToken()}", body)
+        sendWithWakeUpRetry(vehicle, "navigation_request") {
+            api.navigationRequest(
+                "${base}api/1/vehicles/${vehicle.vin}/command/navigation_request",
+                "Bearer ${requireToken()}",
+                body
+            )
         }
         // NIE Ziel/VIN loggen — nur Metadaten (siehe CLAUDE.md PII-Regel).
         logBuffer.info(TAG, "navigation_request OK (address len=${address.length})")
@@ -88,11 +97,15 @@ class TeslaVehicleCommandClient @Inject constructor(
     }
 
     /** Sendet GPS-Koordinaten als Navigationsziel, weckt das Fahrzeug vorher auf falls nötig. */
-    suspend fun navigateGps(vin: String, lat: Double, lon: Double) {
+    suspend fun navigateGps(vehicle: VehicleRef, lat: Double, lon: Double) {
         val base = ensureRegion()
         val body = NavigationGpsBody(lat = lat, lon = lon)
-        sendWithWakeUpRetry(vin, "navigation_gps_request") {
-            api.navigationGps("${base}api/1/vehicles/$vin/command/navigation_gps_request", "Bearer ${requireToken()}", body)
+        sendWithWakeUpRetry(vehicle, "navigation_gps_request") {
+            api.navigationGps(
+                "${base}api/1/vehicles/${vehicle.vin}/command/navigation_gps_request",
+                "Bearer ${requireToken()}",
+                body
+            )
         }
         // NIE Koordinaten/VIN loggen — nur Metadaten (siehe CLAUDE.md PII-Regel).
         logBuffer.info(TAG, "navigation_gps_request OK")
@@ -104,7 +117,7 @@ class TeslaVehicleCommandClient @Inject constructor(
      * 15 Sekunden gewartet und der Aufruf einmal wiederholt.
      */
     private suspend fun sendWithWakeUpRetry(
-        vin: String,
+        vehicle: VehicleRef,
         endpoint: String,
         call: suspend () -> retrofit2.Response<CommandResponse>
     ) {
@@ -114,7 +127,7 @@ class TeslaVehicleCommandClient @Inject constructor(
             val bodyLen = resp.errorBody()?.string()?.length ?: 0
             Log.w(TAG, "$endpoint offline (HTTP ${resp.code()}, body len=$bodyLen) — waking up vehicle")
             logBuffer.warn(TAG, "$endpoint: HTTP ${resp.code()} — vehicle asleep, sending wake_up")
-            wakeUpByVin(vin)
+            wakeUp(vehicle)
             delay(15_000L)
             resp = call()
         }
@@ -131,11 +144,15 @@ class TeslaVehicleCommandClient @Inject constructor(
         }
     }
 
-    /** Weckt das Fahrzeug über seine numerische ID (bevorzugt) oder sucht via Fahrzeugliste. */
-    private suspend fun wakeUpByVin(vin: String) {
+    /**
+     * Weckt das adressierte Fahrzeug über seine numerische ID ([VehicleRef.vehicleId],
+     * bevorzugt) oder schlägt sie über die Fahrzeugliste nach. Bewusst KEINE
+     * globale „gewählte" ID — bei mehreren Autos würde sonst das falsche geweckt.
+     */
+    private suspend fun wakeUp(vehicle: VehicleRef) {
         val base = regionStore.readFleetApiBaseUrl() ?: return
-        val vehicleId = tokenStore.readSelectedVehicleId()
-            ?: listVehicles().firstOrNull { it.vin == vin }?.id
+        val vehicleId = vehicle.vehicleId
+            ?: listVehicles().firstOrNull { it.vin == vehicle.vin }?.id
             ?: run {
                 Log.w(TAG, "wakeUp: vehicle ID not found")
                 logBuffer.warn(TAG, "wake_up: vehicle ID not found")

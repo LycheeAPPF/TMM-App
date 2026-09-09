@@ -12,7 +12,7 @@ import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.ActiveVehicleResolver
 import io.github.lycheeappf.tmm.platform.location.LocationFix
 import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
@@ -37,13 +37,13 @@ class GrokSelfTesterTest {
     private val locationProvider: LocationProvider = mockk()
     private val permissionGate: PermissionGate = mockk()
     private val teslaAuthManager: TeslaAuthManager = mockk()
-    private val teslaTokenStore: TeslaTokenStore = mockk()
+    private val vehicleResolver: ActiveVehicleResolver = mockk()
     private val logBuffer: LogBuffer = mockk(relaxed = true)
 
     private val tester = GrokSelfTester(
         keyTester, provider, prefs, toolRegistry,
         ToolCallExecutor(toolRegistry, logBuffer),
-        locationProvider, permissionGate, teslaAuthManager, teslaTokenStore, logBuffer
+        locationProvider, permissionGate, teslaAuthManager, vehicleResolver, logBuffer
     )
 
     private val fix = LocationFix(52.5200, 13.4050, 25f)
@@ -58,7 +58,7 @@ class GrokSelfTesterTest {
         every { permissionGate.hasBackgroundLocationAccess() } returns true
         every { locationProvider.lastKnownLocation() } returns fix
         coEvery { teslaAuthManager.hasCredentials() } returns true
-        coEvery { teslaTokenStore.readSelectedVin() } returns "5YJ3E1EA7KF000000"
+        coEvery { vehicleResolver.isAnyVehicleConfigured() } returns true
         coEvery { toolRegistry.activeSchemas() } returns emptyList()
     }
 
@@ -142,8 +142,9 @@ class GrokSelfTesterTest {
             .isEqualTo(PositionLocalResult.Ok(fix, backgroundGranted = false))
     }
 
-    @Test fun `tesla local stage reports credentials and vin`() = runTest {
-        coEvery { teslaTokenStore.readSelectedVin() } returns null
+    @Test fun `tesla local stage reports credentials and missing vehicle configuration`() = runTest {
+        // Weder Standard-Fahrzeug noch verknüpftes Gerät (Resolver-Sicht, nicht nur die VIN).
+        coEvery { vehicleResolver.isAnyVehicleConfigured() } returns false
         coEvery { provider.complete(any()) } returns textResponse("52.52, 13.41")
 
         val events = runToList()

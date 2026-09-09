@@ -12,6 +12,7 @@ import io.github.lycheeappf.tmm.core.security.TeslaCredentials
 import io.github.lycheeappf.tmm.core.security.TeslaCredentialsStore
 import io.github.lycheeappf.tmm.core.util.Clock
 import io.github.lycheeappf.tmm.core.util.coRunCatching
+import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.data.store.TeslaPendingAuth
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
@@ -75,6 +76,7 @@ class TeslaAuthManager @Inject constructor(
     private val tokenStore: TeslaTokenStore,
     private val credentialsStore: TeslaCredentialsStore,
     private val regionStore: TeslaRegionStore,
+    private val settingsStore: SettingsStore,
     @TeslaHttpClient private val httpClient: OkHttpClient,
     private val endpoints: TeslaOAuthEndpoints,
     private val clock: Clock,
@@ -119,12 +121,14 @@ class TeslaAuthManager @Inject constructor(
 
     /**
      * Entfernt die Credentials und ALLE davon abhängigen Artefakte (Tokens,
-     * Region) — ohne client_id/secret sind die Tokens nicht mehr refreshbar.
+     * Region, Fahrzeug-Verknüpfungen der Tesla-Geräte) — ohne client_id/secret
+     * sind die Tokens nicht mehr refreshbar, und die VINs gehören zum Account.
      */
     suspend fun clearCredentials(): Unit = withContext(ioDispatcher) {
         credentialsStore.clear()
         tokenStore.clear()
         regionStore.writeFleetApiBaseUrl(null)
+        settingsStore.clearTeslaVehicleLinks()
         _state.update { TeslaAuthState.MissingCredentials }
     }
 
@@ -293,6 +297,8 @@ class TeslaAuthManager @Inject constructor(
         tokenStore.clear()
         // Region ist account-abhängig (EU vs. NA) → beim Logout mit verwerfen.
         regionStore.writeFleetApiBaseUrl(null)
+        // Fahrzeug-Verknüpfungen hängen am Account (VINs) — wie die gewählte VIN in tokenStore.clear().
+        settingsStore.clearTeslaVehicleLinks()
         _state.update {
             if (credentialsStore.isSet()) TeslaAuthState.NotAuthenticated
             else TeslaAuthState.MissingCredentials

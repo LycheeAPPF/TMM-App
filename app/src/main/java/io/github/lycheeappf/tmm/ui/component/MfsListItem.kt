@@ -12,13 +12,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import io.github.lycheeappf.tmm.ui.theme.MfsSpacing
 
 /**
  * Generische Listenzeile: Titel + optionaler Untertitel, optionales Leading/Trailing
  * und optionaler Klick. Konsolidiert die früheren privaten `NavRow` (Home),
- * `AppRow` (Whitelist) und `StatusRow` (Home).
+ * `AppRow` (Whitelist) und `StatusRow` (Home). [subtitleColor] überschreibt die
+ * Standardfarbe des Untertitels (z.B. `error` für Warnzeilen).
  */
 @Composable
 fun MfsListItem(
@@ -26,6 +28,7 @@ fun MfsListItem(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     subtitleMonospace: Boolean = false,
+    subtitleColor: Color? = null,
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
@@ -56,7 +59,7 @@ fun MfsListItem(
                     style = MaterialTheme.typography.bodySmall.let {
                         if (subtitleMonospace) it.copy(fontFamily = FontFamily.Monospace) else it
                     },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = subtitleColor ?: MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

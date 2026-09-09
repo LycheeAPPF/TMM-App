@@ -7,7 +7,7 @@ import io.github.lycheeappf.tmm.channel.llm.tools.AssistantTool
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolSchema
 import io.github.lycheeappf.tmm.core.locale.localizedString
-import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.ActiveVehicleResolver
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaCommandError
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
 import io.github.lycheeappf.tmm.platform.tesla.api.userMessage
@@ -28,18 +28,23 @@ import javax.inject.Singleton
  * (z.B. "Navigiere mich zur nächsten Apotheke"). Das Tool leitet den Zielort
  * an [TeslaVehicleCommandClient] weiter, der die Fleet-API-Call ausführt.
  *
+ * Multi-Tesla: das Ziel-Fahrzeug liefert der [ActiveVehicleResolver] — das per
+ * Bluetooth verbundene, verknüpfte Auto, sonst das Standard-Fahrzeug.
+ *
  * Bei vagen Zielen sucht Grok via Websuche die konkrete Adresse, bevor es das Tool aufruft.
  */
 @Singleton
 class TeslaNavigateTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val commandClient: TeslaVehicleCommandClient,
-    private val tokenStore: TeslaTokenStore
+    private val vehicleResolver: ActiveVehicleResolver
 ) : AssistantTool {
 
     override val schema = ToolSchema(
         name = "tesla_navigate",
         description = "Sends a navigation destination to the driver's Tesla vehicle via the Fleet API. " +
+            "The app picks the Tesla the phone is currently connected to via Bluetooth and falls back " +
+            "to the default vehicle selected in the app settings. " +
             "Call this when the driver asks to navigate somewhere, find a route, or go to a place, " +
             "or when you are explicitly instructed to call this tool (for example an app integration check). " +
             "Always pass a specific, concrete address or place name — never a vague query. " +
@@ -61,7 +66,7 @@ class TeslaNavigateTool @Inject constructor(
     )
 
     override suspend fun invoke(arguments: JsonObject): ToolInvocationResult {
-        val vin = tokenStore.readSelectedVin()
+        val vehicle = vehicleResolver.resolve()
             ?: return ToolInvocationResult.Failure(
                 context.localizedString(R.string.tesla_error_no_vehicle_configured)
             )
@@ -72,7 +77,7 @@ class TeslaNavigateTool @Inject constructor(
         }
 
         return try {
-            commandClient.navigate(vin, address)
+            commandClient.navigate(vehicle, address)
             // Ziel-Echo im Tool-Result, damit das Modell die gestartete Navigation in
             // seiner Bestätigung benennen kann. Rohwert VOR dem Encoden kürzen —
             // Escaping (Quotes/Backslashes/Newlines) übernimmt kotlinx.serialization.

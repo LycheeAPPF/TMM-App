@@ -54,9 +54,9 @@
     <string name="assistant_selftest_position_no_permission">Location permission missing</string>
     <string name="assistant_selftest_position_no_fix">No fresh fix (max. 15 min old)</string>
     <string name="assistant_selftest_position_detail">%1$s (±%2$d m)</string>
-    <string name="assistant_selftest_tesla_ok">Account connected, vehicle selected</string>
+    <string name="assistant_selftest_tesla_ok">Account connected, vehicle configured</string>
     <string name="assistant_selftest_tesla_no_credentials">No Tesla account connected</string>
-    <string name="assistant_selftest_tesla_no_vehicle">No vehicle selected</string>
+    <string name="assistant_selftest_tesla_no_vehicle">No default vehicle selected and no vehicle linked</string>
     <string name="assistant_selftest_nav_ok">Destination sent to the car</string>
     <string name="assistant_selftest_nav_failed">Navigation failed</string>
     <string name="assistant_selftest_nav_wrong_address">Wrong destination sent</string>

@@ -10,8 +10,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.contact.ContactBackfillWorker
 import io.github.lycheeappf.tmm.core.di.IoDispatcher
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.tesla.TeslaDevice
 import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
 import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
+import io.github.lycheeappf.tmm.platform.bluetooth.TeslaDeviceStatus
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.platform.role.DefaultSmsRoleManager
 import kotlinx.coroutines.CoroutineDispatcher
@@ -49,11 +51,9 @@ data class OnboardingUiState(
     val preflightRunning: Boolean = false,
     val preflightTargetAddress: String = "",
     val riskAcknowledged: Boolean = false,
-    /** Optionaler Schritt: gewähltes Tesla-Bluetooth-Gerät; null = keins. */
-    val teslaBtDeviceName: String? = null,
-    val teslaBtAddress: String? = null,
+    /** Optionaler Schritt: gewählte Tesla-Bluetooth-Geräte mit Zeilen-Zustand; leer = keins. */
+    val teslaDevices: List<TeslaDeviceStatus> = emptyList(),
     val hasBluetoothPermission: Boolean = false,
-    val teslaDeviceMissing: Boolean = false,
     val pairedDevices: List<PairedBtDevice> = emptyList(),
     val pairedDevicesLoading: Boolean = false
 )
@@ -85,10 +85,8 @@ class OnboardingViewModel @Inject constructor(
         val preflight: String?,
         val preflightAddress: String,
         val riskAcked: Boolean,
-        val teslaBtName: String?,
-        val teslaBtAddress: String?,
-        val hasBluetooth: Boolean,
-        val teslaDeviceMissing: Boolean
+        val teslaDevices: List<TeslaDeviceStatus>,
+        val hasBluetooth: Boolean
     )
 
     fun refresh() {
@@ -103,13 +101,9 @@ class OnboardingViewModel @Inject constructor(
                     preflight = settingsStore.preflightResult(),
                     preflightAddress = preFlightTester.targetAddress(),
                     riskAcked = settingsStore.isRiskAcknowledged(),
-                    teslaBtName = settingsStore.teslaBtName(),
-                    teslaBtAddress = settingsStore.teslaBtAddress(),
-                    hasBluetooth = permissionGate.hasBluetoothConnect(),
-                    teslaDeviceMissing = settingsStore.teslaBtAddress()?.let { addr ->
-                        permissionGate.hasBluetoothConnect() &&
-                            bluetoothConnectionChecker.pairedDevices().none { it.address.equals(addr, ignoreCase = true) }
-                    } ?: false
+                    // Zeilen-Zustände (nicht mehr gekoppelt / verbunden) kommen aus dem Checker.
+                    teslaDevices = bluetoothConnectionChecker.teslaDeviceStatuses(),
+                    hasBluetooth = permissionGate.hasBluetoothConnect()
                 )
             }
             val currentStep = determineStep(
@@ -136,10 +130,8 @@ class OnboardingViewModel @Inject constructor(
                     preflightStatus = snap.preflight,
                     preflightTargetAddress = snap.preflightAddress,
                     riskAcknowledged = snap.riskAcked,
-                    teslaBtDeviceName = snap.teslaBtName,
-                    teslaBtAddress = snap.teslaBtAddress,
-                    hasBluetoothPermission = snap.hasBluetooth,
-                    teslaDeviceMissing = snap.teslaDeviceMissing
+                    teslaDevices = snap.teslaDevices,
+                    hasBluetoothPermission = snap.hasBluetooth
                 )
             }
         }
@@ -154,18 +146,23 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    /** Merkt sich das gewählte Tesla-Gerät → ab jetzt wird nur verbunden weitergeleitet. */
-    fun selectTeslaDevice(address: String, name: String) {
+    /**
+     * Ersetzt die Tesla-Geräteauswahl (Mehrfach-Picker) → ab jetzt wird nur
+     * weitergeleitet, während eines dieser Geräte verbunden ist.
+     */
+    fun setTeslaDevices(selected: List<PairedBtDevice>) {
         viewModelScope.launch {
-            withContext(ioDispatcher) { settingsStore.setTeslaBtDevice(address, name) }
+            withContext(ioDispatcher) {
+                settingsStore.setTeslaDevices(selected.map { TeslaDevice(address = it.address, name = it.name) })
+            }
             refresh()
         }
     }
 
-    /** Hebt die Tesla-Gerätewahl auf → Verbindungs-Gate aus, Weiterleitung rund um die Uhr. */
-    fun clearTeslaDevice() {
+    /** Entfernt ein Gerät aus der Auswahl; ohne Geräte ist das Gate aus (rund um die Uhr). */
+    fun removeTeslaDevice(address: String) {
         viewModelScope.launch {
-            withContext(ioDispatcher) { settingsStore.clearTeslaBtDevice() }
+            withContext(ioDispatcher) { settingsStore.removeTeslaDevice(address) }
             refresh()
         }
     }
