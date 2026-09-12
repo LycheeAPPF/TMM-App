@@ -54,7 +54,7 @@ class InjectedMessageLedger @Inject constructor(
     }
 
     /**
-     * Normalisiert "Grok <+88810000007>" → "+88810000007", damit
+     * Normalisiert "Grok <+888100000007>" → "+888100000007", damit
      * markInjected (called mit der reinen Fake-Number) und
      * shouldIgnoreOutbound (called mit Tesla-Reply-ADDRESS, evtl. inkl.
      * Display-Prefix) gleichgesetzt werden können. Wir filtern auf

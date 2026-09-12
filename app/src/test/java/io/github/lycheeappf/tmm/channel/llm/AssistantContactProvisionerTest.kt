@@ -15,9 +15,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 /**
- * Gate-Logik der Tesla-Kontakte: der kanonische Grok-Antwort-Kontakt (+88810000000,
+ * Gate-Logik der Tesla-Kontakte: der kanonische Grok-Antwort-Kontakt (+888100000000,
  * fest „Grok") existiert genau dann, wenn der Assistent einsatzbereit ist (Consent +
- * API-Key). Der zusätzliche Sprach-Ansprech-Kontakt (+88810000001) trägt einen
+ * API-Key). Der zusätzliche Sprach-Ansprech-Kontakt (+888100000001) trägt einen
  * konfigurierbaren Namen und folgt dem `voiceAliasEnabled`-Schalter.
  */
 class AssistantContactProvisionerTest {
@@ -34,7 +34,7 @@ class AssistantContactProvisionerTest {
     private val staticMapping = ChannelMapping(
         mappingId = 0L,
         channel = ChannelId.LLM,
-        fakeAddress = "+88810000000",
+        fakeAddress = "+888100000000",
         conversationKey = "default-assistant",
         payload = ChannelPayload.Llm(),
         createdAt = 0L,
@@ -60,9 +60,9 @@ class AssistantContactProvisionerTest {
         provisioner.reconcile()
 
         // Antwort-Kontakt heißt immer „Grok".
-        coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
+        coVerify { contactSyncWriter.upsertContact("+888100000000", "Grok") }
         // Sprach-Ansprech-Kontakt mit konfiguriertem Namen.
-        coVerify { contactSyncWriter.upsertContact("+88810000001", "Elon Musk") }
+        coVerify { contactSyncWriter.upsertContact("+888100000001", "Elon Musk") }
         coVerify(exactly = 0) { contactSyncWriter.deleteContact(any()) }
     }
 
@@ -74,7 +74,7 @@ class AssistantContactProvisionerTest {
 
         provisioner.reconcile()
 
-        coVerify { contactSyncWriter.upsertContact("+88810000001", "xAI Grok") }
+        coVerify { contactSyncWriter.upsertContact("+888100000001", "xAI Grok") }
     }
 
     @Test
@@ -84,10 +84,10 @@ class AssistantContactProvisionerTest {
 
         provisioner.reconcile()
 
-        coVerify { contactSyncWriter.upsertContact("+88810000000", "Grok") }
-        coVerify { contactSyncWriter.deleteContact("+88810000001") }
-        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+88810000001", any()) }
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify { contactSyncWriter.upsertContact("+888100000000", "Grok") }
+        coVerify { contactSyncWriter.deleteContact("+888100000001") }
+        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+888100000001", any()) }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+888100000000") }
     }
 
     @Test
@@ -97,8 +97,8 @@ class AssistantContactProvisionerTest {
 
         provisioner.reconcile()
 
-        coVerify { contactSyncWriter.deleteContact("+88810000000") }
-        coVerify { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify { contactSyncWriter.deleteContact("+888100000000") }
+        coVerify { contactSyncWriter.deleteContact("+888100000001") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
         coVerify(exactly = 0) { contactSyncWriter.upsertContact(any(), any()) }
     }
@@ -110,8 +110,8 @@ class AssistantContactProvisionerTest {
 
         provisioner.reconcile()
 
-        coVerify { contactSyncWriter.deleteContact("+88810000000") }
-        coVerify { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify { contactSyncWriter.deleteContact("+888100000000") }
+        coVerify { contactSyncWriter.deleteContact("+888100000001") }
         coVerify(exactly = 0) { mappingRepository.ensureStaticAssistantMapping(any()) }
     }
 }

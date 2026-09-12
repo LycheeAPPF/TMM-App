@@ -42,7 +42,7 @@ class ContactBackfillWorkerTest {
     private fun notificationMapping() = ChannelMapping(
         mappingId = 42L,
         channel = ChannelId.NOTIFICATION,
-        fakeAddress = "+88800000042",
+        fakeAddress = "+888000000042",
         conversationKey = "com.whatsapp::anna",
         payload = ChannelPayload.Notification(
             sourcePackage = "com.whatsapp",
@@ -61,7 +61,7 @@ class ContactBackfillWorkerTest {
     private fun llmMapping() = ChannelMapping(
         mappingId = 0L,
         channel = ChannelId.LLM,
-        fakeAddress = "+88810000000",
+        fakeAddress = "+888100000000",
         conversationKey = "default-assistant",
         payload = ChannelPayload.Llm(),
         createdAt = 0L,
@@ -81,9 +81,9 @@ class ContactBackfillWorkerTest {
 
         assertThat(result).isEqualTo(ListenableWorker.Result.success())
         // NOTIFICATION-Kontakt wird gebackfilled …
-        coVerify(exactly = 1) { contactSyncWriter.upsertContact("+88800000042", "Anna") }
+        coVerify(exactly = 1) { contactSyncWriter.upsertContact("+888000000042", "Anna") }
         // … der LLM-Kontakt NICHT (gehört allein dem Provisioner).
-        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+88810000000", any()) }
+        coVerify(exactly = 0) { contactSyncWriter.upsertContact("+888100000000", any()) }
         // … und Grok + Aliasse werden via reconcile() (re-)provisioniert.
         coVerify(exactly = 1) { contactProvisioner.reconcile() }
     }

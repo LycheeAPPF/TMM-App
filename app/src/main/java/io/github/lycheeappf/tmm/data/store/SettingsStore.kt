@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.core.model.FakeAddress
 import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -51,7 +52,7 @@ class SettingsStore @Inject constructor(
             assigned = cur
             var next = cur + 1
             while (next in AssistantIdentity.RESERVED_MAPPING_IDS) next++
-            prefs[key] = next.coerceAtMost(MAX_MAPPING_ID - 1)
+            prefs[key] = next.coerceAtMost(FakeAddress.MAX_MAPPING_ID - 1)
         }
         return assigned
     }
@@ -215,7 +216,6 @@ class SettingsStore @Inject constructor(
     companion object {
         const val DEFAULT_SEND_BUDGET = 100
         const val DEFAULT_TTL_HOURS = 24
-        const val MAX_MAPPING_ID = 10_000_000L
 
         const val PREFLIGHT_OK = "ok_failed_in_carrier"
         const val PREFLIGHT_RISK = "warning_sent_via_carrier"

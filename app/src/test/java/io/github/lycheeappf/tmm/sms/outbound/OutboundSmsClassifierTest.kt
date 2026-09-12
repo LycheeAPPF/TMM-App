@@ -57,10 +57,10 @@ class OutboundSmsClassifierTest {
             mapping(
                 mappingId = 42L,
                 channel = ChannelId.NOTIFICATION,
-                fakeAddress = "+88800000042"
+                fakeAddress = "+888000000042"
             )
         )
-        val result = classifier.classify(row(address = "+88800000042"))
+        val result = classifier.classify(row(address = "+888000000042"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 42L,
@@ -75,7 +75,7 @@ class OutboundSmsClassifierTest {
         // klassifiziert (ggf. Mapping inzwischen via TTL gelöscht; Dispatcher
         // returnt dann Expired). Wichtig: Adresse darf nicht NotOurs werden,
         // sonst dispatchen wir nie und der Cleanup räumt nicht auf.
-        val result = classifier.classify(row(address = "+88810000007"))
+        val result = classifier.classify(row(address = "+888100000007"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 7L,
@@ -84,12 +84,12 @@ class OutboundSmsClassifierTest {
         )
     }
 
-    // --- Sprach-Ansprech-Kontakt (+88810000001) → kanonische Grok-Session (id 0) ---
+    // --- Sprach-Ansprech-Kontakt (+888100000001) → kanonische Grok-Session (id 0) ---
 
     @Test
     fun `voice alias address redirects to canonical Grok id 0`() = runBlocking {
         // Bewusst KEIN Mapping im Repo — der Redirect darf nicht von der DB abhängen.
-        val result = classifier.classify(row(address = "+88810000001"))
+        val result = classifier.classify(row(address = "+888100000001"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 0L,
@@ -100,7 +100,7 @@ class OutboundSmsClassifierTest {
 
     @Test
     fun `voice alias bracket form redirects to canonical Grok id 0`() = runBlocking {
-        val result = classifier.classify(row(address = "Elon Musk <+88810000001>"))
+        val result = classifier.classify(row(address = "Elon Musk <+888100000001>"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 0L,
@@ -111,7 +111,19 @@ class OutboundSmsClassifierTest {
 
     @Test
     fun `voice alias 00-prefix form redirects to canonical Grok id 0`() = runBlocking {
-        val result = classifier.classify(row(address = "0088810000001"))
+        val result = classifier.classify(row(address = "00888100000001"))
+        assertThat(result).isEqualTo(
+            OutboundSmsClassifier.Classification.TeslaReply(
+                mappingId = 0L,
+                channelCode = ChannelId.LLM.code
+            )
+        )
+    }
+
+    @Test
+    fun `legacy 12-char voice alias address redirects to canonical Grok id 0`() = runBlocking {
+        // Tesla-Thread aus der Zeit vor den 13-stelligen Adressen.
+        val result = classifier.classify(row(address = "+88810000001"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 0L,
@@ -122,8 +134,8 @@ class OutboundSmsClassifierTest {
 
     @Test
     fun `LLM address routes by its own id via parse`() = runBlocking {
-        // +88810000009 → über FakeAddress.parse als (LLM, 9).
-        val result = classifier.classify(row(address = "+88810000009"))
+        // +888100000009 → über FakeAddress.parse als (LLM, 9).
+        val result = classifier.classify(row(address = "+888100000009"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 9L,
@@ -134,8 +146,8 @@ class OutboundSmsClassifierTest {
 
     @Test
     fun `notification address is not treated as alias`() = runBlocking {
-        // +88800000001 ist Channel-Digit 0 (NOTIFICATION, id 1) — kein Alias.
-        val result = classifier.classify(row(address = "+88800000001"))
+        // +888000000001 ist Channel-Digit 0 (NOTIFICATION, id 1) — kein Alias.
+        val result = classifier.classify(row(address = "+888000000001"))
         assertThat(result).isEqualTo(
             OutboundSmsClassifier.Classification.TeslaReply(
                 mappingId = 1L,

@@ -4,6 +4,17 @@ All notable changes to **Tesla Messages Manager (TMM)** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Fake addresses are one digit longer: `+888` + channel digit + 8-digit ID (13 chars).**
+  The old 8-digit form (`+888 XXXX XXXX`) is exactly the shape of Telegram/Fragment
+  anonymous numbers, so Telegram's contact sync matched the hidden bridge contacts to
+  strangers' accounts and showed them as chats named after your conversations. Existing
+  mappings migrate on next use, bridge contacts are rebuilt once on first start after the
+  update (the car re-pulls its phonebook), and replies to threads still carrying the old
+  address keep routing.
+
 ## [1.0.1] — 2026-07-19
 
 Maintenance release on top of v1.0.0, focused on managing the in-app SMS inbox,

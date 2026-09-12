@@ -7,6 +7,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import io.github.lycheeappf.tmm.channel.llm.AssistantContactProvisioner
+import io.github.lycheeappf.tmm.contact.TeslaContactResync
 import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.core.util.coRunCatching
 import io.github.lycheeappf.tmm.sms.outbound.OutboundSmsObserver
@@ -22,6 +23,7 @@ class MfsApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var outboundSmsObserver: OutboundSmsObserver
     @Inject lateinit var contactProvisioner: AssistantContactProvisioner
+    @Inject lateinit var teslaContactResync: TeslaContactResync
     @Inject lateinit var notificationChannels: AppNotificationChannels
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -40,7 +42,10 @@ class MfsApplication : Application(), Configuration.Provider {
         // Statischen Grok-Auto-Kontakt bei jedem Prozessstart abgleichen — so kann das
         // Auto Grok auch ohne geöffnete App ansprechen (NLS-Bind, Boot, eingehende SMS
         // beleben den Prozess). Idempotent, im Hintergrund; ohne Consent/Key ein No-op.
-        appScope.launch { coRunCatching { contactProvisioner.reconcile() } }
+        appScope.launch {
+            if (resyncContactsForLongerAddressesOnce()) return@launch
+            coRunCatching { contactProvisioner.reconcile() }
+        }
     }
 
     /**
@@ -82,6 +87,22 @@ class MfsApplication : Application(), Configuration.Provider {
         prefs.edit().putBoolean(KEY_LANGUAGE_SEEDED, true).apply()
     }
 
+    /**
+     * Einmalig nach dem Wechsel auf 13-stellige Fake-Adressen (siehe
+     * [io.github.lycheeappf.tmm.core.model.AddressScheme.Itu888]): Bridge-Kontakte mit
+     * alten 12-stelligen Nummern löschen und neu aufbauen — sonst matcht Telegrams
+     * Kontakt-Sync sie weiter auf fremde Accounts. [TeslaContactResync.force]
+     * provisioniert Grok + Alias dabei mit, daher entfällt hier der reguläre reconcile.
+     * Flag wird nur nach Erfolg gesetzt, damit ein Abbruch beim nächsten Start nachholt.
+     */
+    private suspend fun resyncContactsForLongerAddressesOnce(): Boolean {
+        val prefs = getSharedPreferences(PREFS_LOCALE, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_ADDRESS_V2_RESYNCED, false)) return false
+        val ok = coRunCatching { teslaContactResync.force() }.isSuccess
+        if (ok) prefs.edit().putBoolean(KEY_ADDRESS_V2_RESYNCED, true).apply()
+        return ok
+    }
+
     companion object {
         const val CHANNEL_STATUS = "status"
         const val CHANNEL_FALLBACK = "fallback"
@@ -89,5 +110,6 @@ class MfsApplication : Application(), Configuration.Provider {
 
         private const val PREFS_LOCALE = "mfs_locale"
         private const val KEY_LANGUAGE_SEEDED = "language_seeded"
+        private const val KEY_ADDRESS_V2_RESYNCED = "address_v2_contacts_resynced"
     }
 }

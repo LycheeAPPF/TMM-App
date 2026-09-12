@@ -1,7 +1,7 @@
 package io.github.lycheeappf.tmm.core.model
 
 /**
- * Fake-Telefonnummer im Schema `<prefix> [Channel-Digit] [7-stellige Mapping-ID]`.
+ * Fake-Telefonnummer im Schema `<prefix> [Channel-Digit] [8-stellige Mapping-ID]`.
  *
  * Konkrete Adress-Form hängt vom [AddressScheme] ab — Default ist
  * [AddressScheme.Itu888] (`+888...`): von libphonenumber parsebar (sonst
@@ -22,8 +22,15 @@ data class FakeAddress(
         AddressScheme.Itu888.prefix + channel.code.toString() + mappingId.toString().padStart(ID_DIGITS, '0')
 
     companion object {
-        const val ID_DIGITS = 7
-        const val MAX_MAPPING_ID = 10_000_000L
+        const val ID_DIGITS = 8
+        const val MAX_MAPPING_ID = 100_000_000L
+
+        /**
+         * Länge des Vor-1.0.2-Schemas (7-stellige ID). Wird weiter geparst, damit
+         * Tesla-Replies auf alte Threads und die Inbox-Filterung bestehender Fake-Rows
+         * nach dem Upgrade funktionieren; neu geschrieben wird nur noch [ID_DIGITS].
+         */
+        const val LEGACY_TOTAL_LENGTH = 12
 
         /**
          * Parsed eine rohe Adress-String gegen das aktive [AddressScheme] (Itu888).
@@ -40,7 +47,7 @@ data class FakeAddress(
         }
 
         private fun tryParseWith(clean: String, scheme: AddressScheme): FakeAddress? {
-            if (clean.length != scheme.totalLength) return null
+            if (clean.length != scheme.totalLength && clean.length != LEGACY_TOTAL_LENGTH) return null
             if (!clean.startsWith(scheme.prefix)) return null
             val channelDigit = clean[scheme.prefix.length].digitToIntOrNull() ?: return null
             val channel = ChannelId.fromCode(channelDigit) ?: return null

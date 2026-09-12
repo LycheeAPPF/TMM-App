@@ -312,7 +312,7 @@ class AssistantPreferencesStore @Inject constructor(
 
     /**
      * Ist der zusätzliche Sprach-Ansprech-Kontakt ([AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS],
-     * +88810000001) aktiv? Default `true`. Trägt [voiceAliasName] und lenkt Diktate auf die
+     * +888100000001) aktiv? Default `true`. Trägt [voiceAliasName] und lenkt Diktate auf die
      * kanonische Grok-Session um; „Aus" entfernt den Zusatzkontakt.
      */
     suspend fun voiceAliasEnabled(): Boolean =
