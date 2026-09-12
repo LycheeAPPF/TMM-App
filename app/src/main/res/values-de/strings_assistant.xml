@@ -54,9 +54,9 @@
     <string name="assistant_selftest_position_no_permission">Standort-Berechtigung fehlt</string>
     <string name="assistant_selftest_position_no_fix">Kein frischer Fix (max. 15 min alt)</string>
     <string name="assistant_selftest_position_detail">%1$s (±%2$d m)</string>
-    <string name="assistant_selftest_tesla_ok">Konto verbunden, Fahrzeug gewählt</string>
+    <string name="assistant_selftest_tesla_ok">Konto verbunden, Fahrzeug konfiguriert</string>
     <string name="assistant_selftest_tesla_no_credentials">Kein Tesla-Konto verbunden</string>
-    <string name="assistant_selftest_tesla_no_vehicle">Kein Fahrzeug gewählt</string>
+    <string name="assistant_selftest_tesla_no_vehicle">Kein Standard-Fahrzeug gewählt und kein Fahrzeug verknüpft</string>
     <string name="assistant_selftest_nav_ok">Ziel ans Auto gesendet</string>
     <string name="assistant_selftest_nav_failed">Navigation fehlgeschlagen</string>
     <string name="assistant_selftest_nav_wrong_address">Falsches Ziel gesendet</string>

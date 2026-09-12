@@ -8,7 +8,7 @@ import io.github.lycheeappf.tmm.channel.llm.tools.ToolCallExecutor
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolRegistry
 import io.github.lycheeappf.tmm.core.util.LogBuffer
 import io.github.lycheeappf.tmm.data.store.AssistantPreferencesStore
-import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.ActiveVehicleResolver
 import io.github.lycheeappf.tmm.platform.location.LocationProvider
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthManager
@@ -42,7 +42,7 @@ class GrokSelfTester @Inject constructor(
     private val locationProvider: LocationProvider,
     private val permissionGate: PermissionGate,
     private val teslaAuthManager: TeslaAuthManager,
-    private val teslaTokenStore: TeslaTokenStore,
+    private val vehicleResolver: ActiveVehicleResolver,
     private val logBuffer: LogBuffer
 ) {
 
@@ -65,7 +65,9 @@ class GrokSelfTester @Inject constructor(
 
         emit(SelfTestEvent.StageRunning(SelfTestStage.TESLA_LOCAL))
         val credentialsSet = teslaAuthManager.hasCredentials()
-        val vinSelected = teslaTokenStore.readSelectedVin() != null
+        // Multi-Tesla: Standard-Fahrzeug ODER ein verknüpftes Gerät zählt als konfiguriert —
+        // nicht `resolve() != null`, sonst meldete ein 2-Auto-Setup ohne Standard „kein Fahrzeug".
+        val vinSelected = vehicleResolver.isAnyVehicleConfigured()
         emit(SelfTestEvent.TeslaLocalResult(credentialsSet, vinSelected))
         logBuffer.info(TAG, "Self-test tesla: credentials=$credentialsSet vin=$vinSelected")
 

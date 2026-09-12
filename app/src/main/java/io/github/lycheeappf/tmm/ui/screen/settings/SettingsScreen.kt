@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -64,9 +65,12 @@ import io.github.lycheeappf.tmm.ui.component.SettingCard
 import io.github.lycheeappf.tmm.ui.component.StatusPill
 import io.github.lycheeappf.tmm.ui.component.TeslaConnectionCard
 import io.github.lycheeappf.tmm.ui.component.TeslaDevicePickerDialog
+import io.github.lycheeappf.tmm.ui.component.TeslaVehicleLinkDialog
+import io.github.lycheeappf.tmm.ui.component.maskVin
 import io.github.lycheeappf.tmm.ui.component.mfsExpandEnter
 import io.github.lycheeappf.tmm.ui.component.mfsExpandExit
 import io.github.lycheeappf.tmm.ui.component.preflightStatusUi
+import io.github.lycheeappf.tmm.platform.tesla.api.VehicleInfo
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaAuthState
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthConfig
 import io.github.lycheeappf.tmm.ui.screen.diagnostics.DiagnosticsShare
@@ -125,11 +129,11 @@ fun SettingsScreen(
     if (showDevicePicker) {
         TeslaDevicePickerDialog(
             devices = state.pairedDevices,
-            selectedAddress = state.teslaBtAddress,
+            selectedAddresses = state.teslaDevices.map { it.device.address }.toSet(),
             loading = state.pairedDevicesLoading,
-            onSelect = { device ->
+            onConfirm = { selected ->
                 showDevicePicker = false
-                viewModel.selectTeslaDevice(device.address, device.name)
+                viewModel.setTeslaDevices(selected)
             },
             onCancel = { showDevicePicker = false }
         )
@@ -233,17 +237,16 @@ fun SettingsScreen(
             }
 
             TeslaConnectionCard(
-                deviceName = state.teslaBtDeviceName,
-                deviceMissing = state.teslaDeviceMissing,
+                devices = state.teslaDevices,
                 hasPermission = state.hasBluetoothPermission,
                 permanentlyDenied = btPermanentlyDenied,
                 onGrantPermission = { btPermLauncher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
                 onOpenAppSettings = openAppSettings,
-                onSelectDevice = {
+                onSelectDevices = {
                     viewModel.loadPairedDevices()
                     showDevicePicker = true
                 },
-                onClearDevice = { viewModel.clearTeslaDevice() }
+                onRemoveDevice = { viewModel.removeTeslaDevice(it) }
             )
 
             SectionHeader(stringResource(R.string.tesla_api_section))
@@ -416,9 +419,6 @@ private fun MaskedCredentialField(
     )
 }
 
-/** VIN ist PII — in der UI nur die letzten 4 Zeichen zeigen (wie im Diagnostics-Export). */
-private fun maskVin(vin: String): String = "…" + vin.takeLast(4)
-
 @Composable
 private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewModel) {
     val authState = state.teslaAuthState
@@ -462,19 +462,57 @@ private fun TeslaFleetApiCard(state: SettingsUiState, viewModel: SettingsViewMod
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Multi-Tesla: Fahrzeug ↔ Bluetooth-Gerät verknüpfen, damit Grok das Auto
+                // navigiert, in dem man sitzt. Nur sinnvoll, wenn Geräte gewählt sind.
+                val teslaDevices = state.teslaDevices.map { it.device }
+                var linkTarget by remember { mutableStateOf<VehicleInfo?>(null) }
+                linkTarget?.let { vehicle ->
+                    TeslaVehicleLinkDialog(
+                        vehicle = vehicle,
+                        devices = teslaDevices,
+                        onLink = { address ->
+                            linkTarget = null
+                            viewModel.linkTeslaVehicle(vehicle, address)
+                        },
+                        onCancel = { linkTarget = null }
+                    )
+                }
                 if (state.teslaVehicles.isNotEmpty()) {
-                    Column {
+                    if (teslaDevices.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.tesla_api_link_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Column(modifier = Modifier.selectableGroup()) {
                         state.teslaVehicles.forEach { vehicle ->
+                            val selected = vehicle.vin == vin
+                            val linkedDevice = teslaDevices.firstOrNull { it.vin == vehicle.vin }
+                            val masked = maskVin(vehicle.vin)
                             MfsListItem(
-                                title = vehicle.displayName.ifBlank { maskVin(vehicle.vin) },
-                                subtitle = maskVin(vehicle.vin),
-                                trailing = if (vehicle.vin == vin) ({
-                                    RadioButton(selected = true, onClick = null)
-                                }) else ({
-                                    RadioButton(selected = false, onClick = { viewModel.selectTeslaVehicle(vehicle.vin, vehicle.id) })
-                                }),
-
-                                onClick = { viewModel.selectTeslaVehicle(vehicle.vin, vehicle.id) }
+                                title = vehicle.displayName.ifBlank { masked },
+                                subtitle = if (linkedDevice != null) {
+                                    "$masked · ${stringResource(R.string.tesla_api_linked_to, linkedDevice.name)}"
+                                } else masked,
+                                // Radio = Standard-Fahrzeug (Fallback des Resolvers); die ganze Zeile
+                                // ist selectable, damit a11y „ausgewählt" ansagt.
+                                modifier = Modifier.selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = { viewModel.selectTeslaVehicle(vehicle.vin, vehicle.id) }
+                                ),
+                                leading = { RadioButton(selected = selected, onClick = null) },
+                                trailing = if (teslaDevices.isNotEmpty()) ({
+                                    IconButton(onClick = { linkTarget = vehicle }) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Link,
+                                            contentDescription = stringResource(R.string.tesla_api_link_device),
+                                            tint = if (linkedDevice != null) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }) else null
                             )
                         }
                     }

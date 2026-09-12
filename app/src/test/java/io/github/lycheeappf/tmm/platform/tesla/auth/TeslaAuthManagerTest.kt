@@ -6,9 +6,12 @@ import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.core.security.TeslaCredentials
 import io.github.lycheeappf.tmm.core.security.TeslaCredentialsStore
 import io.github.lycheeappf.tmm.core.util.Clock
+import io.github.lycheeappf.tmm.data.store.SettingsStore
 import io.github.lycheeappf.tmm.data.store.TeslaPendingAuth
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -55,6 +58,8 @@ class TeslaAuthManagerTest {
     private val tokenStore = FakeTeslaTokenStore()
     private val credentialsStore = FakeTeslaCredentialsStore()
     private val regionStore = FakeTeslaRegionStore()
+    // Konkrete Klasse (DataStore) → relaxed Mock statt Fake; nur die Link-Bereinigung wird verifiziert.
+    private val settingsStore = mockk<SettingsStore>(relaxed = true)
     private val ioDispatcher = Executors.newFixedThreadPool(2).asCoroutineDispatcher()
     private val appScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
@@ -79,6 +84,7 @@ class TeslaAuthManagerTest {
             tokenStore = tokenStore,
             credentialsStore = credentialsStore,
             regionStore = regionStore,
+            settingsStore = settingsStore,
             httpClient = client,
             endpoints = endpoints,
             clock = Clock { nowMs },
@@ -304,6 +310,20 @@ class TeslaAuthManagerTest {
         assertThat(tokenStore.accessToken).isNull()
         // Cancellation ist KEIN Auth-Fehler: der Error-Pfad darf nicht feuern.
         assertThat(cancellingManager.state.value).isEqualTo(TeslaAuthState.Loading)
+    }
+
+    // ---- Multi-Tesla: Fahrzeug-Verknüpfungen hängen am Account ----------------
+
+    @Test fun `logout clears the vehicle links of the tesla devices`() = runTest {
+        manager.logout()
+
+        coVerify(exactly = 1) { settingsStore.clearTeslaVehicleLinks() }
+    }
+
+    @Test fun `clearing credentials clears the vehicle links of the tesla devices`() = runTest {
+        manager.clearCredentials()
+
+        coVerify(exactly = 1) { settingsStore.clearTeslaVehicleLinks() }
     }
 
     private companion object {

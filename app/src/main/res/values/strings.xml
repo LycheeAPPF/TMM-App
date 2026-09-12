@@ -115,13 +115,20 @@
     <string name="tesla_api_status_connected">Connected</string>
     <string name="tesla_api_status_not_connected">Not connected</string>
     <string name="tesla_api_status_loading">Loading…</string>
-    <string name="tesla_api_vehicle_selected">Vehicle: %1$s</string>
+    <string name="tesla_api_vehicle_selected">Default vehicle: %1$s</string>
     <string name="tesla_api_load_vehicles">Load vehicles</string>
-    <string name="tesla_api_no_vehicle">No vehicle selected</string>
+    <string name="tesla_api_no_vehicle">No default vehicle selected</string>
     <string name="tesla_api_token_expires">Token expires: %1$s</string>
     <string name="tesla_api_error_prefix">Error: %1$s</string>
     <string name="tesla_api_missing_credentials">No Tesla API credentials stored. Create your own app at developer.tesla.com and add its Client ID and Client Secret in the app settings to enable vehicle features.</string>
     <string name="tesla_api_diagnostic_failed">Region diagnostics failed</string>
+    <!-- Multi-Tesla: link a Fleet vehicle to one of the selected Bluetooth devices -->
+    <string name="tesla_api_link_hint">Link each vehicle to its Bluetooth device — Grok then navigates the car you are currently in. The default vehicle is the fallback when no linked car is connected.</string>
+    <string name="tesla_api_link_device">Link Bluetooth device</string>
+    <string name="tesla_api_link_dialog_title">Which Bluetooth device is \"%1$s\"?</string>
+    <string name="tesla_api_link_none">Not linked</string>
+    <string name="tesla_api_linked_to">Bluetooth: %1$s</string>
+    <string name="tesla_api_link_name_match">Name matches this vehicle</string>
 
     <!-- Tesla API credentials (user-provided app registration) -->
     <string name="tesla_credentials_title">Tesla API credentials</string>

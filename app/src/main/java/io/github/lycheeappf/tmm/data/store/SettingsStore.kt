@@ -1,6 +1,7 @@
 package io.github.lycheeappf.tmm.data.store
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -11,14 +12,22 @@ import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.lycheeappf.tmm.core.model.FakeAddress
 import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
+import io.github.lycheeappf.tmm.domain.tesla.TeslaDevice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("mfs_settings")
+/**
+ * `internal` (nicht private), damit Tests im selben Modul Legacy-Keys seeden
+ * können — ein zweiter `preferencesDataStore("mfs_settings")` auf demselben File
+ * würde zur Laufzeit crashen (Muster: `teslaAuthDataStore`).
+ */
+internal val Context.dataStore: DataStore<Preferences> by preferencesDataStore("mfs_settings")
 
 @Singleton
 class SettingsStore @Inject constructor(
@@ -113,33 +122,93 @@ class SettingsStore @Inject constructor(
         store.edit { it[androidx.datastore.preferences.core.booleanPreferencesKey(KEY_SEND_BUDGET_ENABLED)] = value }
     }
 
-    // ---------- Tesla-Bluetooth-Verbindung ----------
+    // ---------- Tesla-Bluetooth-Geräte (Multi-Tesla) ----------
 
     /**
-     * MAC-Adresse des gekoppelten Tesla-Geräts. Ist sie gesetzt, leitet die App
-     * Nachrichten nur weiter, während genau dieses Gerät per Bluetooth verbunden
-     * ist (siehe `BluetoothConnectionChecker`). Null = kein Gerät gewählt → Gate
-     * inaktiv (Fail-Open, leitet rund um die Uhr weiter wie vorher).
+     * Die vom User gewählten Tesla-Bluetooth-Geräte. Ist die Liste nicht leer,
+     * leitet die App Nachrichten nur weiter, während EINES dieser Geräte per
+     * Bluetooth verbunden ist (siehe `BluetoothConnectionChecker`). Leer = kein
+     * Gerät gewählt → Gate inaktiv (Fail-Open, leitet rund um die Uhr weiter).
+     *
+     * Read-through-Migration: Existiert der Listen-Key noch nicht, wird das
+     * Einzel-Gerät aus den Vor-Multi-Tesla-Keys (`tesla_bt_address`/`_name`)
+     * geliefert — ohne Write. Der erste Write (jeder Setter unten) faltet es in
+     * die Liste und entfernt die Legacy-Keys atomar.
      */
-    suspend fun teslaBtAddress(): String? =
-        store.data.first()[stringPreferencesKey(KEY_TESLA_BT_ADDRESS)]?.takeIf { it.isNotBlank() }
+    suspend fun teslaDevices(): List<TeslaDevice> = readTeslaDevices(store.data.first())
 
-    /** Anzeigename des gewählten Tesla-Geräts (nur für die UI). */
-    suspend fun teslaBtName(): String? =
-        store.data.first()[stringPreferencesKey(KEY_TESLA_BT_NAME)]?.takeIf { it.isNotBlank() }
+    /**
+     * Ersetzt die Auswahl. Für Adressen, die bereits gewählt waren, bleibt die
+     * Fahrzeug-Verknüpfung (`vin`/`vehicleId`) erhalten — nur der Name wird aus
+     * [selected] übernommen; abgewählte Geräte (und ihre Links) fallen weg.
+     * Adressen werden uppercase normalisiert und (ignoreCase) dedupliziert.
+     */
+    suspend fun setTeslaDevices(selected: List<TeslaDevice>) = updateTeslaDevices { current ->
+        selected
+            .map { it.copy(address = it.address.uppercase()) }
+            .distinctBy { it.address }
+            .map { incoming ->
+                val existing = current.firstOrNull { it.sameAddress(incoming.address) }
+                if (existing != null && incoming.vin == null) {
+                    incoming.copy(vin = existing.vin, vehicleId = existing.vehicleId)
+                } else incoming
+            }
+    }
 
-    suspend fun setTeslaBtDevice(address: String, name: String) {
-        store.edit {
-            it[stringPreferencesKey(KEY_TESLA_BT_ADDRESS)] = address
-            it[stringPreferencesKey(KEY_TESLA_BT_NAME)] = name
+    suspend fun removeTeslaDevice(address: String) = updateTeslaDevices { current ->
+        current.filterNot { it.sameAddress(address) }
+    }
+
+    /**
+     * Ordnet das Fleet-Fahrzeug [vin] dem Gerät [address] zu. Ein Fahrzeug hängt
+     * an höchstens einem Gerät — es wird vorher überall entfernt. `address == null`
+     * = nur entkoppeln. Unbekannte Adresse → No-op (bis auf das Entkoppeln).
+     */
+    suspend fun linkVehicleToDevice(vin: String, vehicleId: Long, address: String?) =
+        updateTeslaDevices { current ->
+            current.map { device ->
+                when {
+                    address != null && device.sameAddress(address) ->
+                        device.copy(vin = vin, vehicleId = vehicleId)
+                    device.vin == vin -> device.copy(vin = null, vehicleId = null)
+                    else -> device
+                }
+            }
+        }
+
+    /** Entfernt alle Fahrzeug-Verknüpfungen (Tesla-Logout), behält die Geräte. */
+    suspend fun clearTeslaVehicleLinks() = updateTeslaDevices { current ->
+        current.map { it.copy(vin = null, vehicleId = null) }
+    }
+    /**
+     * Ein einziger `edit`: liest die aktuelle Liste (inkl. Legacy-Fallback) aus
+     * denselben `prefs`, wendet [transform] an, schreibt das JSON und entfernt die
+     * Legacy-Keys — Merge, Link und Migration können so nie racen. Leere Liste →
+     * Key entfernen statt `"[]"` speichern.
+     */
+    private suspend fun updateTeslaDevices(transform: (List<TeslaDevice>) -> List<TeslaDevice>) {
+        store.edit { prefs ->
+            val next = transform(readTeslaDevices(prefs))
+            if (next.isEmpty()) prefs.remove(stringPreferencesKey(KEY_TESLA_DEVICES))
+            else prefs[stringPreferencesKey(KEY_TESLA_DEVICES)] = teslaJson.encodeToString(next)
+            prefs.remove(stringPreferencesKey(KEY_TESLA_BT_ADDRESS))
+            prefs.remove(stringPreferencesKey(KEY_TESLA_BT_NAME))
         }
     }
 
-    suspend fun clearTeslaBtDevice() {
-        store.edit {
-            it.remove(stringPreferencesKey(KEY_TESLA_BT_ADDRESS))
-            it.remove(stringPreferencesKey(KEY_TESLA_BT_NAME))
+    private fun readTeslaDevices(prefs: Preferences): List<TeslaDevice> {
+        prefs[stringPreferencesKey(KEY_TESLA_DEVICES)]?.let { raw ->
+            return runCatching { teslaJson.decodeFromString<List<TeslaDevice>>(raw) }
+                .getOrElse {
+                    // Payload NIE loggen (MAC/VIN) — nur die Tatsache.
+                    Log.w(TAG, "tesla_bt_devices decode failed, treating as empty: ${it::class.simpleName}")
+                    emptyList()
+                }
         }
+        val legacyAddress = prefs[stringPreferencesKey(KEY_TESLA_BT_ADDRESS)]?.takeIf { it.isNotBlank() }
+            ?: return emptyList()
+        val legacyName = prefs[stringPreferencesKey(KEY_TESLA_BT_NAME)]?.takeIf { it.isNotBlank() }
+        return listOf(TeslaDevice(address = legacyAddress.uppercase(), name = legacyName ?: legacyAddress))
     }
 
     // ---------- TTL ----------
@@ -214,8 +283,12 @@ class SettingsStore @Inject constructor(
         store.data.map { it[intPreferencesKey(KEY_SEND_BUDGET)] ?: DEFAULT_SEND_BUDGET }
 
     companion object {
+        private const val TAG = "SettingsStore"
         const val DEFAULT_SEND_BUDGET = 100
         const val DEFAULT_TTL_HOURS = 24
+
+        /** Tolerant gegenüber künftigen Feldern; Defaults (null-Links) nicht ausschreiben. */
+        private val teslaJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
         const val PREFLIGHT_OK = "ok_failed_in_carrier"
         const val PREFLIGHT_RISK = "warning_sent_via_carrier"
@@ -227,6 +300,8 @@ class SettingsStore @Inject constructor(
         private const val KEY_LAST_OUTBOX_ID = "last_outbox_id"
         private const val KEY_SEND_BUDGET = "send_budget_per_day"
         private const val KEY_SEND_BUDGET_ENABLED = "send_budget_enabled"
+        private const val KEY_TESLA_DEVICES = "tesla_bt_devices"
+        /** Vor-Multi-Tesla-Keys (Einzelgerät) — nur noch für die Read-through-Migration. */
         private const val KEY_TESLA_BT_ADDRESS = "tesla_bt_address"
         private const val KEY_TESLA_BT_NAME = "tesla_bt_name"
         private const val KEY_TTL_HOURS = "mapping_ttl_hours"

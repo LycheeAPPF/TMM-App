@@ -8,7 +8,10 @@ import io.github.lycheeappf.tmm.core.locale.AppLocaleManager
 import io.github.lycheeappf.tmm.core.locale.localizedString
 import io.github.lycheeappf.tmm.core.notification.AppNotificationChannels
 import io.github.lycheeappf.tmm.data.store.SettingsStore
+import io.github.lycheeappf.tmm.domain.tesla.TeslaDevice
 import io.github.lycheeappf.tmm.platform.bluetooth.BluetoothConnectionChecker
+import io.github.lycheeappf.tmm.platform.bluetooth.PairedBtDevice
+import io.github.lycheeappf.tmm.platform.bluetooth.TeslaDeviceStatus
 import io.github.lycheeappf.tmm.platform.permission.PermissionGate
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
 import io.github.lycheeappf.tmm.platform.tesla.api.VehicleInfo
@@ -142,26 +145,60 @@ class SettingsViewModelTest {
         coVerify(exactly = 1) { store.setSendBudgetEnabled(false) }
     }
 
+    // ---- Multi-Tesla: Geräteauswahl + Fahrzeug-Verknüpfung --------------------
+
     @Test
-    fun `selectTeslaDevice persists address and name`() = runTest(dispatcher) {
+    fun `setTeslaDevices persists the picked devices as a TeslaDevice list`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.selectTeslaDevice("AA:BB:CC:DD:EE:FF", "Model Y")
+        vm.setTeslaDevices(
+            listOf(PairedBtDevice("AA:BB:CC:DD:EE:FF", "Model Y"), PairedBtDevice("11:22:33:44:55:66", "Model 3"))
+        )
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { store.setTeslaBtDevice("AA:BB:CC:DD:EE:FF", "Model Y") }
+        // Links werden im Store gemerged — das ViewModel liefert nur Adresse + Name.
+        coVerify(exactly = 1) {
+            store.setTeslaDevices(
+                listOf(TeslaDevice("AA:BB:CC:DD:EE:FF", "Model Y"), TeslaDevice("11:22:33:44:55:66", "Model 3"))
+            )
+        }
     }
 
     @Test
-    fun `clearTeslaDevice removes the stored device`() = runTest(dispatcher) {
+    fun `removeTeslaDevice removes exactly that device`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.clearTeslaDevice()
+        vm.removeTeslaDevice("AA:BB:CC:DD:EE:FF")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { store.clearTeslaBtDevice() }
+        coVerify(exactly = 1) { store.removeTeslaDevice("AA:BB:CC:DD:EE:FF") }
+    }
+
+    @Test
+    fun `linkTeslaVehicle links the fleet vehicle to the chosen device`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.linkTeslaVehicle(VehicleInfo(id = 42L, vin = "5YJ3E1EA7KF000001", displayName = "Karl"), "AA:BB:CC:DD:EE:FF")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { store.linkVehicleToDevice("5YJ3E1EA7KF000001", 42L, "AA:BB:CC:DD:EE:FF") }
+    }
+
+    @Test
+    fun `refresh mirrors the tesla device statuses into the ui state`() = runTest(dispatcher) {
+        val statuses = listOf(
+            TeslaDeviceStatus(TeslaDevice("AA:BB:CC:DD:EE:FF", "Model Y"), missing = false, connected = true),
+            TeslaDeviceStatus(TeslaDevice("11:22:33:44:55:66", "Model 3"), missing = true, connected = false)
+        )
+        coEvery { bluetoothConnectionChecker.teslaDeviceStatuses() } returns statuses
+
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        assertThat(vm.uiState.value.teslaDevices).isEqualTo(statuses)
     }
 
     // ---- Tesla Fleet API: Credentials im UiState ------------------------------

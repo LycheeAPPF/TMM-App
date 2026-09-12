@@ -5,7 +5,8 @@ import com.google.common.truth.Truth.assertThat
 import io.github.lycheeappf.tmm.R
 import io.github.lycheeappf.tmm.channel.llm.tools.ToolInvocationResult
 import io.github.lycheeappf.tmm.core.locale.localizedString
-import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.ActiveVehicleResolver
+import io.github.lycheeappf.tmm.domain.tesla.VehicleRef
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaCommandError
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaVehicleCommandClient
 import io.mockk.coEvery
@@ -28,22 +29,26 @@ import org.junit.Test
 /**
  * Sichert das Tool-Result-JSON von [TeslaNavigateTool]: via kotlinx.serialization
  * gebaut (Quotes/Backslashes/Newlines korrekt escaped, Roundtrip-parsebar), Ziel-Echo
- * enthalten, Kürzung des ROHEN Werts vor dem Encoden. Fehlerpfade (fehlendes Fahrzeug,
- * fehlende Credentials, typisierte [TeslaCommandError]s, unerwartete Exceptions)
- * landen als lokalisierte [ToolInvocationResult.Failure]; Cancellation propagiert.
+ * enthalten, Kürzung des ROHEN Werts vor dem Encoden. Das Ziel-Fahrzeug kommt aus dem
+ * [ActiveVehicleResolver] (verbundenes verknüpftes Auto, sonst Standard-Fahrzeug).
+ * Fehlerpfade (kein Fahrzeug, fehlende Credentials, typisierte [TeslaCommandError]s,
+ * unerwartete Exceptions) landen als lokalisierte [ToolInvocationResult.Failure];
+ * Cancellation propagiert.
  */
 class TeslaNavigateToolTest {
 
     private val context: Context = mockk()
     private val commandClient: TeslaVehicleCommandClient = mockk()
-    private val tokenStore: TeslaTokenStore = mockk()
+    private val vehicleResolver: ActiveVehicleResolver = mockk()
 
-    private val tool = TeslaNavigateTool(context, commandClient, tokenStore)
+    private val tool = TeslaNavigateTool(context, commandClient, vehicleResolver)
+
+    private val resolvedVehicle = VehicleRef("5YJ3E1EA7KF000000", vehicleId = 4711L)
 
     @Before fun setup() {
         mockkStatic("io.github.lycheeappf.tmm.core.locale.LocaleExtKt")
         every { context.localizedString(any()) } returns "Fehlertext"
-        coEvery { tokenStore.readSelectedVin() } returns "5YJ3E1EA7KF000000"
+        coEvery { vehicleResolver.resolve() } returns resolvedVehicle
         coEvery { commandClient.navigate(any(), any()) } returns Unit
     }
 
@@ -60,6 +65,12 @@ class TeslaNavigateToolTest {
         val parsed = Json.parseToJsonElement((result as ToolInvocationResult.Success).output).jsonObject
         assertThat(parsed["status"]?.jsonPrimitive?.content).isEqualTo("ok")
         assertThat(parsed["destination"]?.jsonPrimitive?.content).isEqualTo("Alexanderplatz Berlin")
+    }
+
+    @Test fun `destination is sent to the resolved vehicle`() = runTest {
+        tool.invoke(args("Alexanderplatz Berlin"))
+
+        coVerify(exactly = 1) { commandClient.navigate(resolvedVehicle, "Alexanderplatz Berlin") }
     }
 
     @Test fun `quotes backslashes and newlines survive the JSON roundtrip`() = runTest {
@@ -89,8 +100,8 @@ class TeslaNavigateToolTest {
         coVerify(exactly = 0) { commandClient.navigate(any(), any()) }
     }
 
-    @Test fun `missing vehicle selection returns the localized setup hint without calling the fleet api`() = runTest {
-        coEvery { tokenStore.readSelectedVin() } returns null
+    @Test fun `no resolvable vehicle returns the localized setup hint without calling the fleet api`() = runTest {
+        coEvery { vehicleResolver.resolve() } returns null
         every { context.localizedString(R.string.tesla_error_no_vehicle_configured) } returns "Kein Fahrzeug verbunden"
 
         val result = tool.invoke(args("Alexanderplatz Berlin"))

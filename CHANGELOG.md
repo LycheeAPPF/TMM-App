@@ -6,7 +6,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Multi-Tesla.** The **Tesla connection** card (Settings → Forwarding, and the setup
+  guide) now lets you select **every Tesla you drive** from the paired Bluetooth devices
+  (checkbox picker with *Apply*). Messages and Grok are forwarded while **any** of the
+  selected cars is connected; each row shows its state (*Connected*, no longer paired)
+  and its own *Remove* button. An existing single-device selection is migrated
+  automatically.
+- **Navigation goes to the car you're in.** In the **Tesla Fleet API** card every
+  vehicle gets a *Link Bluetooth device* button. Once a vehicle is linked to its
+  Bluetooth device, Grok's `tesla_navigate` sends the destination to the **connected**
+  car; the radio-selected vehicle is now the **default vehicle** and only used as a
+  fallback (no linked car connected, desk testing, self-test). Links are cleared on
+  Tesla logout. The diagnostics export counts configured devices and links (no MACs,
+  names or VINs).
+
 ### Changed
+- The Grok self-test's "Tesla" stage now reports *vehicle configured* when either a
+  default vehicle is selected **or** at least one device is linked.
+- Downgrading to an older version after this update drops the Bluetooth device
+  selection (the old single-device keys are removed on the first change); forwarding
+  then falls back to 24/7 as before.
+
+### Fixed
+- **Wake-up targeted the wrong car.** `wake_up` for a sleeping vehicle used the globally
+  selected vehicle id regardless of the VIN being commanded; it now uses the id of the
+  addressed vehicle (looked up via the vehicle list if unknown).
 - **Fake addresses are one digit longer: `+888` + channel digit + 8-digit ID (13 chars).**
   The old 8-digit form (`+888 XXXX XXXX`) is exactly the shape of Telegram/Fragment
   anonymous numbers, so Telegram's contact sync matched the hidden bridge contacts to

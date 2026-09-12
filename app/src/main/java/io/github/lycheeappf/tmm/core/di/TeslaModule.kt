@@ -9,6 +9,8 @@ import io.github.lycheeappf.tmm.data.store.DataStoreTeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.KeystoreTeslaTokenStore
 import io.github.lycheeappf.tmm.data.store.TeslaRegionStore
 import io.github.lycheeappf.tmm.data.store.TeslaTokenStore
+import io.github.lycheeappf.tmm.domain.tesla.ActiveVehicleResolver
+import io.github.lycheeappf.tmm.platform.tesla.DefaultActiveVehicleResolver
 import io.github.lycheeappf.tmm.platform.tesla.api.TeslaFleetApi
 import io.github.lycheeappf.tmm.platform.tesla.auth.TeslaOAuthEndpoints
 import kotlinx.serialization.json.Json
@@ -81,6 +83,10 @@ abstract class TeslaStoreModule {
 
     @Binds
     abstract fun bindTeslaRegionStore(impl: DataStoreTeslaRegionStore): TeslaRegionStore
+
+    /** Multi-Tesla: verbundenes verknüpftes Auto vor dem Standard-Fahrzeug (siehe Interface-Doc). */
+    @Binds
+    abstract fun bindActiveVehicleResolver(impl: DefaultActiveVehicleResolver): ActiveVehicleResolver
 }
 
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class TeslaJson
