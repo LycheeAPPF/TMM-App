@@ -15,6 +15,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   update (the car re-pulls its phonebook), and replies to threads still carrying the old
   address keep routing.
 
+### Internal
+- The contacts authenticator account type is derived from the `applicationId`, so the debug
+  build (`.debug`) can create its own bridge contacts next to an installed release build.
+  The release type string is unchanged.
+
 ## [1.0.1] — 2026-07-19
 
 Maintenance release on top of v1.0.0, focused on managing the in-app SMS inbox,
