@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.lycheeappf.tmm.core.model.FakeAddress
 import io.github.lycheeappf.tmm.domain.channel.AssistantIdentity
 import io.github.lycheeappf.tmm.domain.tesla.TeslaDevice
 import kotlinx.coroutines.flow.Flow
@@ -60,7 +61,7 @@ class SettingsStore @Inject constructor(
             assigned = cur
             var next = cur + 1
             while (next in AssistantIdentity.RESERVED_MAPPING_IDS) next++
-            prefs[key] = next.coerceAtMost(MAX_MAPPING_ID - 1)
+            prefs[key] = next.coerceAtMost(FakeAddress.MAX_MAPPING_ID - 1)
         }
         return assigned
     }
@@ -285,7 +286,6 @@ class SettingsStore @Inject constructor(
         private const val TAG = "SettingsStore"
         const val DEFAULT_SEND_BUDGET = 100
         const val DEFAULT_TTL_HOURS = 24
-        const val MAX_MAPPING_ID = 10_000_000L
 
         /** Tolerant gegenüber künftigen Feldern; Defaults (null-Links) nicht ausschreiben. */
         private val teslaJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }

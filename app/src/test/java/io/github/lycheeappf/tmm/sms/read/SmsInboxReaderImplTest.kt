@@ -64,7 +64,7 @@ class SmsInboxReaderImplTest {
     @Test
     fun `groupConversations excludes fake +888 threads`() {
         val rows = listOf(
-            row(2, 9, "+88810000005", "fake", 200, read = false, type = inbox),
+            row(2, 9, "+888100000005", "fake", 200, read = false, type = inbox),
             row(1, 1, "+49111", "real", 100, read = false, type = inbox)
         )
         val convs = SmsInboxReaderImpl.groupConversations(
@@ -109,7 +109,7 @@ class SmsInboxReaderImplTest {
 
     @Test
     fun `countUnread ignores fakes and blank addresses`() {
-        val addresses = listOf("+49111", "+88810000005", "", "+49222")
+        val addresses = listOf("+49111", "+888100000005", "", "+49222")
         val count = SmsInboxReaderImpl.countUnread(addresses) { FakeAddress.isFakeAddress(it) }
         assertThat(count).isEqualTo(2)
     }
@@ -118,7 +118,7 @@ class SmsInboxReaderImplTest {
     fun `mayDelete refuses fake rows and empty targets`() {
         val isFake = { a: String -> FakeAddress.isFakeAddress(a) }
         assertThat(SmsInboxReaderImpl.mayDelete(listOf("+49111"), isFake)).isTrue()
-        assertThat(SmsInboxReaderImpl.mayDelete(listOf("+49111", "+88810000005"), isFake)).isFalse()
+        assertThat(SmsInboxReaderImpl.mayDelete(listOf("+49111", "+888100000005"), isFake)).isFalse()
         assertThat(SmsInboxReaderImpl.mayDelete(emptyList(), isFake)).isFalse()
     }
 

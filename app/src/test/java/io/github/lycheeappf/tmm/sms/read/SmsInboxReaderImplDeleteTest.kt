@@ -71,7 +71,7 @@ class SmsInboxReaderImplDeleteTest {
 
     @Test
     fun `delete refuses fake-only targets`() = runTest {
-        FakeSmsProvider.rows = listOf(1L to "+88810000005")
+        FakeSmsProvider.rows = listOf(1L to "+888100000005")
 
         assertThat(reader().deleteThread(7)).isFalse()
         assertThat(FakeSmsProvider.deleteSelections).isEmpty()
@@ -79,7 +79,7 @@ class SmsInboxReaderImplDeleteTest {
 
     @Test
     fun `delete refuses mixed real and fake targets`() = runTest {
-        FakeSmsProvider.rows = listOf(1L to "+49111", 2L to "+88810000005")
+        FakeSmsProvider.rows = listOf(1L to "+49111", 2L to "+888100000005")
 
         assertThat(reader().deleteThread(7)).isFalse()
         assertThat(FakeSmsProvider.deleteSelections).isEmpty()

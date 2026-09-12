@@ -50,10 +50,10 @@ class MappingRepositoryImplTest {
         )
 
         assertThat(mapping.mappingId).isEqualTo(42L)
-        assertThat(mapping.fakeAddress).isEqualTo("+88800000042")
+        assertThat(mapping.fakeAddress).isEqualTo("+888000000042")
         assertThat(mapping.channel).isEqualTo(ChannelId.NOTIFICATION)
         assertThat(mapping.replyable).isTrue()
-        assertThat(inserted.captured.fakeAddress).isEqualTo("+88800000042")
+        assertThat(inserted.captured.fakeAddress).isEqualTo("+888000000042")
     }
 
     @Test
@@ -62,7 +62,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.NOTIFICATION.code,
-            fakeAddress = "+88800000007",
+            fakeAddress = "+888000000007",
             conversationKey = "com.whatsapp::anna",
             payloadJson = PayloadJson.encode(testPayload),
             createdAt = now - 60_000,
@@ -84,14 +84,14 @@ class MappingRepositoryImplTest {
         )
 
         assertThat(mapping.mappingId).isEqualTo(7L)
-        assertThat(mapping.fakeAddress).isEqualTo("+88800000007")
+        assertThat(mapping.fakeAddress).isEqualTo("+888000000007")
         coVerify(exactly = 0) { dao.insert(any()) }
     }
 
     @Test
     fun `allocateOrReuse migrates display-only legacy address back to numeric`() = runTest {
         // Aus dem Display-only-Versuch: fakeAddress = "Grok". Wir migrieren
-        // zurück auf "+88810000007", weil das den Reply-Pfad ermöglicht.
+        // zurück auf "+888100000007", weil das den Reply-Pfad ermöglicht.
         val now = System.currentTimeMillis()
         val legacy = MappingEntity(
             mappingId = 7L,
@@ -108,7 +108,7 @@ class MappingRepositoryImplTest {
         coEvery {
             dao.findByConversationKey(ChannelId.LLM.code, "default-assistant")
         } returns legacy
-        coEvery { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+88810000007") } returns 1
+        coEvery { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+888100000007") } returns 1
 
         val mapping = repository.allocateOrReuse(
             channel = ChannelId.LLM,
@@ -117,17 +117,48 @@ class MappingRepositoryImplTest {
             ttlMillis = 1000L
         )
 
-        assertThat(mapping.fakeAddress).isEqualTo("+88810000007")
-        coVerify { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+88810000007") }
+        assertThat(mapping.fakeAddress).isEqualTo("+888100000007")
+        coVerify { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+888100000007") }
     }
 
     @Test
-    fun `allocateOrReuse leaves numeric legacy address untouched on reuse`() = runTest {
+    fun `allocateOrReuse migrates legacy 12-char address to canonical 13-char form`() = runTest {
+        val now = System.currentTimeMillis()
+        val legacy = MappingEntity(
+            mappingId = 7L,
+            channel = ChannelId.LLM.code,
+            fakeAddress = "+88810000007",
+            conversationKey = "default-assistant",
+            payloadJson = PayloadJson.encode(ChannelPayload.Llm(assistantDisplayName = "Grok")),
+            createdAt = now - 60_000,
+            expiresAt = now - 1000,
+            lastUsedAt = null,
+            replyCount = 0,
+            replyable = true
+        )
+        coEvery {
+            dao.findByConversationKey(ChannelId.LLM.code, "default-assistant")
+        } returns legacy
+        coEvery { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+888100000007") } returns 1
+
+        val mapping = repository.allocateOrReuse(
+            channel = ChannelId.LLM,
+            conversationKey = "default-assistant",
+            payload = ChannelPayload.Llm(assistantDisplayName = "Grok"),
+            ttlMillis = 1000L
+        )
+
+        assertThat(mapping.fakeAddress).isEqualTo("+888100000007")
+        coVerify { dao.updateFakeAddress(7L, ChannelId.LLM.code, "+888100000007") }
+    }
+
+    @Test
+    fun `allocateOrReuse leaves canonical address untouched on reuse`() = runTest {
         val now = System.currentTimeMillis()
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+88810000007",
+            fakeAddress = "+888100000007",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now - 60_000,
@@ -147,7 +178,7 @@ class MappingRepositoryImplTest {
             ttlMillis = 1000L
         )
 
-        assertThat(mapping.fakeAddress).isEqualTo("+88810000007")
+        assertThat(mapping.fakeAddress).isEqualTo("+888100000007")
         coVerify(exactly = 0) { dao.updateFakeAddress(any(), any(), any()) }
     }
 
@@ -162,7 +193,7 @@ class MappingRepositoryImplTest {
         val entity = MappingEntity(
             mappingId = 5L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+88810000005",
+            fakeAddress = "+888100000005",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = 0L,
@@ -171,9 +202,9 @@ class MappingRepositoryImplTest {
             replyCount = 0,
             replyable = true
         )
-        coEvery { dao.findByFakeAddress("+88810000005") } returns entity
+        coEvery { dao.findByFakeAddress("+888100000005") } returns entity
 
-        val mapping = repository.findByFakeAddress("+88810000005")
+        val mapping = repository.findByFakeAddress("+888100000005")
         assertThat(mapping).isNotNull()
         assertThat(mapping!!.mappingId).isEqualTo(5L)
     }
@@ -217,7 +248,7 @@ class MappingRepositoryImplTest {
 
         assertThat(mapping.mappingId).isEqualTo(0L)
         assertThat(mapping.channel).isEqualTo(ChannelId.LLM)
-        assertThat(mapping.fakeAddress).isEqualTo("+88810000000")
+        assertThat(mapping.fakeAddress).isEqualTo("+888100000000")
         assertThat(mapping.expiresAt).isEqualTo(Long.MAX_VALUE)
         assertThat(inserted.captured.mappingId).isEqualTo(0L)
         assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
@@ -239,7 +270,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 0L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+88810000000",
+            fakeAddress = "+888100000000",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now - 5000,
@@ -276,7 +307,7 @@ class MappingRepositoryImplTest {
         val dynamic = MappingEntity(
             mappingId = 5L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+88810000005",
+            fakeAddress = "+888100000005",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now - 5000,
@@ -294,11 +325,11 @@ class MappingRepositoryImplTest {
         val mapping = repository.ensureStaticAssistantMapping("Grok")
 
         assertThat(mapping.mappingId).isEqualTo(0L)
-        assertThat(mapping.fakeAddress).isEqualTo("+88810000000")
+        assertThat(mapping.fakeAddress).isEqualTo("+888100000000")
         assertThat(inserted.captured.expiresAt).isEqualTo(Long.MAX_VALUE)
         // Reihenfolge-Invariante: ZUERST Kontakt (Lookup-Key = fakeAddress), DANN Row.
         coVerifyOrder {
-            contactSyncWriter.deleteContact("+88810000005")
+            contactSyncWriter.deleteContact("+888100000005")
             dao.deleteById(5L, ChannelId.LLM.code)
         }
     }
@@ -309,7 +340,7 @@ class MappingRepositoryImplTest {
         fun llm(id: Long) = MappingEntity(
             mappingId = id,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+8881" + id.toString().padStart(7, '0'),
+            fakeAddress = "+8881" + id.toString().padStart(8, '0'),
             conversationKey = if (id == 0L) "default-assistant" else "default-assistant-$id",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now,
@@ -326,13 +357,13 @@ class MappingRepositoryImplTest {
         assertThat(removed).isEqualTo(1)
         // Reihenfolge-Invariante: ZUERST Kontakt (Lookup-Key = fakeAddress), DANN Row.
         coVerifyOrder {
-            contactSyncWriter.deleteContact("+88810000003")
+            contactSyncWriter.deleteContact("+888100000003")
             dao.deleteById(3L, ChannelId.LLM.code)
         }
         // Beide reservierte Ids (Grok id 0 + Sprach-Alias id 1) bleiben unangetastet.
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+888100000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+888100000001") }
         coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
@@ -340,13 +371,13 @@ class MappingRepositoryImplTest {
     fun `sweepStaleAssistantMappings preserves voice alias id 1 when stale LLM row with id 1 exists`() = runTest {
         // Regressionstest: vor der Einführung von RESERVED_MAPPING_IDS = {0, 1} konnte
         // nextMappingId() id=1 an eine LLM-Session vergeben. Diese Altlast-Row hat
-        // fakeAddress=+88810000001 — exakt die Sprach-Alias-Adresse. Der Sweep DARF
+        // fakeAddress=+888100000001 — exakt die Sprach-Alias-Adresse. Der Sweep DARF
         // sie weder löschen (Kontakt) noch aus der DB entfernen.
         val now = System.currentTimeMillis()
         val staleVoiceAliasRow = MappingEntity(
             mappingId = 1L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+88810000001",
+            fakeAddress = "+888100000001",
             conversationKey = "default-assistant-1",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now,
@@ -360,7 +391,7 @@ class MappingRepositoryImplTest {
         val removed = repository.sweepStaleAssistantMappings()
 
         assertThat(removed).isEqualTo(0)
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+888100000001") }
         coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
@@ -370,7 +401,7 @@ class MappingRepositoryImplTest {
         fun llm(id: Long) = MappingEntity(
             mappingId = id,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+8881" + id.toString().padStart(7, '0'),
+            fakeAddress = "+8881" + id.toString().padStart(8, '0'),
             conversationKey = if (id == 0L) "default-assistant" else "default-assistant-$id",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now,
@@ -388,14 +419,14 @@ class MappingRepositoryImplTest {
         val removed = repository.sweepStaleAssistantMappings()
 
         assertThat(removed).isEqualTo(2)
-        coVerify { contactSyncWriter.deleteContact("+88810000003") }
-        coVerify { contactSyncWriter.deleteContact("+88810000004") }
+        coVerify { contactSyncWriter.deleteContact("+888100000003") }
+        coVerify { contactSyncWriter.deleteContact("+888100000004") }
         coVerify { dao.deleteById(3L, ChannelId.LLM.code) }
         coVerify { dao.deleteById(4L, ChannelId.LLM.code) }
         // Reservierte Ids 0 und 1 unangetastet.
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000000") }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+888100000000") }
         coVerify(exactly = 0) { dao.deleteById(0L, ChannelId.LLM.code) }
-        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+88810000001") }
+        coVerify(exactly = 0) { contactSyncWriter.deleteContact("+888100000001") }
         coVerify(exactly = 0) { dao.deleteById(1L, ChannelId.LLM.code) }
     }
 
@@ -405,7 +436,7 @@ class MappingRepositoryImplTest {
         val staticMapping = MappingEntity(
             mappingId = 0L,
             channel = ChannelId.LLM.code,
-            fakeAddress = "+88810000000",
+            fakeAddress = "+888100000000",
             conversationKey = "default-assistant",
             payloadJson = PayloadJson.encode(ChannelPayload.Llm()),
             createdAt = now - 5000,
@@ -439,7 +470,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.NOTIFICATION.code,
-            fakeAddress = "+88800000007",
+            fakeAddress = "+888000000007",
             conversationKey = "com.whatsapp::anna",
             payloadJson = replyableJson,
             createdAt = now - 60_000,
@@ -480,7 +511,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.NOTIFICATION.code,
-            fakeAddress = "+88800000007",
+            fakeAddress = "+888000000007",
             conversationKey = "com.whatsapp::anna",
             payloadJson = PayloadJson.encode(testPayload),
             createdAt = now - 60_000,
@@ -516,7 +547,7 @@ class MappingRepositoryImplTest {
         val existing = MappingEntity(
             mappingId = 7L,
             channel = ChannelId.NOTIFICATION.code,
-            fakeAddress = "+88800000007",
+            fakeAddress = "+888000000007",
             conversationKey = "com.whatsapp::anna",
             payloadJson = PayloadJson.encode(actionless),
             createdAt = now - 60_000,

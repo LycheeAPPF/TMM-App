@@ -40,6 +40,7 @@ android {
         targetSdk = 36
         versionCode = 14
         versionName = "1.0.1"
+        resValue("string", "contacts_account_type", "io.github.lycheeappf.tmm.contacts")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -72,6 +73,7 @@ android {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            resValue("string", "contacts_account_type", "io.github.lycheeappf.tmm.debug.contacts")
         }
         release {
             isMinifyEnabled = true

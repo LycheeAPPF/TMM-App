@@ -73,15 +73,7 @@ class MappingRepositoryImpl @Inject constructor(
                 newExpiresAt = effectiveExpiry,
                 now = now
             )
-            // Migration: ein vorheriger Display-only-Versuch hat fakeAddress
-            // auf einen Klartext-Namen ("Grok", "Anna") gesetzt. Das bricht
-            // den Reply-Pfad (Tesla schreibt outbox-Row nicht zuverlässig mit
-            // unserem String). Wir migrieren zurück auf die deterministische
-            // numerische `+888x...`-Form, damit `FakeAddress.parse(outbox)`
-            // wieder zuverlässig zur mappingId resolved. SmsContentProvider-
-            // Writer wickelt die Number dann in "Display <Number>" ein, damit
-            // Tesla wenigstens den Namen mit anzeigt.
-            val migratedAddress = maybeMigrateDisplayBackToNumeric(existing)
+            val migratedAddress = maybeMigrateToCanonicalAddress(existing)
             return existing.copy(
                 expiresAt = effectiveExpiry,
                 lastUsedAt = now,
@@ -110,24 +102,19 @@ class MappingRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Wenn das existing-Mapping einen Display-Only-fakeAddress hat (z.B. "Grok"),
-     * migrieren wir es zurück auf die numerische `+888x...`-Form. Das ist
-     * die rollback-Migration zum letzten working Reply-Pfad — Display-only
-     * brach den Outbox-Roundtrip. Die numerische Form wird vom Provider-
-     * Writer in ein "Display <Number>"-Format eingewickelt, damit Tesla
-     * beide Informationen sieht.
+     * Zieht eine abweichende `fakeAddress` auf die kanonische [FakeAddress.toE164]-Form:
+     * Display-only-Reste ("Grok") ebenso wie 12-stellige Legacy-Adressen. Alte Kontakte
+     * werden beim Upgrade per [io.github.lycheeappf.tmm.contact.TeslaContactResync] entsorgt.
      */
-    private suspend fun maybeMigrateDisplayBackToNumeric(existing: MappingEntity): String {
-        // FakeAddress.parse() returnt nicht-null nur für unsere numerischen
-        // Schema-Adressen. Wenn parse != null → schon numeric → no-op.
-        if (FakeAddress.parse(existing.fakeAddress) != null) return existing.fakeAddress
-        val numeric = FakeAddress(
+    private suspend fun maybeMigrateToCanonicalAddress(existing: MappingEntity): String {
+        val canonical = FakeAddress(
             channel = io.github.lycheeappf.tmm.core.model.ChannelId.fromCode(existing.channel)
                 ?: return existing.fakeAddress,
             mappingId = existing.mappingId
         ).toE164()
-        dao.updateFakeAddress(existing.mappingId, existing.channel, numeric)
-        return numeric
+        if (existing.fakeAddress == canonical) return canonical
+        dao.updateFakeAddress(existing.mappingId, existing.channel, canonical)
+        return canonical
     }
 
     override suspend fun ensureStaticAssistantMapping(displayName: String): ChannelMapping {

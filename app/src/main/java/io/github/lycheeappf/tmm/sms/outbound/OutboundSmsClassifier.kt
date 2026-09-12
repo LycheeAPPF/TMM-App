@@ -38,13 +38,15 @@ class OutboundSmsClassifier @Inject constructor(
     suspend fun classify(row: OutboundSmsRow): Classification {
         if (row.address.isBlank()) return Classification.NotOurs
 
-        // Sprach-Ansprech-Kontakt (z.B. „Elon Musk"): exakte Alias-Adresse → auf die
+        // Sprach-Ansprech-Kontakt (z.B. „Elon Musk"): Alias-Adresse (via parse, also auch
+        // Bracket-, 00- und 12-stellige Legacy-Form) → auf die
         // KANONISCHE Grok-Session (id 0) umlenken. Muss VOR findByFakeAddress und dem
         // FakeAddress.parse-Fallback stehen: der Alias hat keine DB-Row, parse würde
         // ihn sonst auf ein Phantom-Mapping (id 1) auflösen → „Konversation abgelaufen".
         // Durch das Umlenken auf id 0 läuft der Turn auf der Grok-Session UND die
-        // Antwort wird aus +88810000000 / „Grok" injiziert.
-        if (normalizeAddress(row.address) == AssistantIdentity.VOICE_ALIAS_FAKE_ADDRESS) {
+        // Antwort wird aus +888100000000 / „Grok" injiziert.
+        val parsed = FakeAddress.parse(row.address)
+        if (parsed == FakeAddress(ChannelId.LLM, AssistantIdentity.VOICE_ALIAS_MAPPING_ID)) {
             return Classification.TeslaReply(
                 mappingId = AssistantIdentity.RESERVED_MAPPING_ID,
                 channelCode = ChannelId.LLM.code
@@ -57,22 +59,8 @@ class OutboundSmsClassifier @Inject constructor(
         }
 
         // Fallback: `+888x...`-Schema (aus Bracket-Form extrahiert oder pure Numeric).
-        FakeAddress.parse(row.address)?.let { parsed ->
-            return Classification.TeslaReply(parsed.mappingId, parsed.channel.code)
-        }
+        if (parsed != null) return Classification.TeslaReply(parsed.mappingId, parsed.channel.code)
         return Classification.NotOurs
-    }
-
-    /**
-     * Normalisiert eine ADDRESS-Spalte auf reine `+E.164`-Form (analog
-     * [FakeAddress.parse]): entfernt alles außer `+`/Ziffern und wandelt ein
-     * führendes `00` in `+`. Toleriert damit Bracket-Form (`"Elon Musk <+888…>"`)
-     * und `00`-Präfix beim Alias-Match.
-     */
-    private fun normalizeAddress(raw: String): String {
-        var clean = raw.replace(Regex("[^+0-9]"), "")
-        if (clean.startsWith("00")) clean = "+" + clean.substring(2)
-        return clean
     }
 
     sealed class Classification {

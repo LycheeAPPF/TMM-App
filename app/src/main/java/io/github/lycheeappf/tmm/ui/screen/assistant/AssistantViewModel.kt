@@ -317,7 +317,7 @@ class AssistantViewModel @Inject constructor(
     }
 
     /**
-     * Schaltet den zusätzlichen Sprach-Ansprech-Kontakt (+88810000001) ein/aus bzw.
+     * Schaltet den zusätzlichen Sprach-Ansprech-Kontakt (+888100000001) ein/aus bzw.
      * setzt seinen Namen SOFORT (kein Debounce — Preset-Tap/„Aus"/„Anwenden" sind
      * diskrete Aktionen) und erzwingt einen Tesla-Kontakt-Sync, damit das Auto den
      * Kontakt beim nächsten PBAP-Pull neu zieht bzw. entfernt. Erst persistieren,

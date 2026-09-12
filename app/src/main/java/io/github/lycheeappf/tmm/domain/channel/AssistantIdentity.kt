@@ -27,7 +27,7 @@ object AssistantIdentity {
     const val RESERVED_MAPPING_ID = 0L
 
     /**
-     * Reservierte Fake-Adresse `+88810000000` (Channel-Digit 1 = [ChannelId.LLM], Id 0).
+     * Reservierte Fake-Adresse `+888100000000` (Channel-Digit 1 = [ChannelId.LLM], Id 0).
      * `+888` ist das einzige aktive Schema (siehe [AddressScheme]).
      */
     val STATIC_FAKE_ADDRESS: String =
@@ -44,7 +44,7 @@ object AssistantIdentity {
     const val VOICE_ALIAS_MAPPING_ID = 1L
 
     /**
-     * Fake-Adresse `+88810000001` des Sprach-Ansprech-Kontakts (Channel-Digit 1 = LLM,
+     * Fake-Adresse `+888100000001` des Sprach-Ansprech-Kontakts (Channel-Digit 1 = LLM,
      * Id 1) — kann per Konstruktion nie die NOTIFICATION-Kontakte (Digit 0) treffen.
      */
     val VOICE_ALIAS_FAKE_ADDRESS: String =

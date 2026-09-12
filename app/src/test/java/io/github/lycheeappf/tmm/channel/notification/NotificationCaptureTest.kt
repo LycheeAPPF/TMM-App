@@ -74,7 +74,7 @@ class NotificationCaptureTest {
         coEvery { mappingRepository.allocateOrReuse(any(), any(), any(), any()) } returns ChannelMapping(
             mappingId = 42L,
             channel = ChannelId.NOTIFICATION,
-            fakeAddress = "+88800000042",
+            fakeAddress = "+888000000042",
             conversationKey = extracted.conversationKey,
             payload = ChannelPayload.Notification("com.whatsapp", "key", "input", "Anna", "Anna"),
             createdAt = 0L, expiresAt = Long.MAX_VALUE, lastUsedAt = null,
@@ -110,7 +110,7 @@ class NotificationCaptureTest {
         capture.onPosted(sbnWith(0))
 
         coVerify(exactly = 1) { mappingRepository.allocateOrReuse(any(), any(), any(), any()) }
-        coVerify(exactly = 1) { smsWriter.injectIncoming("+88800000042", "Hallo!", 1_000L, "Anna") }
+        coVerify(exactly = 1) { smsWriter.injectIncoming("+888000000042", "Hallo!", 1_000L, "Anna") }
     }
 
     @Test
